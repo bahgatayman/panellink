@@ -1,0 +1,365 @@
+<?php
+
+namespace App\Services;
+
+use Exception;
+
+class MikroTikService
+{
+    private $socket;
+    private string $host;
+    private int $port;
+    private string $username;
+    private string $password;
+
+    public function __construct(string $host, int $port, string $username, string $password)
+    {
+        $this->host = $host;
+        $this->port = $port;
+        $this->username = $username;
+        $this->password = $password;
+    }
+
+    public function connect(): bool
+    {
+        $this->socket = @fsockopen($this->host, $this->port, $errno, $errstr, 5);
+
+        if (!$this->socket) {
+            throw new Exception("Connection failed: $errstr ($errno)");
+        }
+
+        stream_set_timeout($this->socket, 5);
+
+        try {
+            $this->sendSentence(['/login', "=name=$this->username", "=password=$this->password"]);
+            $response = $this->readSentence();
+
+            if (isset($response[0]) && $response[0] === '!done') {
+                return true;
+            }
+
+            if (isset($response[0]) && $response[0] === '!trap') {
+                $message = $response[1] ?? 'Unknown error';
+                throw new Exception("Login failed: $message");
+            }
+
+            $challenge = null;
+            foreach ($response as $word) {
+                if (str_starts_with($word, '=ret=')) {
+                    $challenge = substr($word, 5);
+                    break;
+                }
+            }
+
+            if ($challenge) {
+                $md5Challenge = pack('H*', $challenge);
+                $md5Password = md5(chr(0) . $this->password . $md5Challenge);
+                $this->sendSentence(['/login', "=name=$this->username", "=response=00" . $md5Password]);
+                $response = $this->readSentence();
+
+                if (isset($response[0]) && $response[0] === '!done') {
+                    return true;
+                }
+
+                if (isset($response[0]) && $response[0] === '!trap') {
+                    $message = $response[1] ?? 'Unknown error';
+                    throw new Exception("Login failed: $message");
+                }
+            }
+
+            throw new Exception('Unexpected login response');
+        } catch (Exception $e) {
+            $this->disconnect();
+            throw $e;
+        }
+    }
+
+    public function disconnect(): void
+    {
+        if ($this->socket) {
+            fclose($this->socket);
+            $this->socket = null;
+        }
+    }
+
+    public function createHotspotUser(string $phone, string $password, string $profileName): bool
+    {
+        $this->sendSentence([
+            '/ip/hotspot/user/add',
+            '=name=' . $phone,
+            '=password=' . $password,
+            '=profile=' . $profileName,
+        ]);
+        $response = $this->readSentence();
+        if (isset($response[0]) && $response[0] === '!trap') {
+            $message = $response[1] ?? 'Unknown error';
+            throw new Exception("Failed to create hotspot user: $message");
+        }
+        return in_array('!done', $response);
+    }
+
+    public function deleteHotspotUser(string $phone): bool
+    {
+        $this->sendSentence(['/ip/hotspot/user/remove', "=.id=name=$phone"]);
+        $response = $this->readSentence();
+        if (isset($response[0]) && $response[0] === '!trap') {
+            $message = $response[1] ?? 'Unknown error';
+            throw new Exception("Failed to delete hotspot user: $message");
+        }
+        return in_array('!done', $response);
+    }
+
+    public function setUserSpeed(string $phone, string $profileName): bool
+    {
+        $this->sendSentence([
+            '/ip/hotspot/user/print',
+            '?name=' . $phone,
+        ]);
+        $response = $this->readSentence();
+        $id = null;
+        foreach ($response as $word) {
+            if (str_starts_with($word, '=.id=')) {
+                $id = substr($word, 5);
+            }
+        }
+        if (!$id) {
+            throw new Exception("User '$phone' not found on MikroTik");
+        }
+
+        $this->sendSentence([
+            '/ip/hotspot/user/set',
+            '=.id=' . $id,
+            '=profile=' . $profileName,
+        ]);
+        $response = $this->readSentence();
+        return in_array('!done', $response);
+    }
+
+    public function getActiveUsers(): array
+    {
+        $this->sendSentence(['/ip/hotspot/active/print']);
+        $users = [];
+
+        while (true) {
+            $response = $this->readSentence();
+
+            if (isset($response[0]) && $response[0] === '!done') {
+                break;
+            }
+
+            if (isset($response[0]) && $response[0] === '!re') {
+                $user = [];
+
+                foreach ($response as $word) {
+                    if (str_starts_with($word, '=user=')) {
+                        $user['phone'] = substr($word, 6);
+                    } elseif (str_starts_with($word, '=uptime=')) {
+                        $user['uptime'] = substr($word, 8);
+                    } elseif (str_starts_with($word, '=bytes-in=')) {
+                        $user['bytes_in'] = substr($word, 10);
+                    } elseif (str_starts_with($word, '=bytes-out=')) {
+                        $user['bytes_out'] = substr($word, 11);
+                    } elseif (str_starts_with($word, '=address=')) {
+                        $user['ip'] = substr($word, 9);
+                    }
+                }
+
+                if (!empty($user)) {
+                    $users[] = $user;
+                }
+            }
+        }
+
+        return $users;
+    }
+
+    public function createHotspotProfile(string $name, string $speedDownload, string $speedUpload): bool
+    {
+        $rateLimit = $speedUpload . '/' . $speedDownload;
+        $this->sendSentence([
+            '/ip/hotspot/user/profile/add',
+            '=name=' . $name,
+            '=rate-limit=' . $rateLimit,
+        ]);
+        $response = $this->readSentence();
+        if (isset($response[0]) && $response[0] === '!trap') {
+            $message = $response[1] ?? 'Unknown error';
+            throw new Exception("Failed to create hotspot profile: $message");
+        }
+        return in_array('!done', $response);
+    }
+
+    public function updateHotspotProfile(string $name, string $speedDownload, string $speedUpload): bool
+    {
+        $rateLimit = $speedUpload . '/' . $speedDownload;
+
+        $this->sendSentence([
+            '/ip/hotspot/user/profile/print',
+            '?name=' . $name,
+        ]);
+        $response = $this->readSentence();
+        $id = null;
+        foreach ($response as $word) {
+            if (str_starts_with($word, '=.id=')) {
+                $id = substr($word, 5);
+            }
+        }
+        if (!$id) {
+            throw new Exception("Profile '$name' not found on MikroTik");
+        }
+
+        $this->sendSentence([
+            '/ip/hotspot/user/profile/set',
+            '=.id=' . $id,
+            '=rate-limit=' . $rateLimit,
+        ]);
+        $response = $this->readSentence();
+        return in_array('!done', $response);
+    }
+
+    public function deleteHotspotProfile(string $name): bool
+    {
+        $this->sendSentence([
+            '/ip/hotspot/user/profile/print',
+            '?name=' . $name,
+        ]);
+        $response = $this->readSentence();
+        $id = null;
+        foreach ($response as $word) {
+            if (str_starts_with($word, '=.id=')) {
+                $id = substr($word, 5);
+            }
+        }
+        if (!$id) {
+            throw new Exception("Profile '$name' not found on MikroTik");
+        }
+
+        $this->sendSentence([
+            '/ip/hotspot/user/profile/remove',
+            '=.id=' . $id,
+        ]);
+        $response = $this->readSentence();
+        return in_array('!done', $response);
+    }
+
+    private function sendSentence(array $words): void
+    {
+        foreach ($words as $word) {
+            $this->writeWord($word);
+        }
+
+        $this->writeWord('');
+    }
+
+    private function readSentence(): array
+    {
+        $words = [];
+
+        while (true) {
+            $word = $this->readWord();
+
+            if ($word === '') {
+                break;
+            }
+
+            $words[] = $word;
+        }
+
+        return $words;
+    }
+
+    private function writeWord(string $word): void
+    {
+        $length = strlen($word);
+        $encoded = $this->encodeLength($length) . $word;
+
+        $written = @fwrite($this->socket, $encoded, strlen($encoded));
+
+        if ($written === false) {
+            throw new Exception('Failed to write to socket');
+        }
+    }
+
+    private function readWord(): string
+    {
+        $length = $this->readLength();
+
+        if ($length === 0) {
+            return '';
+        }
+
+        $word = @fread($this->socket, $length);
+
+        if ($word === false) {
+            throw new Exception('Failed to read from socket');
+        }
+
+        return $word;
+    }
+
+    private function encodeLength(int $length): string
+    {
+        if ($length < 0x80) {
+            return chr($length);
+        }
+
+        if ($length < 0x4000) {
+            return chr(($length >> 8) | 0x80) . chr($length & 0xFF);
+        }
+
+        if ($length < 0x200000) {
+            return chr(($length >> 16) | 0xC0) . chr(($length >> 8) & 0xFF) . chr($length & 0xFF);
+        }
+
+        if ($length < 0x10000000) {
+            return chr(($length >> 24) | 0xE0) . chr(($length >> 16) & 0xFF) . chr(($length >> 8) & 0xFF) . chr($length & 0xFF);
+        }
+
+        return chr(0xF0) . chr(($length >> 24) & 0xFF) . chr(($length >> 16) & 0xFF) . chr(($length >> 8) & 0xFF) . chr($length & 0xFF);
+    }
+
+    private function readLength(): int
+    {
+        $byte = @fread($this->socket, 1);
+
+        if ($byte === false || $byte === '') {
+            throw new Exception('Failed to read length byte');
+        }
+
+        $ord = ord($byte);
+
+        if ($ord < 0x80) {
+            return $ord;
+        }
+
+        if ($ord < 0xC0) {
+            $next = @fread($this->socket, 1);
+            if ($next === false) {
+                throw new Exception('Failed to read second length byte');
+            }
+            return (($ord & 0x3F) << 8) | ord($next);
+        }
+
+        if ($ord < 0xE0) {
+            $next = @fread($this->socket, 2);
+            if ($next === false || strlen($next) < 2) {
+                throw new Exception('Failed to read length bytes');
+            }
+            return (($ord & 0x1F) << 16) | (ord($next[0]) << 8) | ord($next[1]);
+        }
+
+        if ($ord < 0xF0) {
+            $next = @fread($this->socket, 3);
+            if ($next === false || strlen($next) < 3) {
+                throw new Exception('Failed to read length bytes');
+            }
+            return (($ord & 0x0F) << 24) | (ord($next[0]) << 16) | (ord($next[1]) << 8) | ord($next[2]);
+        }
+
+        $next = @fread($this->socket, 4);
+        if ($next === false || strlen($next) < 4) {
+            throw new Exception('Failed to read length bytes');
+        }
+        return (ord($next[0]) << 24) | (ord($next[1]) << 16) | (ord($next[2]) << 8) | ord($next[3]);
+    }
+}
