@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\HotspotUser;
 use App\Models\Room;
+use App\Models\SharedSession;
 use App\Models\SpeedProfile;
 use App\Models\Workspace;
 use App\Services\MikroTikService;
@@ -59,18 +60,21 @@ class DashboardController extends Controller
         }
 
         if ($owner->hasFeature('booking')) {
-            $viewData['todayBookings']   = Booking::where('owner_id', $ownerId)
+            $viewData['todayBookings']      = Booking::where('owner_id', $ownerId)
                 ->where('booking_date', today())
                 ->where('status', '!=', 'cancelled')
                 ->count();
-            $viewData['pendingBookings'] = Booking::where('owner_id', $ownerId)
+            $viewData['pendingBookings']    = Booking::where('owner_id', $ownerId)
                 ->where('status', 'pending')
                 ->count();
-            $viewData['monthRevenue']    = Booking::where('owner_id', $ownerId)
+            $viewData['monthRevenue']       = Booking::where('owner_id', $ownerId)
                 ->where('status', 'completed')
                 ->whereMonth('booking_date', now()->month)
                 ->whereYear('booking_date', now()->year)
                 ->sum('total_price');
+            $viewData['openSharedSessions'] = SharedSession::where('owner_id', $ownerId)
+                ->where('status', 'open')
+                ->count();
         }
 
         return view('dashboard.index', $viewData);

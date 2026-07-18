@@ -1,10 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+@php $locale = app()->getLocale(); $isRtl = $locale === 'ar'; @endphp
+<html lang="{{ $locale }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Subscription Expired - LinkSpace</title>
+    <title>{{ __('app.status.expired') }} - {{ __('app.auth.linkspace') }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    @if($isRtl)
+    <link href="https://fonts.googleapis.com/css2?family:Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Cairo', sans-serif; }</style>
+    @endif
 </head>
 <body class="min-h-screen bg-gradient-to-br from-gray-50 to-red-50 flex items-center justify-center p-4">
     <div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-8 text-center">
@@ -14,16 +19,16 @@
             </svg>
         </div>
 
-        <h1 class="text-2xl font-bold text-gray-900 mb-2">Subscription Expired</h1>
+        <h1 class="text-2xl font-bold text-gray-900 mb-2">{{ __('app.label.subscription') }} {{ __('app.status.expired') }}</h1>
 
         <div class="bg-gray-50 rounded-lg p-4 mb-6 text-left">
             <dl class="space-y-2 text-sm">
                 <div class="flex justify-between">
-                    <dt class="text-gray-500">Business</dt>
+                    <dt class="text-gray-500">{{ __('app.label.business') }}</dt>
                     <dd class="text-gray-900 font-medium">{{ $owner->business_name }}</dd>
                 </div>
                 <div class="flex justify-between">
-                    <dt class="text-gray-500">Owner</dt>
+                    <dt class="text-gray-500">{{ __('app.admin.owner') }}</dt>
                     <dd class="text-gray-900">{{ $owner->name }}</dd>
                 </div>
                 @if ($owner->subscription_expires_at)
@@ -46,7 +51,7 @@
         <form method="POST" action="/logout">
             @csrf
             <button type="submit" class="bg-gray-800 text-white px-6 py-2.5 rounded-lg hover:bg-gray-700 transition font-medium text-sm w-full">
-                Logout
+                {{ __('app.nav.logout') }}
             </button>
         </form>
     </div>

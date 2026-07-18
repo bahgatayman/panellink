@@ -1,15 +1,15 @@
 @extends('layouts.admin')
 
-@section('page-title', 'Dashboard')
+@section('page-title', __('app.section.dashboard'))
 
 @section('content')
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">{{ __('app.admin.admin_dashboard') }}</h1>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs lg:text-sm font-medium text-gray-500">Total Owners</p>
+                    <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.admin.total_owners') }}</p>
                     <p class="text-2xl lg:text-3xl font-bold text-gray-900 mt-1">{{ $totalOwners }}</p>
                 </div>
                 <div class="w-10 h-10 lg:w-12 lg:h-12 bg-gray-50 rounded-xl flex items-center justify-center">
@@ -23,7 +23,7 @@
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs lg:text-sm font-medium text-gray-500">Active Subscriptions</p>
+                    <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.admin.active_subscriptions') }}</p>
                     <p class="text-2xl lg:text-3xl font-bold text-green-600 mt-1">{{ $activeOwners }}</p>
                 </div>
                 <div class="w-10 h-10 lg:w-12 lg:h-12 bg-green-50 rounded-xl flex items-center justify-center">
@@ -37,9 +37,9 @@
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs lg:text-sm font-medium text-gray-500">Expiring Soon</p>
+                    <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.admin.expiring_soon') }}</p>
                     <p class="text-2xl lg:text-3xl font-bold text-yellow-600 mt-1">{{ $expiringSoon }}</p>
-                    <p class="text-xs text-gray-400 mt-1">Within 7 days</p>
+                    <p class="text-xs text-gray-400 mt-1">{{ __('app.admin.within_7_days') }}</p>
                 </div>
                 <div class="w-10 h-10 lg:w-12 lg:h-12 bg-yellow-50 rounded-xl flex items-center justify-center">
                     <svg class="w-5 h-5 lg:w-6 lg:h-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -52,7 +52,7 @@
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs lg:text-sm font-medium text-gray-500">Expired</p>
+                    <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.admin.expired') }}</p>
                     <p class="text-2xl lg:text-3xl font-bold text-red-600 mt-1">{{ $expiredOwners }}</p>
                 </div>
                 <div class="w-10 h-10 lg:w-12 lg:h-12 bg-red-50 rounded-xl flex items-center justify-center">
@@ -68,7 +68,7 @@
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs lg:text-sm font-medium text-gray-500">Total Workspaces</p>
+                    <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.admin.total_workspaces') }}</p>
                     <p class="text-2xl lg:text-3xl font-bold text-gray-900 mt-1">{{ $totalWorkspaces }}</p>
                 </div>
                 <div class="w-10 h-10 lg:w-12 lg:h-12 bg-indigo-50 rounded-xl flex items-center justify-center">
@@ -81,7 +81,7 @@
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs lg:text-sm font-medium text-gray-500">Total Rooms</p>
+                    <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.admin.total_rooms') }}</p>
                     <p class="text-2xl lg:text-3xl font-bold text-gray-900 mt-1">{{ $totalRooms }}</p>
                 </div>
                 <div class="w-10 h-10 lg:w-12 lg:h-12 bg-purple-50 rounded-xl flex items-center justify-center">
@@ -96,7 +96,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
             <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-semibold text-gray-800">Total Hotspot Users</h2>
+                <h2 class="text-lg font-semibold text-gray-800">{{ __('app.admin.total_hotspot_users') }}</h2>
                 <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
                     <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -104,25 +104,25 @@
                 </div>
             </div>
             <p class="text-3xl font-bold text-gray-900">{{ $totalUsers }}</p>
-            <p class="text-sm text-gray-500 mt-1">Across all owners</p>
+            <p class="text-sm text-gray-500 mt-1">{{ __('app.admin.across_all_owners') }}</p>
         </div>
 
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
             <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-semibold text-gray-800">Recent Renewals</h2>
+                <h2 class="text-lg font-semibold text-gray-800">{{ __('app.admin.recent_renewals') }}</h2>
             </div>
             @if ($recentRenewals->isEmpty())
-                <p class="text-sm text-gray-500">No renewals yet.</p>
+                <p class="text-sm text-gray-500">{{ __('app.empty.no_renewals') }}</p>
             @else
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead>
                             <tr class="text-left text-gray-500 border-b border-gray-100">
-                                <th class="pb-2 font-medium">Owner</th>
-                                <th class="pb-2 font-medium">Months</th>
-                                <th class="pb-2 font-medium">Expires</th>
-                                <th class="pb-2 font-medium">By</th>
-                                <th class="pb-2 font-medium">Date</th>
+                                <th class="pb-2 font-medium">{{ __('app.table.th.owner') }}</th>
+                                <th class="pb-2 font-medium">{{ __('app.table.th.months') }}</th>
+                                <th class="pb-2 font-medium">{{ __('app.table.th.expires') }}</th>
+                                <th class="pb-2 font-medium">{{ __('app.table.th.by') }}</th>
+                                <th class="pb-2 font-medium">{{ __('app.table.th.date') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -146,7 +146,7 @@
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs lg:text-sm font-medium text-gray-500">Total Bookings</p>
+                    <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.admin.total_bookings') }}</p>
                     <p class="text-2xl lg:text-3xl font-bold text-gray-900 mt-1">{{ $totalBookings }}</p>
                 </div>
                 <div class="w-10 h-10 lg:w-12 lg:h-12 bg-orange-50 rounded-xl flex items-center justify-center">
@@ -159,7 +159,7 @@
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs lg:text-sm font-medium text-gray-500">Today's Bookings</p>
+                    <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.admin.today_bookings') }}</p>
                     <p class="text-2xl lg:text-3xl font-bold text-blue-600 mt-1">{{ $todayBookings }}</p>
                 </div>
                 <div class="w-10 h-10 lg:w-12 lg:h-12 bg-blue-50 rounded-xl flex items-center justify-center">
@@ -172,8 +172,8 @@
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs lg:text-sm font-medium text-gray-500">Monthly Revenue</p>
-                    <p class="text-2xl lg:text-3xl font-bold text-green-600 mt-1">{{ number_format($monthRevenue, 2) }} EGP</p>
+                    <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.admin.monthly_revenue') }}</p>
+                    <p class="text-2xl lg:text-3xl font-bold text-green-600 mt-1">ج.م {{ number_format($monthRevenue, 2) }}</p>
                 </div>
                 <div class="w-10 h-10 lg:w-12 lg:h-12 bg-green-50 rounded-xl flex items-center justify-center">
                     <svg class="w-5 h-5 lg:w-6 lg:h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">

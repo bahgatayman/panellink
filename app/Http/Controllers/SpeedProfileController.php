@@ -104,21 +104,13 @@ class SpeedProfileController extends Controller
             'is_default'     => 'boolean',
         ]);
 
-        $isDefault = $validated['is_default'] ?? false;
-
-        if ($isDefault) {
+        if ($request->boolean('is_default')) {
             SpeedProfile::where('owner_id', auth('owner')->id())
-                ->where('is_default', true)
                 ->where('id', '!=', $profile->id)
                 ->update(['is_default' => false]);
         }
 
-        $profile->update([
-            'name'           => $validated['name'],
-            'speed_download' => $validated['speed_download'],
-            'speed_upload'   => $validated['speed_upload'],
-            'is_default'     => $isDefault,
-        ]);
+        $profile->update($validated);
 
         $owner = auth('owner')->user();
         $mikrotik = new MikroTikService(
@@ -128,15 +120,46 @@ class SpeedProfileController extends Controller
             $owner->mikrotik_password,
         );
 
+        $assignedUsers = collect();
+        $syncErrors = [];
+
         try {
             $mikrotik->connect();
-            $mikrotik->updateHotspotProfile($profile->name, $profile->speed_download, $profile->speed_upload);
-            $mikrotik->disconnect();
+
+            $mikrotik->updateHotspotProfile(
+                $profile->name,
+                $profile->speed_download,
+                $profile->speed_upload
+            );
+
+            $assignedUsers = HotspotUser::where('owner_id', auth('owner')->id())
+                ->where('speed_profile_id', $profile->id)
+                ->get();
+
+            foreach ($assignedUsers as $user) {
+                try {
+                    $mikrotik->setUserSpeed($user->phone, $profile->name);
+                    $user->update([
+                        'speed_download' => $profile->speed_download,
+                        'speed_upload'   => $profile->speed_upload,
+                    ]);
+                } catch (\Exception $e) {
+                    $syncErrors[] = $user->name . ': ' . $e->getMessage();
+                }
+            }
         } catch (\Exception $e) {
-            return back()->with('error', "Profile updated locally but MikroTik sync failed: {$e->getMessage()}");
+            return back()->with('error', 'Profile updated in DB but MikroTik sync failed: ' . $e->getMessage());
+        } finally {
+            $mikrotik->disconnect();
         }
 
-        return redirect('/speed-profiles')->with('success', 'Speed profile updated successfully');
+        if (!empty($syncErrors)) {
+            return redirect('/speed-profiles')
+                ->with('warning', 'Profile updated but some users failed to sync: ' . implode(', ', $syncErrors));
+        }
+
+        return redirect('/speed-profiles')
+            ->with('success', 'Speed profile updated and synced to ' . ($assignedUsers->count() ?? 0) . ' users on MikroTik.');
     }
 
     public function destroy(int $id): RedirectResponse

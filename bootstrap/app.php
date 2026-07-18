@@ -12,10 +12,21 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->web([
+            \App\Http\Middleware\SetLocale::class,
+        ]);
+
         $middleware->alias([
             'subscription.active' => \App\Http\Middleware\CheckSubscription::class,
             'feature'             => \App\Http\Middleware\CheckFeature::class,
         ]);
+
+        $middleware->redirectGuestsTo(function (Illuminate\Http\Request $request) {
+            if ($request->is('admin/*') || $request->routeIs('admin.*')) {
+                return route('admin.login');
+            }
+            return route('login');
+        });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

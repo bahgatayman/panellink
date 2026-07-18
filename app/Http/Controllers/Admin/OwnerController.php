@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Feature;
 use App\Models\Owner;
+use App\Models\Plan;
 use App\Models\Subscription;
 use Illuminate\Http\Request;
 
@@ -45,8 +46,11 @@ class OwnerController extends Controller
             'mikrotik_port'     => 'required|integer',
             'mikrotik_username' => 'required|string',
             'mikrotik_password' => 'required|string',
+            'plan_id'           => 'required|exists:plans,id',
             'months'            => 'required|integer|min:1|max:24',
         ]);
+
+        $plan = Plan::findOrFail($validated['plan_id']);
 
         $owner = Owner::create([
             'name'              => $validated['name'],
@@ -57,18 +61,21 @@ class OwnerController extends Controller
             'mikrotik_port'     => $validated['mikrotik_port'],
             'mikrotik_username' => $validated['mikrotik_username'],
             'mikrotik_password' => $validated['mikrotik_password'],
+            'plan_id'                 => $plan->id,
             'subscription_starts_at'  => now(),
             'subscription_expires_at' => now()->addMonths((int) $validated['months']),
             'is_active'               => true,
         ]);
 
         Subscription::create([
-            'owner_id'   => $owner->id,
-            'admin_id'   => auth('admin')->id(),
-            'months'     => (int) $validated['months'],
-            'starts_at'  => now(),
-            'expires_at' => now()->addMonths((int) $validated['months']),
-            'notes'      => 'Initial subscription on registration',
+            'owner_id'    => $owner->id,
+            'admin_id'    => auth('admin')->id(),
+            'plan_id'     => $plan->id,
+            'months'      => (int) $validated['months'],
+            'amount_paid' => $plan->price_per_month * (int) $validated['months'],
+            'starts_at'   => now(),
+            'expires_at'  => now()->addMonths((int) $validated['months']),
+            'notes'       => 'Initial subscription on registration',
         ]);
 
         return redirect("/admin/owners/{$owner->id}")
@@ -84,8 +91,9 @@ class OwnerController extends Controller
             ->get();
         $usersCount    = $owner->hotspotUsers()->count();
         $features      = Feature::all();
+        $plans         = Plan::orderBy('sort_order')->get();
 
-        return view('admin.owners.show', compact('owner', 'subscriptions', 'usersCount', 'features'));
+        return view('admin.owners.show', compact('owner', 'subscriptions', 'usersCount', 'features', 'plans'));
     }
 
     public function toggleActive($id)

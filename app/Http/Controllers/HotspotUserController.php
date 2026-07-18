@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\HotspotUser;
 use App\Models\SpeedProfile;
 use App\Services\MikroTikService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -42,12 +43,24 @@ class HotspotUserController extends Controller
         $validated = $request->validate([
             'name'  => 'required|string|max:255',
             'phone' => 'required|string|max:20|unique:hotspot_users,phone',
+            'email' => 'nullable|email|max:255',
+            'notes' => 'nullable|string|max:500',
         ]);
 
         $phone = (string) $validated['phone'];
         $password = $phone;
 
         $owner = auth('owner')->user();
+
+        if (!$owner->plan) {
+            return back()->withInput()->with('error',
+                'No active plan assigned. Please contact your administrator.');
+        }
+
+        if (!$owner->canAddMoreUsers()) {
+            return back()->withInput()->with('error',
+                "You have reached your plan limit of {$owner->plan->max_members} members. Please upgrade your plan to add more users.");
+        }
 
         $defaultProfile = SpeedProfile::where('owner_id', $owner->id)
             ->where('is_default', true)
@@ -82,6 +95,8 @@ class HotspotUserController extends Controller
             'speed_upload'     => $defaultProfile->speed_upload,
             'speed_profile_id' => $defaultProfile->id,
             'status'           => 'active',
+            'email'            => $validated['email'] ?? null,
+            'notes'            => $validated['notes'] ?? null,
         ]);
 
         return redirect('/users')->with('success', "User {$validated['name']} added successfully");
@@ -95,9 +110,16 @@ class HotspotUserController extends Controller
 
         $speedProfiles = SpeedProfile::where('owner_id', auth('owner')->id())->get();
 
+        $recentBookings = $user->bookings()
+            ->with('room.workspace')
+            ->latest()
+            ->take(5)
+            ->get();
+
         return view('users.show', [
             'user' => $user,
             'speedProfiles' => $speedProfiles,
+            'recentBookings' => $recentBookings,
         ]);
     }
 
@@ -121,11 +143,15 @@ class HotspotUserController extends Controller
         $validated = $request->validate([
             'name'   => 'required|string|max:255',
             'status' => 'required|in:active,inactive',
+            'email'  => 'nullable|email|max:255',
+            'notes'  => 'nullable|string|max:500',
         ]);
 
         $user->update([
             'name'   => $validated['name'],
             'status' => $validated['status'],
+            'email'  => $validated['email'] ?? $user->email,
+            'notes'  => $validated['notes'] ?? $user->notes,
         ]);
 
         return redirect("/users/{$user->id}")->with('success', 'User updated successfully');
@@ -212,5 +238,22 @@ class HotspotUserController extends Controller
         ]);
 
         return back()->with('success', 'Speed updated successfully');
+    }
+
+    public function search(Request $request): JsonResponse
+    {
+        $query = $request->get('q', '');
+
+        $users = HotspotUser::where('owner_id', auth('owner')->id())
+            ->where('status', 'active')
+            ->where(function ($q) use ($query) {
+                $q->where('name', 'like', "%{$query}%")
+                  ->orWhere('phone', 'like', "%{$query}%");
+            })
+            ->select('id', 'name', 'phone')
+            ->limit(10)
+            ->get();
+
+        return response()->json($users);
     }
 }

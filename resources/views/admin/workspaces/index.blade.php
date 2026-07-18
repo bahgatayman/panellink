@@ -1,28 +1,28 @@
 @extends('layouts.admin')
 
-@section('page-title', 'Workspaces')
+@section('page-title', __('app.section.workspaces'))
 
 @section('content')
     <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">Workspaces</h1>
-        <span class="text-sm text-gray-500">{{ $workspaces->total() }} total</span>
+        <h1 class="text-2xl font-bold text-gray-900">{{ __('app.section.workspaces') }}</h1>
+        <span class="text-sm text-gray-500">{{ $workspaces->total() }} {{ __('app.common.total') }}</span>
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         @if($workspaces->isEmpty())
             <div class="text-center py-12">
-                <p class="text-gray-500 text-sm">No workspaces found.</p>
+                <p class="text-gray-500 text-sm">{{ __('app.empty.no_workspaces') }}</p>
             </div>
         @else
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="text-left text-gray-500 bg-gray-50 border-b border-gray-100">
-                            <th class="px-4 py-3 font-medium">Workspace</th>
-                            <th class="px-4 py-3 font-medium">Owner</th>
-                            <th class="px-4 py-3 font-medium">City</th>
-                            <th class="px-4 py-3 font-medium">Rooms</th>
-                            <th class="px-4 py-3 font-medium">Status</th>
+                            <th class="px-4 py-3 font-medium">{{ __('app.table.th.workspace') }}</th>
+                            <th class="px-4 py-3 font-medium">{{ __('app.table.th.owner') }}</th>
+                            <th class="px-4 py-3 font-medium">{{ __('app.common.city') }}</th>
+                            <th class="px-4 py-3 font-medium">{{ __('app.workspace.rooms') }}</th>
+                            <th class="px-4 py-3 font-medium">{{ __('app.table.th.status') }}</th>
                             <th class="px-4 py-3 font-medium"></th>
                         </tr>
                     </thead>
@@ -40,12 +40,12 @@
                                 <td class="px-4 py-3">
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                                         {{ $workspace->is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' }}">
-                                        {{ $workspace->is_active ? 'Active' : 'Inactive' }}
+                                        {{ $workspace->is_active ? __('app.status.active') : __('app.status.inactive') }}
                                     </span>
                                 </td>
                                 <td class="px-4 py-3">
                                     <a href="{{ route('admin.workspaces.show', $workspace) }}"
-                                        class="text-blue-600 hover:text-blue-800 text-xs font-medium">View</a>
+                                        class="text-blue-600 hover:text-blue-800 text-xs font-medium">{{ __('app.common.view') }}</a>
                                 </td>
                             </tr>
                         @endforeach

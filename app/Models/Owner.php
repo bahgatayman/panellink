@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -25,6 +26,7 @@ class Owner extends Authenticatable
         'subscription_starts_at',
         'subscription_expires_at',
         'is_active',
+        'plan_id',
     ];
 
     protected $hidden = [
@@ -64,14 +66,48 @@ class Owner extends Authenticatable
         return $this->hasMany(Subscription::class);
     }
 
-    public function customers(): HasMany
-    {
-        return $this->hasMany(Customer::class);
-    }
-
     public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class);
+    }
+
+    public function sharedSessions(): HasMany
+    {
+        return $this->hasMany(SharedSession::class);
+    }
+
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class);
+    }
+
+    /**
+     * In-app notifications for this owner. Overrides the Notifiable trait's
+     * database-notification relation, which this app does not use.
+     */
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(Notification::class);
+    }
+
+    public function canAddMoreUsers(): bool
+    {
+        if (!$this->plan) return false;
+        $currentCount = $this->hotspotUsers()->count();
+        return $currentCount < $this->plan->max_members;
+    }
+
+    public function remainingUserSlots(): int
+    {
+        if (!$this->plan) return 0;
+        $currentCount = $this->hotspotUsers()->count();
+        return max(0, $this->plan->max_members - $currentCount);
+    }
+
+    public function usagePercentage(): float
+    {
+        if (!$this->plan || $this->plan->max_members == 0) return 0;
+        return round(($this->hotspotUsers()->count() / $this->plan->max_members) * 100, 1);
     }
 
     public function features(): BelongsToMany
@@ -111,7 +147,7 @@ class Owner extends Authenticatable
     public function daysUntilExpiry(): int
     {
         if (!$this->subscription_expires_at) return 0;
-        return max(0, now()->diffInDays($this->subscription_expires_at, false));
+        return (int) max(0, now()->diffInDays($this->subscription_expires_at, false));
     }
 
     public function subscriptionStatus(): string

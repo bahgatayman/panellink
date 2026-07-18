@@ -14,7 +14,7 @@ class Booking extends Model
     protected $fillable = [
         'owner_id',
         'room_id',
-        'customer_id',
+        'hotspot_user_id',
         'booking_date',
         'start_time',
         'end_time',
@@ -45,9 +45,9 @@ class Booking extends Model
         return $this->belongsTo(Room::class);
     }
 
-    public function customer(): BelongsTo
+    public function hotspotUser(): BelongsTo
     {
-        return $this->belongsTo(Customer::class);
+        return $this->belongsTo(HotspotUser::class, 'hotspot_user_id');
     }
 
     public function statusColor(): string

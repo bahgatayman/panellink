@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 
-@section('page-title', $owner->business_name . ' - Users')
+@section('page-title', $owner->business_name . ' - ' . __('app.user.hotspot_users'))
 
 @section('content')
     <div class="mb-6">
@@ -8,9 +8,9 @@
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
             </svg>
-            Back to {{ $owner->business_name }}
+            {{ __('app.common.back') }} to {{ $owner->business_name }}
         </a>
-        <h1 class="text-2xl font-bold text-gray-900">{{ $owner->business_name }} — Hotspot Users</h1>
+        <h1 class="text-2xl font-bold text-gray-900">{{ $owner->business_name }} — {{ __('app.user.hotspot_users') }}</h1>
         <p class="text-sm text-gray-500 mt-1">Read-only view of all hotspot users for this owner.</p>
     </div>
 
@@ -19,12 +19,12 @@
             <table class="w-full text-sm">
                 <thead>
                     <tr class="text-left text-gray-500 bg-gray-50 border-b border-gray-100">
-                        <th class="px-4 lg:px-6 py-3 font-medium">Name</th>
-                        <th class="px-4 lg:px-6 py-3 font-medium">Phone</th>
-                        <th class="px-4 lg:px-6 py-3 font-medium">Speed ↓</th>
-                        <th class="px-4 lg:px-6 py-3 font-medium">Speed ↑</th>
-                        <th class="px-4 lg:px-6 py-3 font-medium">Status</th>
-                        <th class="px-4 lg:px-6 py-3 font-medium">Created</th>
+                        <th class="px-4 lg:px-6 py-3 font-medium">{{ __('app.table.th.name') }}</th>
+                        <th class="px-4 lg:px-6 py-3 font-medium">{{ __('app.table.th.phone') }}</th>
+                        <th class="px-4 lg:px-6 py-3 font-medium">{{ __('app.table.th.download') }}</th>
+                        <th class="px-4 lg:px-6 py-3 font-medium">{{ __('app.table.th.upload') }}</th>
+                        <th class="px-4 lg:px-6 py-3 font-medium">{{ __('app.table.th.status') }}</th>
+                        <th class="px-4 lg:px-6 py-3 font-medium">{{ __('app.table.th.created') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -36,16 +36,16 @@
                             <td class="px-4 lg:px-6 py-3 text-gray-700">{{ $user->speed_upload }}</td>
                             <td class="px-4 lg:px-6 py-3">
                                 @if ($user->status === 'active')
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{{ __('app.status.active') }}</span>
                                 @else
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Inactive</span>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">{{ __('app.status.inactive') }}</span>
                                 @endif
                             </td>
                             <td class="px-4 lg:px-6 py-3 text-gray-500">{{ $user->created_at->format('Y-m-d') }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-4 lg:px-6 py-8 text-center text-gray-500">No users found for this owner.</td>
+                            <td colspan="6" class="px-4 lg:px-6 py-8 text-center text-gray-500">{{ __('app.empty.no_owner_users') }}</td>
                         </tr>
                     @endforelse
                 </tbody>

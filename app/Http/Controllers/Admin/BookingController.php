@@ -10,7 +10,7 @@ class BookingController extends Controller
 {
     public function index(): View
     {
-        $bookings = Booking::with(['owner', 'room.workspace', 'customer'])
+        $bookings = Booking::with(['owner', 'room.workspace', 'hotspotUser'])
             ->latest()
             ->paginate(20);
 
@@ -19,7 +19,7 @@ class BookingController extends Controller
 
     public function show($id): View
     {
-        $booking = Booking::with(['owner', 'room.workspace', 'customer'])
+        $booking = Booking::with(['owner', 'room.workspace', 'hotspotUser'])
             ->findOrFail($id);
 
         return view('admin.bookings.show', compact('booking'));

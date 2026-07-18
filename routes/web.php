@@ -14,10 +14,15 @@ use App\Http\Controllers\SpeedProfileController;
 use App\Http\Controllers\SubscriptionController as OwnerSubscriptionController;
 use App\Http\Controllers\WorkspaceController;
 use App\Http\Controllers\RoomController;
-use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\BookingController;
+use App\Http\Controllers\SharedSessionController;
 use App\Http\Controllers\Admin\WorkspaceController as AdminWorkspaceController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
+use App\Http\Controllers\Admin\PlanController;
+use App\Http\Controllers\Admin\FinancialController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\LanguageController;
 use App\Http\Controllers\DemoRequestController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,6 +31,8 @@ Route::get('/', function () {
 });
 
 Route::post('/demo-request', [DemoRequestController::class, 'send'])->name('demo.request');
+
+Route::post('/language/{locale}', [LanguageController::class, 'switch'])->name('language.switch');
 
 // ===================== Owner Auth =====================
 Route::middleware('guest:owner')->group(function () {
@@ -43,6 +50,7 @@ Route::get('/subscription/expired', [OwnerSubscriptionController::class, 'expire
 // ===================== Owner Routes (authenticated + subscription check) =====================
 Route::middleware(['auth:owner', 'subscription.active'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index']);
+    Route::get('/users/search', [HotspotUserController::class, 'search']);
 
     // Hotspot feature routes
     Route::middleware('feature:hotspot')->group(function () {
@@ -87,13 +95,11 @@ Route::middleware(['auth:owner', 'subscription.active'])->group(function () {
 
     // Booking feature routes
     Route::middleware('feature:booking')->group(function () {
-        Route::get('/customers', [CustomerController::class, 'index']);
-        Route::get('/customers/create', [CustomerController::class, 'create']);
-        Route::post('/customers', [CustomerController::class, 'store']);
-        Route::get('/customers/{customer}', [CustomerController::class, 'show']);
-        Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit']);
-        Route::put('/customers/{customer}', [CustomerController::class, 'update']);
-        Route::delete('/customers/{customer}', [CustomerController::class, 'destroy']);
+        Route::get('/shared-sessions', [SharedSessionController::class, 'index'])->name('shared-sessions.index');
+        Route::get('/shared-sessions/create', [SharedSessionController::class, 'create'])->name('shared-sessions.create');
+        Route::post('/shared-sessions', [SharedSessionController::class, 'store'])->name('shared-sessions.store');
+        Route::get('/shared-sessions/{session}/close-preview', [SharedSessionController::class, 'closePreview'])->name('shared-sessions.close-preview');
+        Route::post('/shared-sessions/{session}/close', [SharedSessionController::class, 'close'])->name('shared-sessions.close');
 
         Route::get('/bookings/calendar', [BookingController::class, 'calendar']);
         Route::get('/bookings/check-availability', [BookingController::class, 'checkAvailability']);
@@ -109,11 +115,20 @@ Route::middleware(['auth:owner', 'subscription.active'])->group(function () {
 
     Route::get('/settings', [SettingsController::class, 'index']);
     Route::post('/settings/test-connection', [SettingsController::class, 'testConnection']);
+
+    Route::get('/profile', [ProfileController::class, 'index']);
+
+    // Notifications (cross-cutting — available to every authenticated owner)
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+    Route::get('/notifications/{id}/open', [NotificationController::class, 'open'])->name('notifications.open');
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
 });
 
 // ===================== Admin Auth =====================
 Route::middleware('guest:admin')->group(function () {
-    Route::get('/admin/login', [AuthController::class, 'showLogin']);
+    Route::get('/admin/login', [AuthController::class, 'showLogin'])->name('admin.login');
     Route::post('/admin/login', [AuthController::class, 'login']);
 });
 
@@ -144,4 +159,15 @@ Route::middleware('auth:admin')->prefix('admin')->group(function () {
     // Admin Bookings (read-only)
     Route::get('/bookings', [AdminBookingController::class, 'index'])->name('admin.bookings.index');
     Route::get('/bookings/{booking}', [AdminBookingController::class, 'show'])->name('admin.bookings.show');
+
+    // Admin Plans Management
+    Route::get('/plans', [PlanController::class, 'index'])->name('admin.plans.index');
+    Route::get('/plans/create', [PlanController::class, 'create'])->name('admin.plans.create');
+    Route::post('/plans', [PlanController::class, 'store'])->name('admin.plans.store');
+    Route::get('/plans/{plan}/edit', [PlanController::class, 'edit'])->name('admin.plans.edit');
+    Route::put('/plans/{plan}', [PlanController::class, 'update'])->name('admin.plans.update');
+    Route::post('/plans/{plan}/toggle', [PlanController::class, 'toggle'])->name('admin.plans.toggle');
+
+    // Admin Financial Dashboard
+    Route::get('/financial', [FinancialController::class, 'index'])->name('admin.financial.index');
 });

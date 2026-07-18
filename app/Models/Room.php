@@ -63,22 +63,48 @@ class Room extends Model
     public function typeLabel(): string
     {
         return match ($this->type) {
-            'hot_desk'       => 'Hot Desk',
-            'private_office' => 'Private Office',
-            'meeting_room'   => 'Meeting Room',
-            'event_space'    => 'Event Space',
-            default          => ucfirst($this->type),
+            'meeting'  => 'Meeting Room',
+            'training' => 'Training Room',
+            'shared'   => 'Shared Space',
+            'office'   => 'Private Office',
+            default    => ucfirst($this->type),
         };
     }
 
     public function typeColor(): string
     {
         return match ($this->type) {
-            'hot_desk'       => 'blue',
-            'private_office' => 'purple',
-            'meeting_room'   => 'green',
-            'event_space'    => 'orange',
-            default          => 'gray',
+            'meeting'  => 'blue',
+            'training' => 'purple',
+            'shared'   => 'green',
+            'office'   => 'orange',
+            default    => 'gray',
         };
+    }
+
+    public function isShared(): bool
+    {
+        return $this->type === 'shared';
+    }
+
+    public function sharedSessions(): HasMany
+    {
+        return $this->hasMany(SharedSession::class);
+    }
+
+    public function openSharedSessions(): HasMany
+    {
+        return $this->sharedSessions()->where('status', 'open');
+    }
+
+    public function availableSharedSlots(): int
+    {
+        $openCount = $this->openSharedSessions()->count();
+        return max(0, $this->capacity - $openCount);
+    }
+
+    public function isSharedFull(): bool
+    {
+        return $this->availableSharedSlots() === 0;
     }
 }

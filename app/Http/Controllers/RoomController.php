@@ -29,15 +29,13 @@ class RoomController extends Controller
         $workspace = $this->getWorkspace($workspaceId);
 
         $roomTypes = [
-            'hot_desk'       => 'Hot Desk',
-            'private_office' => 'Private Office',
-            'meeting_room'   => 'Meeting Room',
-            'event_space'    => 'Event Space',
+            'meeting'  => 'Meeting Room',
+            'training' => 'Training Room',
+            'shared'   => 'Shared Space',
+            'office'   => 'Private Office',
         ];
 
-        $capacityOptions = [1, 2, 4, 6, 8, 10, 15, 20, 30, 50];
-
-        return view('workspaces.rooms.create', compact('workspace', 'roomTypes', 'capacityOptions'));
+        return view('workspaces.rooms.create', compact('workspace', 'roomTypes'));
     }
 
     public function store(Request $request, int $workspaceId): RedirectResponse
@@ -46,8 +44,8 @@ class RoomController extends Controller
 
         $data = $request->validate([
             'name'           => 'required|string|max:255',
-            'type'           => 'required|in:hot_desk,private_office,meeting_room,event_space',
-            'capacity'       => 'required|integer|min:1',
+            'type'           => 'required|in:meeting,training,shared,office',
+            'capacity'       => 'required|integer|min:1|max:999',
             'price_per_hour' => 'required|numeric|min:0',
             'description'    => 'nullable|string|max:1000',
         ]);
@@ -67,15 +65,13 @@ class RoomController extends Controller
         $room      = $this->getRoom($workspace, $roomId);
 
         $roomTypes = [
-            'hot_desk'       => 'Hot Desk',
-            'private_office' => 'Private Office',
-            'meeting_room'   => 'Meeting Room',
-            'event_space'    => 'Event Space',
+            'meeting'  => 'Meeting Room',
+            'training' => 'Training Room',
+            'shared'   => 'Shared Space',
+            'office'   => 'Private Office',
         ];
 
-        $capacityOptions = [1, 2, 4, 6, 8, 10, 15, 20, 30, 50];
-
-        return view('workspaces.rooms.edit', compact('workspace', 'room', 'roomTypes', 'capacityOptions'));
+        return view('workspaces.rooms.edit', compact('workspace', 'room', 'roomTypes'));
     }
 
     public function update(Request $request, int $workspaceId, int $roomId): RedirectResponse
@@ -85,8 +81,8 @@ class RoomController extends Controller
 
         $data = $request->validate([
             'name'           => 'required|string|max:255',
-            'type'           => 'required|in:hot_desk,private_office,meeting_room,event_space',
-            'capacity'       => 'required|integer|min:1',
+            'type'           => 'required|in:meeting,training,shared,office',
+            'capacity'       => 'required|integer|min:1|max:999',
             'price_per_hour' => 'required|numeric|min:0',
             'description'    => 'nullable|string|max:1000',
         ]);

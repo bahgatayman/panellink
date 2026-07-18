@@ -13,7 +13,9 @@ class Subscription extends Model
     protected $fillable = [
         'owner_id',
         'admin_id',
+        'plan_id',
         'months',
+        'amount_paid',
         'starts_at',
         'expires_at',
         'notes',
@@ -35,5 +37,10 @@ class Subscription extends Model
     public function admin(): BelongsTo
     {
         return $this->belongsTo(Admin::class);
+    }
+
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class);
     }
 }

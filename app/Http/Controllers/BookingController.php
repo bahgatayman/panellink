@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Booking;
-use App\Models\Customer;
+use App\Models\HotspotUser;
 use App\Models\Room;
 use App\Services\BookingService;
 use Carbon\Carbon;
@@ -23,7 +23,7 @@ class BookingController extends Controller
         $roomId  = $request->get('room_id');
 
         $bookings = Booking::where('owner_id', $ownerId)
-            ->with(['room.workspace', 'customer'])
+            ->with(['room.workspace', 'hotspotUser'])
             ->when($status, fn($q) => $q->where('status', $status))
             ->when($date,   fn($q) => $q->where('booking_date', $date))
             ->when($roomId, fn($q) => $q->where('room_id', $roomId))
@@ -45,15 +45,15 @@ class BookingController extends Controller
             ->with('workspace')
             ->get();
 
-        $customers = Customer::where('owner_id', $ownerId)
+        $users = HotspotUser::where('owner_id', $ownerId)
             ->orderBy('name')
             ->get();
 
         $timeSlots = $this->generateTimeSlots();
 
-        $selectedCustomer = $request->get('customer_id');
+        $selectedUserId = $request->get('hotspot_user_id');
 
-        return view('bookings.create', compact('rooms', 'customers', 'timeSlots', 'selectedCustomer'));
+        return view('bookings.create', compact('rooms', 'users', 'timeSlots', 'selectedUserId'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -61,19 +61,24 @@ class BookingController extends Controller
         $ownerId = auth('owner')->id();
 
         $validated = $request->validate([
-            'room_id'      => 'required|exists:rooms,id',
-            'customer_id'  => 'required|exists:customers,id',
-            'booking_date' => 'required|date|after_or_equal:today',
-            'start_time'   => 'required|date_format:H:i',
-            'end_time'     => 'required|date_format:H:i|after:start_time',
-            'notes'        => 'nullable|string|max:500',
+            'room_id'         => 'required|exists:rooms,id',
+            'hotspot_user_id' => 'required|exists:hotspot_users,id',
+            'booking_date'    => 'required|date|after_or_equal:today',
+            'start_time'      => 'required|date_format:H:i',
+            'end_time'        => 'required|date_format:H:i|after:start_time',
+            'notes'           => 'nullable|string|max:500',
         ]);
 
         $room = Room::where('id', $validated['room_id'])
             ->where('owner_id', $ownerId)
             ->firstOrFail();
 
-        $customer = Customer::where('id', $validated['customer_id'])
+        if ($room->isShared()) {
+            return redirect()->route('shared-sessions.room', $room->id)
+                ->with('info', 'This is a shared room. Use the Session Panel to open sessions for users.');
+        }
+
+        $hotspotUser = HotspotUser::where('id', $validated['hotspot_user_id'])
             ->where('owner_id', $ownerId)
             ->firstOrFail();
 
@@ -90,17 +95,17 @@ class BookingController extends Controller
         );
 
         $booking = Booking::create([
-            'owner_id'      => $ownerId,
-            'room_id'       => $room->id,
-            'customer_id'   => $customer->id,
-            'booking_date'  => $validated['booking_date'],
-            'start_time'    => $validated['start_time'],
-            'end_time'      => $validated['end_time'],
-            'price_per_hour'=> $room->price_per_hour,
-            'total_hours'   => $calc['total_hours'],
-            'total_price'   => $calc['total_price'],
-            'status'        => 'confirmed',
-            'notes'         => $validated['notes'],
+            'owner_id'        => $ownerId,
+            'room_id'         => $room->id,
+            'hotspot_user_id' => $hotspotUser->id,
+            'booking_date'    => $validated['booking_date'],
+            'start_time'      => $validated['start_time'],
+            'end_time'        => $validated['end_time'],
+            'price_per_hour'  => $room->price_per_hour,
+            'total_hours'     => $calc['total_hours'],
+            'total_price'     => $calc['total_price'],
+            'status'          => 'confirmed',
+            'notes'           => $validated['notes'],
         ]);
 
         return redirect("/bookings/{$booking->id}")->with('success', 'Booking confirmed successfully.');
@@ -109,7 +114,7 @@ class BookingController extends Controller
     public function show($id): View
     {
         $booking = Booking::where('owner_id', auth('owner')->id())
-            ->with(['room.workspace', 'customer'])
+            ->with(['room.workspace', 'hotspotUser'])
             ->findOrFail($id);
 
         return view('bookings.show', compact('booking'));
@@ -120,7 +125,7 @@ class BookingController extends Controller
         $ownerId = auth('owner')->id();
 
         $booking = Booking::where('owner_id', $ownerId)
-            ->with(['room.workspace', 'customer'])
+            ->with(['room.workspace', 'hotspotUser'])
             ->findOrFail($id);
 
         if (!in_array($booking->status, ['pending', 'confirmed'])) {
@@ -132,13 +137,13 @@ class BookingController extends Controller
             ->with('workspace')
             ->get();
 
-        $customers = Customer::where('owner_id', $ownerId)
+        $users = HotspotUser::where('owner_id', $ownerId)
             ->orderBy('name')
             ->get();
 
         $timeSlots = $this->generateTimeSlots();
 
-        return view('bookings.edit', compact('booking', 'rooms', 'customers', 'timeSlots'));
+        return view('bookings.edit', compact('booking', 'rooms', 'users', 'timeSlots'));
     }
 
     public function update(Request $request, $id): RedirectResponse
@@ -152,17 +157,22 @@ class BookingController extends Controller
         }
 
         $validated = $request->validate([
-            'room_id'      => 'required|exists:rooms,id',
-            'customer_id'  => 'required|exists:customers,id',
-            'booking_date' => 'required|date',
-            'start_time'   => 'required|date_format:H:i',
-            'end_time'     => 'required|date_format:H:i|after:start_time',
-            'notes'        => 'nullable|string|max:500',
+            'room_id'         => 'required|exists:rooms,id',
+            'hotspot_user_id' => 'required|exists:hotspot_users,id',
+            'booking_date'    => 'required|date',
+            'start_time'      => 'required|date_format:H:i',
+            'end_time'        => 'required|date_format:H:i|after:start_time',
+            'notes'           => 'nullable|string|max:500',
         ]);
 
         $room = Room::where('id', $validated['room_id'])
             ->where('owner_id', $ownerId)
             ->firstOrFail();
+
+        if ($room->isShared()) {
+            return redirect()->route('shared-sessions.room', $room->id)
+                ->with('info', 'This is a shared room. Use the Session Panel to open sessions for users.');
+        }
 
         if ($room->hasConflict($validated['booking_date'], $validated['start_time'], $validated['end_time'], $id)) {
             return back()->withInput()->with('error',
@@ -177,15 +187,15 @@ class BookingController extends Controller
         );
 
         $booking->update([
-            'room_id'       => $room->id,
-            'customer_id'   => $validated['customer_id'],
-            'booking_date'  => $validated['booking_date'],
-            'start_time'    => $validated['start_time'],
-            'end_time'      => $validated['end_time'],
-            'price_per_hour'=> $room->price_per_hour,
-            'total_hours'   => $calc['total_hours'],
-            'total_price'   => $calc['total_price'],
-            'notes'         => $validated['notes'],
+            'room_id'         => $room->id,
+            'hotspot_user_id' => $validated['hotspot_user_id'],
+            'booking_date'    => $validated['booking_date'],
+            'start_time'      => $validated['start_time'],
+            'end_time'        => $validated['end_time'],
+            'price_per_hour'  => $room->price_per_hour,
+            'total_hours'     => $calc['total_hours'],
+            'total_price'     => $calc['total_price'],
+            'notes'           => $validated['notes'],
         ]);
 
         return redirect("/bookings/{$id}")->with('success', 'Booking updated successfully.');
@@ -235,7 +245,7 @@ class BookingController extends Controller
         $carbon  = Carbon::parse($date);
 
         $bookings = Booking::where('owner_id', $ownerId)
-            ->with(['room.workspace', 'customer'])
+            ->with(['room.workspace', 'hotspotUser'])
             ->whereMonth('booking_date', $carbon->month)
             ->whereYear('booking_date', $carbon->year)
             ->where('status', '!=', 'cancelled')

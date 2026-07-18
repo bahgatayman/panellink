@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HotspotUser extends Model
 {
@@ -16,6 +17,8 @@ class HotspotUser extends Model
         'speed_upload',
         'status',
         'speed_profile_id',
+        'email',
+        'notes',
     ];
 
     protected $hidden = [
@@ -30,5 +33,20 @@ class HotspotUser extends Model
     public function speedProfile(): BelongsTo
     {
         return $this->belongsTo(SpeedProfile::class);
+    }
+
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(Booking::class, 'hotspot_user_id');
+    }
+
+    public function sharedSessions(): HasMany
+    {
+        return $this->hasMany(SharedSession::class, 'hotspot_user_id');
+    }
+
+    public function hasOpenSharedSession(): bool
+    {
+        return $this->sharedSessions()->where('status', 'open')->exists();
     }
 }
