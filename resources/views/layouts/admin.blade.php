@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Link Space Panel Admin - @yield('page-title', __('app.nav.dashboard'))</title>
-    <link rel="icon" type="image/png" href="/logo.png">
+    <link rel="icon" type="image/webp" href="/logo.webp">
     <script src="https://cdn.tailwindcss.com"></script>
     @if($isRtl)
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -17,9 +17,7 @@
         <!-- Mobile header -->
         <div class="lg:hidden flex items-center justify-between bg-[#1a0f0f] px-4 py-3">
             <div class="flex items-center gap-2">
-                <div class="bg-white rounded-md px-2 py-1 inline-flex items-center">
-                    <img src="/logo.png" alt="Link Space Panel" class="h-8 w-auto">
-                </div>
+                <img src="/logo.webp" alt="Link Space Panel" class="h-7 w-auto brightness-0 invert">
                 <span class="text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded">Admin</span>
             </div>
             <div class="flex items-center gap-2">
@@ -37,7 +35,7 @@
         <!-- Sidebar -->
         <aside id="sidebar" class="fixed lg:static inset-y-0 {{ $isRtl ? 'right-0' : 'left-0' }} z-20 w-[260px] bg-gradient-to-b from-[#1a0f0f] to-[#2d1a1a] text-white flex flex-col shrink-0 transition-transform duration-300 {{ $isRtl ? 'translate-x-full' : '-translate-x-full' }} lg:translate-x-0">
             <div class="flex flex-col items-center px-6 py-6 border-b border-white/10">
-                <img src="/logo.png" alt="Link Space Panel" class="h-16 w-auto rounded-xl bg-white p-2">
+                <img src="/logo.webp" alt="Link Space Panel" class="h-8 w-auto brightness-0 invert">
                 <span class="text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded mt-2">Admin</span>
             </div>
             <nav class="flex-1 px-3 py-4 space-y-1">

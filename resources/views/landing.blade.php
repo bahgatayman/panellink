@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Link Space Panel — {{ __('app.landing.product_demo') }}</title>
-    <link rel="icon" type="image/png" href="/logo.png">
+    <link rel="icon" type="image/webp" href="/logo.webp">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -172,7 +172,7 @@
         <div class="max-w-6xl mx-auto px-5 sm:px-8">
             <div class="flex items-center justify-between h-16">
                 <a href="/" class="flex items-center gap-3 shrink-0">
-                    <img src="/logo.png"
+                    <img src="/logo.webp"
                          alt="Link Space Panel"
                          class="h-10 w-auto">
                 </a>
@@ -272,7 +272,7 @@
                 <!-- Screen Header -->
                 <div class="flex items-center justify-between px-5 py-4 border-b border-surface-100">
                     <div class="flex items-center gap-2">
-                        <img src="/logo.png"
+                        <img src="/logo.webp"
                              alt="Link Space Panel"
                              class="h-8 w-auto">
                         <span class="text-xs font-medium text-surface-400 hidden sm:inline">·</span>
@@ -826,7 +826,7 @@
         <div class="max-w-6xl mx-auto">
             <div class="flex flex-col sm:flex-row items-center justify-between gap-5">
                 <div class="flex items-center gap-3">
-                    <img src="/logo.png"
+                    <img src="/logo.webp"
                          alt="Link Space Panel"
                          class="h-10 w-auto">
                 </div>
