@@ -51,6 +51,13 @@ return [
         'admin_login'               => 'Admin Login',
         'admin_panel'               => 'Administrator Panel',
         'linkspace_admin'           => 'Link Space Panel Admin',
+        'forgot_password'           => 'Forgot password?',
+        'forgot_password_hint'      => 'Enter your email and we will send you a link to reset your password.',
+        'send_reset_link'           => 'Send Reset Link',
+        'back_to_login'             => 'Back to login',
+        'reset_password'            => 'Reset Password',
+        'reset_password_hint'       => 'Choose a new password for your account.',
+        'new_password'              => 'New Password',
     ],
 
     /*

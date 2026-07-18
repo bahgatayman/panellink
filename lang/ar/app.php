@@ -44,6 +44,13 @@ return [
         'admin_login' => 'دخول المشرف',
         'admin_panel_subtitle' => 'لوحة تحكم المشرف',
         'ls_admin' => 'مشرف LS',
+        'forgot_password' => 'نسيت كلمة المرور؟',
+        'forgot_password_hint' => 'أدخل بريدك الإلكتروني وسنرسل لك رابطًا لإعادة تعيين كلمة المرور.',
+        'send_reset_link' => 'إرسال رابط إعادة التعيين',
+        'back_to_login' => 'العودة لتسجيل الدخول',
+        'reset_password' => 'إعادة تعيين كلمة المرور',
+        'reset_password_hint' => 'اختر كلمة مرور جديدة لحسابك.',
+        'new_password' => 'كلمة المرور الجديدة',
     ],
 
     'common' => [

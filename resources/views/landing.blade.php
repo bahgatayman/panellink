@@ -158,6 +158,32 @@
 
         .modal-overlay { background: rgba(28, 25, 23, 0.5); backdrop-filter: blur(8px); }
 
+        /* Offset anchor targets so the fixed nav doesn't cover section headings */
+        section[id] { scroll-margin-top: 5rem; }
+
+        /* Hero background image + ambient depth */
+        .hero-bg {
+            background-image: url('/images/hero-bg.svg');
+            background-size: cover;
+            background-position: center top;
+        }
+        .hero-glow {
+            position: absolute;
+            border-radius: 9999px;
+            filter: blur(64px);
+            pointer-events: none;
+        }
+        @keyframes floatY { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-26px); } }
+        .hero-glow.g1 { animation: floatY 9s ease-in-out infinite; }
+        .hero-glow.g2 { animation: floatY 12s ease-in-out infinite reverse; }
+
+        @keyframes cueBounce { 0%, 100% { transform: translateX(-50%) translateY(0); opacity: 0.55; } 50% { transform: translateX(-50%) translateY(6px); opacity: 1; } }
+        .scroll-cue { animation: cueBounce 2s ease-in-out infinite; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .hero-glow.g1, .hero-glow.g2, .scroll-cue { animation: none; }
+        }
+
         @media (max-width: 640px) {
             .cta-btn { padding: 12px 22px; font-size: 0.85rem; }
         }
@@ -202,7 +228,7 @@
                 <a href="#product" class="block text-sm font-medium text-surface-600 py-2">{{ __('app.landing.product') }}</a>
                 <a href="#how-it-works" class="block text-sm font-medium text-surface-600 py-2">{{ __('app.landing.how_it_works') }}</a>
                 <a href="#pricing" class="block text-sm font-medium text-surface-600 py-2">{{ __('app.landing.pricing') }}</a>
-                <a href="/login" class="block text-sm font-medium text-brand-600 py-2">{{ __('app.landing.sign_in') }}</a>
+                <a href="/login" class="block text-sm font-medium text-indigo-600 py-2">{{ __('app.landing.sign_in') }}</a>
                 <button onclick="openDemoModal(); toggleMobile();" class="w-full cta-primary justify-center text-sm">{{ __('app.landing.get_started') }}</button>
             </div>
         </div>
@@ -211,12 +237,19 @@
     <!-- ═══════════════════════════════════════════
          IDENTITY SCREEN
          ═══════════════════════════════════════════ -->
-    <section class="min-h-screen flex items-center justify-center pt-16 px-5 sm:px-8">
-        <div class="max-w-3xl mx-auto text-center">
+    <section class="hero-bg relative min-h-screen flex items-center justify-center pt-16 px-5 sm:px-8 overflow-hidden">
+        <!-- ambient floating glows -->
+        <div class="hero-glow g1 bg-indigo-300/40" style="width:440px;height:440px;top:-40px;{{ $isRtl ? 'right' : 'left' }}:-90px;"></div>
+        <div class="hero-glow g2 bg-violet-300/40" style="width:480px;height:480px;bottom:-140px;{{ $isRtl ? 'left' : 'right' }}:-110px;"></div>
+
+        <div class="relative z-10 max-w-3xl mx-auto text-center">
             <div class="fade-in">
-                <div class="inline-flex items-center gap-2 bg-surface-100 rounded-full px-4 py-1.5 mb-8">
-                    <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-                    <span class="text-xs font-medium text-surface-600">{{ __('app.landing.now_with_smart_booking') }}</span>
+                <div class="inline-flex items-center gap-2.5 bg-white/70 backdrop-blur-md rounded-full pl-2.5 pr-4 py-1.5 mb-8 border border-white/80 shadow-sm shadow-indigo-500/5">
+                    <span class="relative flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span class="text-xs font-semibold text-surface-700">{{ __('app.landing.now_with_smart_booking') }}</span>
                 </div>
             </div>
 
@@ -255,6 +288,12 @@
                 </span>
             </div>
         </div>
+
+        <button onclick="document.getElementById('product').scrollIntoView({behavior:'smooth'})"
+                class="scroll-cue absolute bottom-8 left-1/2 z-10 text-surface-400 hover:text-surface-600 transition hidden sm:block"
+                aria-label="{{ __('app.landing.see_how_it_works') }}">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+        </button>
     </section>
 
     <!-- ═══════════════════════════════════════════

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ __('app.auth.linkspace') }} - {{ __('app.auth.login') }}</title>
+    <title>{{ __('app.auth.linkspace') }} - {{ __('app.auth.forgot_password') }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     @if($isRtl)
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -16,8 +16,14 @@
         <div class="flex justify-center mb-6">
             <img src="/logo.webp" alt="Link Space Panel" class="h-12 w-auto">
         </div>
-        <h1 class="text-2xl font-bold text-gray-900 text-center mb-2">{{ __('app.auth.linkspace') }}</h1>
-        <p class="text-sm text-gray-500 text-center mb-8">{{ __('app.auth.coworking_management') }}</p>
+        <h1 class="text-2xl font-bold text-gray-900 text-center mb-2">{{ __('app.auth.forgot_password') }}</h1>
+        <p class="text-sm text-gray-500 text-center mb-8">{{ __('app.auth.forgot_password_hint') }}</p>
+
+        @if (session('status'))
+            <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4">
+                <p class="text-sm">{{ session('status') }}</p>
+            </div>
+        @endif
 
         @if ($errors->any())
             <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
@@ -27,29 +33,20 @@
             </div>
         @endif
 
-        <form method="POST" action="/login">
+        <form method="POST" action="/forgot-password">
             @csrf
-            <div class="mb-4">
+            <div class="mb-6">
                 <label for="email" class="block text-sm font-medium text-gray-700 mb-1">{{ __('app.auth.email') }}</label>
                 <input type="email" name="email" id="email" value="{{ old('email') }}" required autofocus
                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
             </div>
-            <div class="mb-6">
-                <div class="flex items-center justify-between mb-1">
-                    <label for="password" class="block text-sm font-medium text-gray-700">{{ __('app.auth.password') }}</label>
-                    <a href="/forgot-password" class="text-sm text-blue-600 font-medium hover:underline">{{ __('app.auth.forgot_password') }}</a>
-                </div>
-                <input type="password" name="password" id="password" required
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-            </div>
             <button type="submit" class="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition font-medium">
-                {{ __('app.auth.sign_in') }}
+                {{ __('app.auth.send_reset_link') }}
             </button>
         </form>
 
         <p class="text-center text-sm text-gray-500 mt-6">
-            {{ __('app.auth.dont_have_account') }}
-            <a href="/register" class="text-blue-600 font-medium hover:underline">{{ __('app.auth.register') }}</a>
+            <a href="/login" class="text-blue-600 font-medium hover:underline">{{ __('app.auth.back_to_login') }}</a>
         </p>
     </div>
 </body>

@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 1024" preserveAspectRatio="xMidYMid slice" role="img" aria-label="">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef2ff"/>
+      <stop offset="0.45" stop-color="#f7f7fb"/>
+      <stop offset="1" stop-color="#fafaf9"/>
+    </linearGradient>
+    <radialGradient id="blobA" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#818cf8" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#818cf8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blobB" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#c4b5fd" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#c4b5fd" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blobC" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#a5b4fc" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#a5b4fc" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="center" cx="50%" cy="42%" r="46%">
+      <stop offset="0" stop-color="#fafaf9" stop-opacity="0.9"/>
+      <stop offset="0.7" stop-color="#fafaf9" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#fafaf9" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="52" height="52" patternUnits="userSpaceOnUse">
+      <path d="M52 0H0V52" fill="none" stroke="#4338ca" stroke-opacity="0.06" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <!-- base -->
+  <rect width="1440" height="1024" fill="url(#sky)"/>
+  <rect width="1440" height="1024" fill="url(#grid)"/>
+
+  <!-- glow blobs -->
+  <circle cx="220" cy="150" r="440" fill="url(#blobA)"/>
+  <circle cx="1250" cy="230" r="480" fill="url(#blobB)"/>
+  <circle cx="740" cy="-60" r="400" fill="url(#blobC)"/>
+  <circle cx="1180" cy="900" r="360" fill="url(#blobA)"/>
+
+  <!-- soft light in the center to keep hero copy readable -->
+  <rect width="1440" height="1024" fill="url(#center)"/>
+
+  <!-- network motif (on brand: Link Space) -->
+  <g stroke="#6366f1" stroke-opacity="0.16" stroke-width="1.2" fill="none">
+    <path d="M150 250 L330 180 L470 320 L280 430 Z"/>
+    <path d="M330 180 L520 150"/>
+    <path d="M470 320 L360 520"/>
+    <path d="M1290 160 L1130 250 L1210 420 L1330 330 Z"/>
+    <path d="M1130 250 L980 200"/>
+    <path d="M1210 420 L1120 600"/>
+    <path d="M120 760 L300 700 L250 880"/>
+    <path d="M1180 820 L1330 760"/>
+  </g>
+  <g fill="#6366f1" fill-opacity="0.45">
+    <circle cx="150" cy="250" r="4"/>
+    <circle cx="330" cy="180" r="5"/>
+    <circle cx="470" cy="320" r="4"/>
+    <circle cx="280" cy="430" r="4"/>
+    <circle cx="520" cy="150" r="3.5"/>
+    <circle cx="360" cy="520" r="3.5"/>
+    <circle cx="1290" cy="160" r="4"/>
+    <circle cx="1130" cy="250" r="5"/>
+    <circle cx="1210" cy="420" r="4"/>
+    <circle cx="1330" cy="330" r="3.5"/>
+    <circle cx="980" cy="200" r="3.5"/>
+    <circle cx="1120" cy="600" r="4"/>
+    <circle cx="120" cy="760" r="4"/>
+    <circle cx="300" cy="700" r="4"/>
+    <circle cx="250" cy="880" r="3.5"/>
+    <circle cx="1180" cy="820" r="4"/>
+    <circle cx="1330" cy="760" r="3.5"/>
+  </g>
+</svg>
