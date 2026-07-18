@@ -29,7 +29,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'auth' => [
-        'linkspace'                 => 'LinkSpace',
+        'linkspace'                 => 'Link Space Panel',
         'coworking_management'       => 'Coworking Internet Management',
         'email'                     => 'Email',
         'password'                  => 'Password',
@@ -50,7 +50,7 @@ return [
         'login'                     => 'Login',
         'admin_login'               => 'Admin Login',
         'admin_panel'               => 'Administrator Panel',
-        'linkspace_admin'           => 'LinkSpace Admin',
+        'linkspace_admin'           => 'Link Space Panel Admin',
     ],
 
     /*
@@ -640,7 +640,7 @@ return [
         'configure_your_space'     => 'Configure Your Space',
         'start_managing'           => 'Start Managing',
         'everything_at_a_glance'   => 'Everything at a Glance',
-        'why_linkspace'            => 'Why LinkSpace?',
+        'why_linkspace'            => 'Why Link Space Panel?',
         'built_for_spaces'         => 'Built for Coworking Spaces',
         'no_technical_skills'      => 'No Technical Skills Required',
         'real_time_everything'     => 'Real-Time Everything',
@@ -652,7 +652,7 @@ return [
         'ready_to_transform'       => 'Ready to Transform Your Space?',
         'join_500_spaces'          => 'Join 500+ Coworking Spaces',
         'no_credit_card_needed'    => 'No Credit Card Needed',
-        'footer_text'              => 'LinkSpace — All-in-one coworking management platform.',
+        'footer_text'              => 'Link Space Panel — All-in-one coworking management platform.',
         'all_rights_reserved'      => 'All rights reserved.',
         'demo_modal_title'         => 'Request a Demo',
         'demo_modal_subtitle'      => 'Fill in the form and we\'ll get back to you within 24 hours.',
@@ -705,7 +705,7 @@ return [
             'sub_expiring_title'   => 'Subscription expiring soon',
             'sub_expiring_body'    => 'Your subscription expires in :days days. Contact your administrator to renew.',
             'sub_expired_title'    => 'Subscription expired',
-            'sub_expired_body'     => 'Your subscription has expired. Please renew to keep using LinkSpace.',
+            'sub_expired_body'     => 'Your subscription has expired. Please renew to keep using Link Space Panel.',
             'sub_renewed_title'    => 'Subscription renewed',
             'sub_renewed_body'     => 'Your :plan plan is active until :date.',
             'plan_limit_title'     => 'Member limit reached',

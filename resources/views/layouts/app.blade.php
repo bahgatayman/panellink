@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>LinkSpace - {{ $owner->business_name ?? __('app.auth.linkspace') }}</title>
+    <title>Link Space Panel - {{ $owner->business_name ?? __('app.auth.linkspace') }}</title>
+    <link rel="icon" type="image/png" href="/logo.png">
     <script src="https://cdn.tailwindcss.com"></script>
     @if($isRtl)
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -16,7 +17,9 @@
     <div class="min-h-screen flex flex-col lg:flex-row">
         <!-- Mobile header -->
         <div class="lg:hidden flex items-center justify-between bg-[#0f172a] px-4 py-3">
-            <img src="https://www.link-space.net/img/logo%20link%20space.png" alt="LinkSpace" class="h-7 w-auto brightness-0 invert">
+            <div class="bg-white rounded-md px-2 py-1 inline-flex items-center">
+                <img src="/logo.png" alt="Link Space Panel" class="h-8 w-auto">
+            </div>
             <div class="flex items-center gap-2">
                 <button id="menu-toggle" class="text-white p-2 focus:outline-none">
                     <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -32,7 +35,7 @@
         <!-- Sidebar -->
         <aside id="sidebar" class="fixed lg:static inset-y-0 {{ $isRtl ? 'right-0' : 'left-0' }} z-20 w-[260px] bg-gradient-to-b from-[#0f172a] to-[#1e293b] text-white flex flex-col shrink-0 transition-transform duration-300 {{ $isRtl ? 'translate-x-full' : '-translate-x-full' }} lg:translate-x-0">
             <div class="flex items-center justify-center px-6 py-6 border-b border-white/10">
-                <img src="https://www.link-space.net/img/logo%20link%20space.png" alt="LinkSpace" class="h-8 w-auto brightness-0 invert">
+                <img src="/logo.png" alt="Link Space Panel" class="h-16 w-auto rounded-xl bg-white p-2">
             </div>
             <nav class="flex-1 px-3 py-4 space-y-1">
                 @php $currentOwner = auth('owner')->user(); @endphp

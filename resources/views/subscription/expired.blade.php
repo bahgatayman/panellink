@@ -45,7 +45,7 @@
         </div>
 
         <p class="text-gray-600 text-sm mb-6">
-            Your subscription has expired. Please contact your LinkSpace administrator to renew your subscription.
+            Your subscription has expired. Please contact your Link Space Panel administrator to renew your subscription.
         </p>
 
         <form method="POST" action="/logout">

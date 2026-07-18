@@ -13,10 +13,9 @@
 </head>
 <body class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
     <div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
-        <div class="flex justify-center mb-6">
-            <img src="https://www.link-space.net/img/logo%20link%20space.png" alt="LinkSpace" class="h-12 w-auto">
+        <div class="flex justify-center mb-4">
+            <img src="/logo.png" alt="Link Space Panel" class="h-24 w-auto">
         </div>
-        <h1 class="text-2xl font-bold text-gray-900 text-center mb-2">{{ __('app.auth.linkspace') }}</h1>
         <p class="text-sm text-gray-500 text-center mb-8">{{ __('app.auth.coworking_management') }}</p>
 
         @if ($errors->any())

@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LinkSpace — {{ __('app.landing.product_demo') }}</title>
+    <title>Link Space Panel — {{ __('app.landing.product_demo') }}</title>
+    <link rel="icon" type="image/png" href="/logo.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -171,9 +172,9 @@
         <div class="max-w-6xl mx-auto px-5 sm:px-8">
             <div class="flex items-center justify-between h-16">
                 <a href="/" class="flex items-center gap-3 shrink-0">
-                    <img src="https://www.link-space.net/img/logo%20link%20space.png"
-                         alt="LinkSpace"
-                         class="h-7 w-auto">
+                    <img src="/logo.png"
+                         alt="Link Space Panel"
+                         class="h-10 w-auto">
                 </a>
 
                 <div class="hidden sm:flex items-center gap-8">
@@ -264,16 +265,16 @@
             <div class="text-center mb-16 fade-in">
                 <span class="inline-block text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full mb-4">{{ __('app.landing.product_experience') }}</span>
                 <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-surface-900">{{ __('app.landing.explore_the_system') }}</h2>
-                <p class="mt-3 text-surface-500 text-base sm:text-lg">Click through each module to see how LinkSpace works.</p>
+                <p class="mt-3 text-surface-500 text-base sm:text-lg">Click through each module to see how Link Space Panel works.</p>
             </div>
 
             <div class="product-screen fade-in">
                 <!-- Screen Header -->
                 <div class="flex items-center justify-between px-5 py-4 border-b border-surface-100">
                     <div class="flex items-center gap-2">
-                        <img src="https://www.link-space.net/img/logo%20link%20space.png"
-                             alt="LinkSpace"
-                             class="h-5 w-auto">
+                        <img src="/logo.png"
+                             alt="Link Space Panel"
+                             class="h-8 w-auto">
                         <span class="text-xs font-medium text-surface-400 hidden sm:inline">·</span>
                         <span class="text-xs font-medium text-surface-400 hidden sm:inline">{{ __('app.landing.product_demo') }}</span>
                     </div>
@@ -652,7 +653,7 @@
                         <svg class="w-5 h-5 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                     </div>
                     <h3 class="text-base font-bold mb-2">{{ __('app.landing.no_technical_skills') }}</h3>
-                    <p class="text-sm text-surface-400 leading-relaxed">Forget CLI commands. LinkSpace connects via API and gives you a beautiful interface to manage everything.</p>
+                    <p class="text-sm text-surface-400 leading-relaxed">Forget CLI commands. Link Space Panel connects via API and gives you a beautiful interface to manage everything.</p>
                 </div>
                 <div class="bg-white/5 backdrop-blur-sm rounded-2xl p-7 border border-white/5 hover:bg-white/[0.07] transition">
                     <div class="w-11 h-11 rounded-xl bg-purple-500/10 flex items-center justify-center mb-4">
@@ -749,7 +750,7 @@
                         <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
                         <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
                     </div>
-                    <p class="text-sm text-surface-600 mb-5 leading-relaxed">"LinkSpace transformed how we manage our coworking space. The booking system alone saved us hours of manual work every week."</p>
+                    <p class="text-sm text-surface-600 mb-5 leading-relaxed">"Link Space Panel transformed how we manage our coworking space. The booking system alone saved us hours of manual work every week."</p>
                     <div class="flex items-center gap-3 pt-4 border-t border-surface-100">
                         <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">AK</div>
                         <div>
@@ -825,9 +826,9 @@
         <div class="max-w-6xl mx-auto">
             <div class="flex flex-col sm:flex-row items-center justify-between gap-5">
                 <div class="flex items-center gap-3">
-                    <img src="https://www.link-space.net/img/logo%20link%20space.png"
-                         alt="LinkSpace"
-                         class="h-7 w-auto">
+                    <img src="/logo.png"
+                         alt="Link Space Panel"
+                         class="h-10 w-auto">
                 </div>
                 <p class="text-sm text-surface-400 text-center">{{ __('app.landing.footer_text') }}</p>
                 <div class="flex items-center gap-5 text-sm text-surface-400">
@@ -837,7 +838,7 @@
                 </div>
             </div>
             <div class="mt-6 pt-5 border-t border-surface-100 text-center">
-                <p class="text-xs text-surface-400">&copy; {{ date('Y') }} LinkSpace. {{ __('app.landing.all_rights_reserved') }}</p>
+                <p class="text-xs text-surface-400">&copy; {{ date('Y') }} Link Space Panel. {{ __('app.landing.all_rights_reserved') }}</p>
             </div>
         </div>
     </footer>
