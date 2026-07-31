@@ -152,9 +152,20 @@
         }
         .pricing-card:hover { border-color: #c7d2fe; box-shadow: 0 12px 32px -8px rgba(67, 56, 202, 0.08); }
         .pricing-card.featured {
-            border-color: #4338ca;
-            box-shadow: 0 8px 32px -8px rgba(67, 56, 202, 0.12);
+            border-color: #a5b4fc;
+            box-shadow: 0 0 0 1px #c7d2fe, 0 24px 50px -18px rgba(67, 56, 202, 0.30);
         }
+        @media (min-width: 640px) {
+            .pricing-card.featured { transform: scale(1.05); z-index: 1; }
+            .pricing-card.featured:hover { transform: scale(1.05) translateY(-3px); }
+        }
+
+        /* CTA arrow micro-interaction */
+        .cta-btn svg { transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+        .cta-primary:hover svg, .cta-secondary:hover svg { transform: translateX(3px); }
+
+        /* Nav elevation on scroll */
+        nav.nav-scrolled { box-shadow: 0 6px 24px -14px rgba(28, 25, 23, 0.22); }
 
         .modal-overlay { background: rgba(28, 25, 23, 0.5); backdrop-filter: blur(8px); }
 
@@ -194,7 +205,7 @@
     <!-- ═══════════════════════════════════════════
          NAVIGATION
          ═══════════════════════════════════════════ -->
-    <nav class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-surface-100">
+    <nav id="site-nav" class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-surface-100 transition-shadow duration-300">
         <div class="max-w-6xl mx-auto px-5 sm:px-8">
             <div class="flex items-center justify-between h-16">
                 <a href="/" class="flex items-center gap-3 shrink-0">
@@ -289,11 +300,34 @@
             </div>
         </div>
 
-        <button onclick="document.getElementById('product').scrollIntoView({behavior:'smooth'})"
-                class="scroll-cue absolute bottom-8 left-1/2 z-10 text-surface-400 hover:text-surface-600 transition hidden sm:block"
-                aria-label="{{ __('app.landing.see_how_it_works') }}">
-            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
-        </button>
+    </section>
+
+    <!-- ═══════════════════════════════════════════
+         TRUST / METRICS BAND
+         ═══════════════════════════════════════════ -->
+    <section class="px-5 sm:px-8 -mt-6 sm:-mt-10">
+        <div class="max-w-4xl mx-auto">
+            <div class="fade-in bg-white/75 backdrop-blur-md border border-surface-100 rounded-2xl shadow-sm shadow-surface-200/50 px-4 py-6 sm:px-8">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-y-6 gap-x-4 text-center sm:divide-x divide-surface-100">
+                    <div class="px-2">
+                        <p class="text-2xl sm:text-3xl font-extrabold text-surface-900 tracking-tight">500+</p>
+                        <p class="text-xs text-surface-400 mt-1">Coworking spaces</p>
+                    </div>
+                    <div class="px-2">
+                        <p class="text-2xl sm:text-3xl font-extrabold text-surface-900 tracking-tight">3-in-1</p>
+                        <p class="text-xs text-surface-400 mt-1">Wi-Fi · Rooms · Booking</p>
+                    </div>
+                    <div class="px-2">
+                        <p class="text-2xl sm:text-3xl font-extrabold text-surface-900 tracking-tight">5&nbsp;min</p>
+                        <p class="text-xs text-surface-400 mt-1">Setup time</p>
+                    </div>
+                    <div class="px-2">
+                        <p class="text-2xl sm:text-3xl font-extrabold text-surface-900 tracking-tight">EN · AR</p>
+                        <p class="text-xs text-surface-400 mt-1">Fully bilingual</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </section>
 
     <!-- ═══════════════════════════════════════════
@@ -679,8 +713,10 @@
     <!-- ═══════════════════════════════════════════
          WHY LINKSPACE
          ═══════════════════════════════════════════ -->
-    <section class="py-20 sm:py-28 px-5 sm:px-8 bg-surface-900 text-white">
-        <div class="max-w-6xl mx-auto">
+    <section class="relative overflow-hidden py-20 sm:py-28 px-5 sm:px-8 bg-surface-900 text-white">
+        <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-[640px] h-[420px] bg-indigo-600/20 blur-[130px] rounded-full pointer-events-none"></div>
+        <div class="absolute bottom-0 right-0 w-[420px] h-[320px] bg-violet-600/10 blur-[120px] rounded-full pointer-events-none"></div>
+        <div class="relative max-w-6xl mx-auto">
             <div class="text-center mb-16 fade-in">
                 <span class="inline-block text-xs font-semibold text-indigo-300 bg-white/5 px-3 py-1 rounded-full mb-4">{{ __('app.landing.why_linkspace') }}</span>
                 <h2 class="text-3xl sm:text-4xl font-bold tracking-tight">{{ __('app.landing.built_for_spaces') }}</h2>
@@ -739,7 +775,7 @@
                 </div>
 
                 <div class="pricing-card featured relative">
-                    <span class="absolute -top-3 right-6 text-[0.6rem] font-bold text-white bg-indigo-600 px-3 py-1 rounded-full">Most Popular</span>
+                    <span class="absolute -top-3 left-1/2 -translate-x-1/2 text-[0.62rem] font-bold text-white bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-1 rounded-full shadow-md shadow-indigo-500/30 whitespace-nowrap">★ Most Popular</span>
                     <h3 class="text-base font-bold text-surface-900 mb-1">Professional</h3>
                     <p class="text-sm text-surface-400 mb-4">For growing spaces</p>
                     <p class="text-4xl font-black text-surface-900 mb-1">ج.م 999<span class="text-base font-medium text-surface-400">/mo</span></p>
@@ -842,19 +878,28 @@
          FINAL CTA
          ═══════════════════════════════════════════ -->
     <section class="py-20 sm:py-28 px-5 sm:px-8">
-        <div class="max-w-3xl mx-auto text-center fade-in">
-            <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-surface-900 mb-4">{{ __('app.landing.ready_to_transform') }}</h2>
-            <p class="text-surface-500 text-base sm:text-lg mb-8 max-w-xl mx-auto">{{ __('app.landing.join_500_spaces') }}</p>
-            <div class="flex flex-col sm:flex-row gap-3 justify-center">
-                <button onclick="openDemoModal()" class="cta-primary justify-center">
-                    {{ __('app.landing.start_free_trial') }}
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-                </button>
-                <button onclick="openDemoModal()" class="cta-secondary justify-center">
-                    {{ __('app.landing.request_demo') }}
-                </button>
+        <div class="max-w-5xl mx-auto fade-in">
+            <div class="relative overflow-hidden rounded-3xl px-6 py-16 sm:py-20 text-center shadow-2xl shadow-indigo-500/20"
+                 style="background: radial-gradient(120% 120% at 0% 0%, #6d28d9 0%, transparent 45%), radial-gradient(120% 120% at 100% 100%, #4f46e5 0%, transparent 48%), linear-gradient(135deg, #4338ca 0%, #6d28d9 55%, #7c3aed 100%);">
+                <div class="absolute inset-0 opacity-[0.14]" style="background-image:url('/images/hero-bg.svg'); background-size:cover; mix-blend-mode:soft-light;"></div>
+                <div class="absolute -top-16 -left-16 w-64 h-64 rounded-full bg-white/10 blur-3xl pointer-events-none"></div>
+                <div class="absolute -bottom-20 -right-10 w-72 h-72 rounded-full bg-fuchsia-300/20 blur-3xl pointer-events-none"></div>
+
+                <div class="relative z-10">
+                    <h2 class="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white mb-4 max-w-2xl mx-auto" style="text-wrap:balance">{{ __('app.landing.ready_to_transform') }}</h2>
+                    <p class="text-indigo-100 text-base sm:text-lg mb-9 max-w-xl mx-auto leading-relaxed">{{ __('app.landing.join_500_spaces') }}</p>
+                    <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                        <button onclick="openDemoModal()" class="group inline-flex items-center justify-center gap-2 bg-white text-indigo-700 font-semibold text-sm px-7 py-3.5 rounded-xl hover:bg-indigo-50 transition shadow-lg shadow-indigo-950/20">
+                            {{ __('app.landing.start_free_trial') }}
+                            <svg class="w-4 h-4 transition group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                        </button>
+                        <button onclick="openDemoModal()" class="inline-flex items-center justify-center gap-2 border border-white/40 text-white font-semibold text-sm px-7 py-3.5 rounded-xl hover:bg-white/10 transition">
+                            {{ __('app.landing.request_demo') }}
+                        </button>
+                    </div>
+                    <p class="text-xs text-indigo-200 mt-5">{{ __('app.landing.no_credit_card_needed') }} · 14-day free trial · Cancel anytime</p>
+                </div>
             </div>
-            <p class="text-xs text-surface-400 mt-4">{{ __('app.landing.no_credit_card_needed') }} · 14-day free trial · Cancel anytime</p>
         </div>
     </section>
 
@@ -991,6 +1036,14 @@
             });
         }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
         document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+        // Nav elevation on scroll
+        const siteNav = document.getElementById('site-nav');
+        if (siteNav) {
+            const onScroll = () => siteNav.classList.toggle('nav-scrolled', window.scrollY > 8);
+            onScroll();
+            window.addEventListener('scroll', onScroll, { passive: true });
+        }
     </script>
 </body>
 </html>
