@@ -1,53 +1,47 @@
-<!DOCTYPE html>
-@php $locale = app()->getLocale(); $isRtl = $locale === 'ar'; @endphp
-<html lang="{{ $locale }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ __('app.auth.linkspace') }} - {{ __('app.auth.forgot_password') }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    @if($isRtl)
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Cairo', sans-serif; }</style>
-    @endif
-</head>
-<body class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-    <div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
-        <div class="flex justify-center mb-6">
-            <img src="/logo.webp" alt="Link Space Panel" class="h-12 w-auto">
+@extends('layouts.auth')
+
+@section('title', __('app.auth.forgot_password'))
+@section('heading', __('app.auth.forgot_password'))
+@section('subheading', __('app.auth.forgot_password_hint'))
+
+@section('content')
+    @if (session('status'))
+        <div class="mb-5 rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
+            <p class="text-sm text-emerald-700 flex items-center gap-2">
+                <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>{{ session('status') }}</span>
+            </p>
         </div>
-        <h1 class="text-2xl font-bold text-gray-900 text-center mb-2">{{ __('app.auth.forgot_password') }}</h1>
-        <p class="text-sm text-gray-500 text-center mb-8">{{ __('app.auth.forgot_password_hint') }}</p>
+    @endif
 
-        @if (session('status'))
-            <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4">
-                <p class="text-sm">{{ session('status') }}</p>
-            </div>
-        @endif
+    @if ($errors->any())
+        <div class="mb-5 rounded-xl bg-red-50 border border-red-100 px-4 py-3 space-y-1">
+            @foreach ($errors->all() as $error)
+                <p class="text-sm text-red-600 flex items-start gap-2">
+                    <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>{{ $error }}</span>
+                </p>
+            @endforeach
+        </div>
+    @endif
 
-        @if ($errors->any())
-            <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
-                @foreach ($errors->all() as $error)
-                    <p class="text-sm">{{ $error }}</p>
-                @endforeach
-            </div>
-        @endif
+    <form method="POST" action="/forgot-password" class="space-y-5">
+        @csrf
+        <div>
+            <label for="email" class="lbl">{{ __('app.auth.email') }}</label>
+            <input type="email" name="email" id="email" value="{{ old('email') }}" required autofocus
+                   placeholder="you@example.com" class="field">
+        </div>
+        <button type="submit" class="btn-primary">
+            {{ __('app.auth.send_reset_link') }}
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+        </button>
+    </form>
 
-        <form method="POST" action="/forgot-password">
-            @csrf
-            <div class="mb-6">
-                <label for="email" class="block text-sm font-medium text-gray-700 mb-1">{{ __('app.auth.email') }}</label>
-                <input type="email" name="email" id="email" value="{{ old('email') }}" required autofocus
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-            </div>
-            <button type="submit" class="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition font-medium">
-                {{ __('app.auth.send_reset_link') }}
-            </button>
-        </form>
-
-        <p class="text-center text-sm text-gray-500 mt-6">
-            <a href="/login" class="text-blue-600 font-medium hover:underline">{{ __('app.auth.back_to_login') }}</a>
-        </p>
-    </div>
-</body>
-</html>
+    <p class="text-center text-sm text-surface-500 mt-7">
+        <a href="/login" class="text-indigo-600 font-semibold hover:text-indigo-700 inline-flex items-center gap-1.5">
+            <svg class="w-4 h-4 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+            {{ __('app.auth.back_to_login') }}
+        </a>
+    </p>
+@endsection

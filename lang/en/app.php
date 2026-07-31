@@ -58,6 +58,13 @@ return [
         'reset_password'            => 'Reset Password',
         'reset_password_hint'       => 'Choose a new password for your account.',
         'new_password'              => 'New Password',
+        'welcome_back'              => 'Welcome back',
+        'login_subtitle'            => 'Sign in to manage your space',
+        'remember_me'               => 'Remember me',
+        'brand_headline'            => 'Everything your space needs, in one panel',
+        'brand_point_1'             => 'Manage Wi-Fi users on your MikroTik router',
+        'brand_point_2'             => 'Rooms, bookings & pay-per-minute shared sessions',
+        'brand_point_3'             => 'Live revenue, occupancy & smart alerts',
     ],
 
     /*
