@@ -8,14 +8,21 @@ use App\Models\SpeedProfile;
 /**
  * Feature-aware boundary between the app and the MikroTik router.
  *
- * Every router interaction goes through here so the "build a client from the
- * owner's credentials" step lives in one place and (from Phase 3) the hotspot
- * feature gate is centralized. Method signatures deliberately do NOT expose
- * MikroTikService, so a second router vendor could later sit behind an
- * extracted interface without touching callers.
+ * Every router interaction goes through here so that (a) building a client from
+ * the owner's credentials lives in one place and (b) the hotspot feature gate is
+ * centralized. Method signatures deliberately do NOT expose MikroTikService, so a
+ * second router vendor could later sit behind an extracted interface without
+ * touching callers.
  *
- * NOTE (Phase 2): no gating yet — behavior is identical to the previous inline
- * `new MikroTikService(...)` calls. Gating is introduced in Phase 3.
+ * Gating policy (`shouldSync`): router work only runs when the owner has the
+ * `hotspot` feature AND has configured credentials. When it doesn't:
+ *   - mutating ops (create/delete/setSpeed/profile sync) are a silent no-op — a
+ *     booking-only owner manages members with no router side-effects, and a
+ *     hotspot owner mid-setup isn't hard-blocked (callers surface the "configure
+ *     your router" nudge for that case);
+ *   - reads (`activeUsers`) return empty so no socket is ever opened.
+ * `testConnection` is exempt — it is an explicit connectivity check and must
+ * actually attempt to connect.
  */
 class HotspotSyncService
 {
@@ -29,9 +36,19 @@ class HotspotSyncService
         );
     }
 
-    /** Provision a hotspot user on the router. Throws on router failure. */
+    /** Router work runs only for a hotspot-enabled, configured owner. */
+    private function shouldSync(Owner $owner): bool
+    {
+        return $owner->hasFeature('hotspot') && $owner->hasRouterConfigured();
+    }
+
+    /** Provision a hotspot user on the router. No-op when sync is disabled. Throws on router failure. */
     public function createUser(Owner $owner, string $phone, string $password, string $profileName): void
     {
+        if (! $this->shouldSync($owner)) {
+            return;
+        }
+
         $client = $this->client($owner);
         try {
             $client->connect();
@@ -41,9 +58,13 @@ class HotspotSyncService
         }
     }
 
-    /** Remove a hotspot user from the router. Throws on router failure. */
+    /** Remove a hotspot user from the router. No-op when sync is disabled. Throws on router failure. */
     public function deleteUser(Owner $owner, string $phone): void
     {
+        if (! $this->shouldSync($owner)) {
+            return;
+        }
+
         $client = $this->client($owner);
         try {
             $client->connect();
@@ -53,9 +74,13 @@ class HotspotSyncService
         }
     }
 
-    /** Re-point a single user at a profile on the router. Throws on router failure. */
+    /** Re-point a single user at a profile on the router. No-op when sync is disabled. Throws on router failure. */
     public function setUserSpeed(Owner $owner, string $phone, string $profileName): void
     {
+        if (! $this->shouldSync($owner)) {
+            return;
+        }
+
         $client = $this->client($owner);
         try {
             $client->connect();
@@ -65,9 +90,13 @@ class HotspotSyncService
         }
     }
 
-    /** Create a hotspot profile on the router. Throws on router failure. */
+    /** Create a hotspot profile on the router. No-op when sync is disabled. Throws on router failure. */
     public function createProfile(Owner $owner, string $name, string $speedDownload, string $speedUpload): void
     {
+        if (! $this->shouldSync($owner)) {
+            return;
+        }
+
         $client = $this->client($owner);
         try {
             $client->connect();
@@ -77,9 +106,13 @@ class HotspotSyncService
         }
     }
 
-    /** Delete a hotspot profile from the router. Throws on router failure. */
+    /** Delete a hotspot profile from the router. No-op when sync is disabled. Throws on router failure. */
     public function deleteProfile(Owner $owner, string $name): void
     {
+        if (! $this->shouldSync($owner)) {
+            return;
+        }
+
         $client = $this->client($owner);
         try {
             $client->connect();
@@ -91,15 +124,19 @@ class HotspotSyncService
 
     /**
      * Update a profile on the router and re-apply it to each assigned user in a
-     * single connection. Best-effort per user: returns the list of "name: error"
-     * strings for users that failed (empty array = all synced). Throws only if
-     * the connect / profile-update step itself fails.
+     * single connection. Best-effort per user: returns "name: error" strings for
+     * users that failed (empty array = all synced, or sync disabled). Throws only
+     * if the connect / profile-update step itself fails.
      *
      * @param  iterable<int, \App\Models\HotspotUser>  $assignedUsers
      * @return string[]  per-user sync errors
      */
     public function syncProfileToUsers(Owner $owner, SpeedProfile $profile, iterable $assignedUsers): array
     {
+        if (! $this->shouldSync($owner)) {
+            return [];
+        }
+
         $client = $this->client($owner);
         $errors = [];
 
@@ -125,9 +162,13 @@ class HotspotSyncService
         return $errors;
     }
 
-    /** Live active hotspot users from the router. Throws on router failure. */
+    /** Live active hotspot users from the router. Empty (no socket opened) when sync is disabled. Throws on router failure. */
     public function activeUsers(Owner $owner): array
     {
+        if (! $this->shouldSync($owner)) {
+            return [];
+        }
+
         $client = $this->client($owner);
         try {
             $client->connect();
@@ -138,7 +179,11 @@ class HotspotSyncService
         }
     }
 
-    /** Verify the owner's router credentials connect. Throws on failure. */
+    /**
+     * Verify the owner's router credentials connect. Deliberately NOT gated: it is
+     * an explicit connectivity check invoked from the (hotspot-gated) Settings page.
+     * Throws on failure.
+     */
     public function testConnection(Owner $owner): void
     {
         $client = $this->client($owner);

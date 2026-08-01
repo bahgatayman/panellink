@@ -122,6 +122,15 @@ class Owner extends Authenticatable
         return $this->features()->where('key', $key)->where('is_active', true)->exists();
     }
 
+    /**
+     * Whether this owner has usable MikroTik router credentials. Router sync only
+     * runs when the hotspot feature is enabled AND this returns true.
+     */
+    public function hasRouterConfigured(): bool
+    {
+        return filled($this->mikrotik_host) && filled($this->mikrotik_username);
+    }
+
     public function enableFeature(string $key): void
     {
         $feature = Feature::where('key', $key)->firstOrFail();
