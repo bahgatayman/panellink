@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\MikroTikService;
+use App\Services\HotspotSyncService;
 use Exception;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -11,6 +11,10 @@ use Illuminate\View\View;
 
 class SettingsController extends Controller
 {
+    public function __construct(private HotspotSyncService $sync)
+    {
+    }
+
     public function index(): View
     {
         $owner = Auth::guard('owner')->user();
@@ -24,15 +28,8 @@ class SettingsController extends Controller
     {
         $owner = Auth::guard('owner')->user();
 
-        $service = new MikroTikService(
-            $owner->mikrotik_host,
-            $owner->mikrotik_port,
-            $owner->mikrotik_username,
-            $owner->mikrotik_password,
-        );
-
         try {
-            $service->connect();
+            $this->sync->testConnection($owner);
 
             return back()->with('success', 'Connected to MikroTik successfully');
         } catch (Exception $e) {

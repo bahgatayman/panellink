@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\HotspotUser;
 use App\Models\SpeedProfile;
-use App\Services\MikroTikService;
+use App\Services\HotspotSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,6 +13,10 @@ use Illuminate\View\View;
 
 class HotspotUserController extends Controller
 {
+    public function __construct(private HotspotSyncService $sync)
+    {
+    }
+
     public function index(Request $request): View
     {
         $search = $request->query('search');
@@ -70,20 +74,10 @@ class HotspotUserController extends Controller
             return back()->withInput()->with('error', 'Please set a default speed profile first before adding users.');
         }
 
-        $mikrotik = new MikroTikService(
-            $owner->mikrotik_host,
-            $owner->mikrotik_port,
-            $owner->mikrotik_username,
-            $owner->mikrotik_password,
-        );
-
         try {
-            $mikrotik->connect();
-            $mikrotik->createHotspotUser($phone, $password, $defaultProfile->name);
+            $this->sync->createUser($owner, $phone, $password, $defaultProfile->name);
         } catch (\Exception $e) {
             return back()->withInput()->with('error', 'MikroTik error: ' . $e->getMessage());
-        } finally {
-            $mikrotik->disconnect();
         }
 
         HotspotUser::create([
@@ -165,20 +159,10 @@ class HotspotUserController extends Controller
 
         $owner = auth('owner')->user();
 
-        $mikrotik = new MikroTikService(
-            $owner->mikrotik_host,
-            $owner->mikrotik_port,
-            $owner->mikrotik_username,
-            $owner->mikrotik_password,
-        );
-
         try {
-            $mikrotik->connect();
-            $mikrotik->deleteHotspotUser($user->phone);
+            $this->sync->deleteUser($owner, $user->phone);
         } catch (\Exception $e) {
             return back()->with('error', "Could not delete user from MikroTik: {$e->getMessage()}");
-        } finally {
-            $mikrotik->disconnect();
         }
 
         $user->delete();
@@ -215,20 +199,10 @@ class HotspotUserController extends Controller
 
         $owner = auth('owner')->user();
 
-        $mikrotik = new MikroTikService(
-            $owner->mikrotik_host,
-            $owner->mikrotik_port,
-            $owner->mikrotik_username,
-            $owner->mikrotik_password,
-        );
-
         try {
-            $mikrotik->connect();
-            $mikrotik->setUserSpeed($user->phone, $profile->name);
+            $this->sync->setUserSpeed($owner, $user->phone, $profile->name);
         } catch (\Exception $e) {
             return back()->with('error', 'MikroTik error: ' . $e->getMessage());
-        } finally {
-            $mikrotik->disconnect();
         }
 
         $user->update([

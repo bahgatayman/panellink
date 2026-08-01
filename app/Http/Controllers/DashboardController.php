@@ -8,13 +8,17 @@ use App\Models\Room;
 use App\Models\SharedSession;
 use App\Models\SpeedProfile;
 use App\Models\Workspace;
-use App\Services\MikroTikService;
+use App\Services\HotspotSyncService;
 use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
+    public function __construct(private HotspotSyncService $sync)
+    {
+    }
+
     public function index(): View
     {
         $owner = Auth::guard('owner')->user();
@@ -28,15 +32,7 @@ class DashboardController extends Controller
         $mikrotikError  = null;
 
         try {
-            $mikrotik = new MikroTikService(
-                $owner->mikrotik_host,
-                $owner->mikrotik_port,
-                $owner->mikrotik_username,
-                $owner->mikrotik_password,
-            );
-            $mikrotik->connect();
-            $activeSessions = count($mikrotik->getActiveUsers());
-            $mikrotik->disconnect();
+            $activeSessions = count($this->sync->activeUsers($owner));
         } catch (Exception $e) {
             $mikrotikError = $e->getMessage();
         }
