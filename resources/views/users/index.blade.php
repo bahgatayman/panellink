@@ -51,8 +51,11 @@
                 </thead>
                 <tbody class="divide-y">
                     @foreach ($users as $user)
-                        <tr class="hover:bg-gray-50 transition">
-                            <td class="px-4 py-3 font-medium text-gray-900">{{ $user->name }}</td>
+                        <tr class="row-link hover:bg-gray-50 transition cursor-pointer" data-href="/users/{{ $user->id }}">
+                            <td class="px-4 py-3 font-medium text-gray-900">
+                                {{-- Real link: keeps the row reachable by keyboard and ctrl/middle-clickable. --}}
+                                <a href="/users/{{ $user->id }}" class="hover:text-blue-600">{{ $user->name }}</a>
+                            </td>
                             <td class="px-4 py-3">{{ $user->phone }}</td>
                             @if($owner->hasFeature('hotspot'))
                             <td class="px-4 py-3">{{ $user->speed_download }}</td>
@@ -67,7 +70,6 @@
                             </td>
                             <td class="px-4 py-3 text-gray-500">{{ $user->created_at->format('M d, Y') }}</td>
                             <td class="px-4 py-3 flex gap-2">
-                                <a href="/users/{{ $user->id }}" class="text-blue-600 hover:underline text-sm font-medium">{{ __('app.common.view') }}</a>
                                 <a href="/users/{{ $user->id }}/edit" class="text-blue-600 hover:underline text-sm font-medium">{{ __('app.common.edit') }}</a>
                                 <form method="POST" action="/users/{{ $user->id }}" onsubmit="return confirm('Delete this user?')">
                                     @csrf
@@ -89,4 +91,5 @@
             <p class="text-gray-500 text-lg">{{ __('app.empty.no_users') }}</p>
         </div>
     @endif
+
 @endsection

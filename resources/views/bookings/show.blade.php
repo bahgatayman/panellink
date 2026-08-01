@@ -81,6 +81,81 @@
                     </div>
                 @endif
             </div>
+
+            @php $canSell = auth('owner')->user()->hasFeature('sales'); @endphp
+            @if ($canSell)
+                @php $sale = $booking->sale; @endphp
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="font-semibold text-gray-900 mb-4">{{ __('app.sales.items_extras') }}</h3>
+
+                    @if ($sale && $sale->items->isNotEmpty())
+                        <div class="overflow-x-auto -mx-1 px-1">
+                        <table class="w-full text-sm mb-4">
+                            <tbody class="divide-y divide-gray-100">
+                                @foreach ($sale->items as $item)
+                                    <tr>
+                                        <td class="py-2 text-gray-900">{{ $item->name }}</td>
+                                        <td class="py-2 text-center text-gray-500">&times;{{ $item->quantity }}</td>
+                                        <td class="py-2 text-right text-gray-900 font-medium">ج.م {{ number_format($item->line_total, 2) }}</td>
+                                        <td class="py-2 text-right w-8">
+                                            <form method="POST" action="{{ route('bookings.items.remove', [$booking->id, $item->id]) }}">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button class="text-gray-400 hover:text-red-600" title="{{ __('app.common.delete') }}">&times;</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                        </div>
+                    @else
+                        <p class="text-sm text-gray-400 mb-4">{{ __('app.sales.no_items_yet') }}</p>
+                    @endif
+
+                    @if ($products->isNotEmpty())
+                        <form method="POST" action="{{ route('bookings.items.add', $booking->id) }}" class="flex items-end gap-2 pt-4 border-t border-gray-100">
+                            @csrf
+                            <div class="flex-1">
+                                <label class="block text-xs font-medium text-gray-500 mb-1">{{ __('app.sales.product') }}</label>
+                                <select name="product_id" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    @foreach ($products as $product)
+                                        <option value="{{ $product->id }}">{{ $product->name }} — ج.م {{ number_format($product->price, 2) }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="w-20">
+                                <label class="block text-xs font-medium text-gray-500 mb-1">{{ __('app.sales.qty') }}</label>
+                                <input type="number" name="quantity" value="1" min="1" max="1000"
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium">
+                                {{ __('app.sales.add') }}
+                            </button>
+                        </form>
+                    @else
+                        <p class="text-xs text-gray-400 pt-4 border-t border-gray-100">
+                            {{ __('app.sales.no_products_hint') }}
+                            <a href="{{ route('products.create') }}" class="text-blue-600 hover:underline">{{ __('app.sales.add_product') }}</a>
+                        </p>
+                    @endif
+
+                    <div class="mt-5 pt-4 border-t border-gray-200 space-y-1 text-sm">
+                        <div class="flex justify-between text-gray-500">
+                            <span>{{ __('app.sales.room_charge') }}</span>
+                            <span>ج.م {{ number_format($booking->total_price, 2) }}</span>
+                        </div>
+                        <div class="flex justify-between text-gray-500">
+                            <span>{{ __('app.sales.items') }}</span>
+                            <span>ج.م {{ number_format($sale->total ?? 0, 2) }}</span>
+                        </div>
+                        <div class="flex justify-between text-base font-bold text-gray-900 pt-1">
+                            <span>{{ __('app.sales.grand_total') }}</span>
+                            <span class="text-blue-600">ج.م {{ number_format($booking->grandTotal(), 2) }}</span>
+                        </div>
+                    </div>
+                </div>
+            @endif
         </div>
 
         <div class="space-y-4">

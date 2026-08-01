@@ -19,6 +19,7 @@ class Owner extends Authenticatable
         'email',
         'password',
         'business_name',
+        'logo_path',
         'mikrotik_host',
         'mikrotik_port',
         'mikrotik_username',
@@ -76,6 +77,16 @@ class Owner extends Authenticatable
         return $this->hasMany(SharedSession::class);
     }
 
+    public function products(): HasMany
+    {
+        return $this->hasMany(Product::class);
+    }
+
+    public function sales(): HasMany
+    {
+        return $this->hasMany(Sale::class);
+    }
+
     public function plan(): BelongsTo
     {
         return $this->belongsTo(Plan::class);
@@ -131,12 +142,117 @@ class Owner extends Authenticatable
         return filled($this->mikrotik_host) && filled($this->mikrotik_username);
     }
 
+    /**
+     * Public URL of the owner's uploaded brand image, or null when they have none
+     * (callers fall back to initials()).
+     *
+     * Built with asset() rather than Storage::url(): the latter hard-codes
+     * APP_URL, so an image uploaded while running on `artisan serve` (:8000)
+     * came back pointing at http://localhost (:80) and rendered broken.
+     * asset() follows whatever host the request actually came in on.
+     */
+    public function logoUrl(): ?string
+    {
+        return $this->logo_path
+            ? asset('storage/' . $this->logo_path)
+            : null;
+    }
+
+    /**
+     * Up to two letters from the business name — the placeholder shown wherever
+     * the brand image would go.
+     */
+    public function initials(): string
+    {
+        $source = filled($this->business_name) ? $this->business_name : (string) $this->name;
+
+        $letters = collect(preg_split('/\s+/', trim($source)))
+            ->filter()
+            ->take(2)
+            ->map(fn ($word) => mb_strtoupper(mb_substr($word, 0, 1)))
+            ->implode('');
+
+        return $letters !== '' ? $letters : '?';
+    }
+
     public function enableFeature(string $key): void
     {
         $feature = Feature::where('key', $key)->firstOrFail();
         $this->features()->syncWithoutDetaching([
             $feature->id => ['enabled_at' => now()],
         ]);
+    }
+
+    /** Enable this owner's plan default features. Safe to call repeatedly. */
+    public function applyPlanFeatures(): void
+    {
+        foreach ($this->plan?->defaultFeatures() ?? [] as $key) {
+            if (Feature::where('key', $key)->where('is_active', true)->exists()) {
+                $this->enableFeature($key);
+            }
+        }
+    }
+
+    // ---- Plan limits (0 / null on the plan = unlimited) ----
+
+    public function canAddMoreWorkspaces(): bool
+    {
+        $limit = $this->plan?->max_workspaces;
+        if (! $limit || $limit <= 0) {
+            return true;
+        }
+
+        return $this->workspaces()->count() < $limit;
+    }
+
+    public function remainingWorkspaceSlots(): ?int
+    {
+        $limit = $this->plan?->max_workspaces;
+        if (! $limit || $limit <= 0) {
+            return null; // unlimited
+        }
+
+        return max(0, $limit - $this->workspaces()->count());
+    }
+
+    public function canAddMoreRooms(): bool
+    {
+        $limit = $this->plan?->max_rooms;
+        if (! $limit || $limit <= 0) {
+            return true;
+        }
+
+        return $this->rooms()->count() < $limit;
+    }
+
+    public function remainingRoomSlots(): ?int
+    {
+        $limit = $this->plan?->max_rooms;
+        if (! $limit || $limit <= 0) {
+            return null; // unlimited
+        }
+
+        return max(0, $limit - $this->rooms()->count());
+    }
+
+    public function canAddMoreProducts(): bool
+    {
+        $limit = $this->plan?->max_products;
+        if (! $limit || $limit <= 0) {
+            return true;
+        }
+
+        return $this->products()->count() < $limit;
+    }
+
+    public function remainingProductSlots(): ?int
+    {
+        $limit = $this->plan?->max_products;
+        if (! $limit || $limit <= 0) {
+            return null; // unlimited
+        }
+
+        return max(0, $limit - $this->products()->count());
     }
 
     public function disableFeature(string $key): void

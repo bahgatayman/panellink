@@ -1,29 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 1024" preserveAspectRatio="xMidYMid slice" role="img" aria-label="">
   <defs>
     <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#eef2ff"/>
-      <stop offset="0.45" stop-color="#f7f7fb"/>
-      <stop offset="1" stop-color="#fafaf9"/>
+      <stop offset="0" stop-color="#eef3fb"/>
+      <stop offset="0.45" stop-color="#f5f7fb"/>
+      <stop offset="1" stop-color="#f7f8fa"/>
     </linearGradient>
     <radialGradient id="blobA" cx="50%" cy="50%" r="50%">
-      <stop offset="0" stop-color="#818cf8" stop-opacity="0.55"/>
-      <stop offset="1" stop-color="#818cf8" stop-opacity="0"/>
+      <stop offset="0" stop-color="#6f96d1" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#6f96d1" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="blobB" cx="50%" cy="50%" r="50%">
-      <stop offset="0" stop-color="#c4b5fd" stop-opacity="0.5"/>
-      <stop offset="1" stop-color="#c4b5fd" stop-opacity="0"/>
+      <stop offset="0" stop-color="#88a6d8" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#88a6d8" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="blobC" cx="50%" cy="50%" r="50%">
-      <stop offset="0" stop-color="#a5b4fc" stop-opacity="0.45"/>
-      <stop offset="1" stop-color="#a5b4fc" stop-opacity="0"/>
+      <stop offset="0" stop-color="#b0c6e6" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#b0c6e6" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="center" cx="50%" cy="42%" r="46%">
-      <stop offset="0" stop-color="#fafaf9" stop-opacity="0.9"/>
-      <stop offset="0.7" stop-color="#fafaf9" stop-opacity="0.45"/>
-      <stop offset="1" stop-color="#fafaf9" stop-opacity="0"/>
+      <stop offset="0" stop-color="#f7f8fa" stop-opacity="0.9"/>
+      <stop offset="0.7" stop-color="#f7f8fa" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#f7f8fa" stop-opacity="0"/>
     </radialGradient>
     <pattern id="grid" width="52" height="52" patternUnits="userSpaceOnUse">
-      <path d="M52 0H0V52" fill="none" stroke="#4338ca" stroke-opacity="0.06" stroke-width="1"/>
+      <path d="M52 0H0V52" fill="none" stroke="#163c85" stroke-opacity="0.06" stroke-width="1"/>
     </pattern>
   </defs>
 
@@ -41,7 +41,7 @@
   <rect width="1440" height="1024" fill="url(#center)"/>
 
   <!-- network motif (on brand: Link Space) -->
-  <g stroke="#6366f1" stroke-opacity="0.16" stroke-width="1.2" fill="none">
+  <g stroke="#3f68af" stroke-opacity="0.16" stroke-width="1.2" fill="none">
     <path d="M150 250 L330 180 L470 320 L280 430 Z"/>
     <path d="M330 180 L520 150"/>
     <path d="M470 320 L360 520"/>
@@ -51,7 +51,7 @@
     <path d="M120 760 L300 700 L250 880"/>
     <path d="M1180 820 L1330 760"/>
   </g>
-  <g fill="#6366f1" fill-opacity="0.45">
+  <g fill="#3f68af" fill-opacity="0.45">
     <circle cx="150" cy="250" r="4"/>
     <circle cx="330" cy="180" r="5"/>
     <circle cx="470" cy="320" r="4"/>

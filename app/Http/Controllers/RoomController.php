@@ -42,6 +42,10 @@ class RoomController extends Controller
     {
         $workspace = $this->getWorkspace($workspaceId);
 
+        if (! auth('owner')->user()->canAddMoreRooms()) {
+            return back()->withInput()->with('error', __('app.plan_limit.rooms'));
+        }
+
         $data = $request->validate([
             'name'           => 'required|string|max:255',
             'type'           => 'required|in:meeting,training,shared,office',

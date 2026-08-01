@@ -30,22 +30,11 @@
                 </div>
 
                 <div class="mb-5 relative">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('app.session.user') }}</label>
-                    <input type="text" id="user-search" placeholder="{{ __('app.placeholder.search_name_phone') }}"
-                        autocomplete="off"
-                        class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                    <input type="hidden" name="hotspot_user_id" id="selected-user-id" value="{{ old('hotspot_user_id') }}">
-
-                    <div id="search-results"
-                         class="hidden absolute z-10 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 w-full max-w-md">
-                    </div>
-
-                    <div id="selected-user-display" class="hidden mt-2 flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2">
-                        <span class="text-sm font-medium text-blue-800" id="selected-user-name"></span>
-                        <span class="text-xs text-blue-600" id="selected-user-phone"></span>
-                        <button type="button" onclick="clearUserSelection()"
-                            class="ml-auto text-xs text-gray-400 hover:text-red-500">&cross;</button>
-                    </div>
+                    @include('partials.member-picker', [
+                        'label'        => __('app.session.user'),
+                        'inputClass'   => 'w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm',
+                        'resultsClass' => 'max-w-md',
+                    ])
                     @error('hotspot_user_id') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                 </div>
 
@@ -94,59 +83,4 @@
         </div>
     </div>
 
-    <script>
-    let searchTimeout = null;
-
-    document.getElementById('user-search').addEventListener('input', function() {
-        const q = this.value.trim();
-        clearTimeout(searchTimeout);
-
-        if (q.length < 2) {
-            document.getElementById('search-results').classList.add('hidden');
-            return;
-        }
-
-        searchTimeout = setTimeout(() => {
-            fetch(`/users/search?q=${encodeURIComponent(q)}`)
-                .then(r => r.json())
-                .then(users => {
-                    const container = document.getElementById('search-results');
-                    if (users.length === 0) {
-                        container.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500">No users found</div>';
-                    } else {
-                        container.innerHTML = users.map(u => `
-                            <div class="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b last:border-0"
-                                 onclick="selectUser(${u.id}, '${u.name}', '${u.phone}')">
-                                <p class="text-sm font-medium text-gray-900">${u.name}</p>
-                                <p class="text-xs text-gray-500">${u.phone}</p>
-                            </div>
-                        `).join('');
-                    }
-                    container.classList.remove('hidden');
-                });
-        }, 300);
-    });
-
-    function selectUser(id, name, phone) {
-        document.getElementById('selected-user-id').value    = id;
-        document.getElementById('user-search').value         = '';
-        document.getElementById('search-results').classList.add('hidden');
-        document.getElementById('selected-user-display').classList.remove('hidden');
-        document.getElementById('selected-user-name').textContent  = name;
-        document.getElementById('selected-user-phone').textContent = phone;
-    }
-
-    function clearUserSelection() {
-        document.getElementById('selected-user-id').value = '';
-        document.getElementById('selected-user-display').classList.add('hidden');
-        document.getElementById('user-search').value = '';
-        document.getElementById('user-search').focus();
-    }
-
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('#user-search') && !e.target.closest('#search-results')) {
-            document.getElementById('search-results').classList.add('hidden');
-        }
-    });
-    </script>
 @endsection

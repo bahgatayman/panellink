@@ -31,6 +31,13 @@ class FeatureSeeder extends Seeder
                 'icon'        => 'calendar',
                 'is_active'   => true,
             ],
+            [
+                'key'         => 'sales',
+                'name'        => 'Sales & Products',
+                'description' => 'Sell products and services (coffee, printing, rentals) and attach them to bookings',
+                'icon'        => 'shopping-cart',
+                'is_active'   => true,
+            ],
         ];
 
         foreach ($features as $feature) {

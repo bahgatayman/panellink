@@ -26,6 +26,10 @@ class WorkspaceController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        if (! auth('owner')->user()->canAddMoreWorkspaces()) {
+            return back()->withInput()->with('error', __('app.plan_limit.workspaces'));
+        }
+
         $data = $request->validate([
             'name'        => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',

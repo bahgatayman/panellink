@@ -69,7 +69,8 @@
     <!-- Revenue by Plan -->
     <div class="bg-white rounded-xl border shadow-sm p-6 mt-6">
         <h3 class="font-semibold text-gray-900 mb-4">{{ __('app.financial.revenue_by_plan') }} ({{ $year }})</h3>
-        <table class="w-full text-sm">
+        <div class="overflow-x-auto">
+        <table class="w-full min-w-[36rem] text-sm">
             <thead>
                 <tr class="text-left text-gray-500 border-b">
                     <th class="pb-3">{{ __('app.financial.plan') }}</th>
@@ -95,6 +96,7 @@
                 @endforeach
             </tbody>
         </table>
+        </div>
     </div>
 
     <!-- Expiring Soon -->
@@ -126,7 +128,8 @@
     <!-- Recent Transactions -->
     <div class="bg-white rounded-xl border shadow-sm p-6 mt-6">
         <h3 class="font-semibold text-gray-900 mb-4">{{ __('app.financial.recent_transactions') }}</h3>
-        <table class="w-full text-sm">
+        <div class="overflow-x-auto">
+        <table class="w-full min-w-[40rem] text-sm">
             <thead>
                 <tr class="text-left text-gray-500 border-b text-xs uppercase tracking-wider">
                     <th class="pb-3">{{ __('app.financial.date') }}</th>
@@ -163,5 +166,6 @@
                 @endforeach
             </tbody>
         </table>
+        </div>
     </div>
 @endsection

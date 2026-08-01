@@ -22,7 +22,18 @@ class LoginController extends Controller
             'password' => ['required'],
         ]);
 
-        if (Auth::guard('owner')->attempt($credentials, $request->boolean('remember'))) {
+        $remember = $request->boolean('remember');
+
+        // Single sign-in form for every account type. Accounts stay in separate
+        // tables/guards; we try the platform operator first, then the tenant, and
+        // route each to their own dashboard.
+        if (Auth::guard('admin')->attempt($credentials, $remember)) {
+            $request->session()->regenerate();
+
+            return redirect()->intended('/admin/dashboard');
+        }
+
+        if (Auth::guard('owner')->attempt($credentials, $remember)) {
             $request->session()->regenerate();
 
             return redirect()->intended('/dashboard');
@@ -35,7 +46,9 @@ class LoginController extends Controller
 
     public function logout(Request $request): RedirectResponse
     {
+        // Log out whichever guard this session belongs to.
         Auth::guard('owner')->logout();
+        Auth::guard('admin')->logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

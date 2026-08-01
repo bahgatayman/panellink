@@ -14,6 +14,8 @@ return [
         'workspaces'      => 'Workspaces',
         'bookings'        => 'Bookings',
         'shared_sessions' => 'Shared Sessions',
+        'products'        => 'Products',
+        'sales'           => 'Sales',
         'settings'        => 'Settings',
         'my_profile'      => 'My Profile',
         'logout'          => 'Logout',
@@ -21,6 +23,37 @@ return [
         'financial'       => 'Financial',
         'owners'          => 'Owners',
         'features'        => 'Features',
+        'notifications'   => 'Notifications',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Admin → Owner notifications
+    |--------------------------------------------------------------------------
+    */
+    'admin_notif' => [
+        'title'           => 'Send Notification',
+        'subtitle'        => 'Broadcast an in-app notification to owners.',
+        'message_title'   => 'Title',
+        'message_body'    => 'Message',
+        'level'           => 'Level',
+        'level_info'      => 'Info',
+        'level_success'   => 'Success',
+        'level_warning'   => 'Warning',
+        'level_danger'    => 'Important',
+        'action_url'      => 'Link',
+        'action_url_hint' => 'Optional. Where owners go when they click — e.g. /dashboard or /bookings.',
+        'optional'        => 'optional',
+        'target'          => 'Send to',
+        'target_all'      => 'All owners',
+        'target_active'   => 'Active owners only',
+        'target_selected' => 'Selected owners',
+        'send'            => 'Send Notification',
+        'sent'            => 'Notification sent to :count owner(s).',
+        'no_recipients'   => 'No owners matched the selected target.',
+        'recent_sends'    => 'Recent Broadcasts',
+        'no_sends'        => 'No notifications sent yet.',
+        'read_of'         => ':read/:total read',
     ],
 
     /*
@@ -355,6 +388,7 @@ return [
         'pending_confirmations'  => 'Pending Confirmations',
         'open_sessions'          => 'Open Sessions',
         'this_month_revenue'     => 'This Month Revenue',
+        'product_sales'          => 'Product Sales (This Month)',
         'workspace_overview'     => 'Workspace Overview',
         'total_workspaces'       => 'Total Workspaces',
         'total_rooms'            => 'Total Rooms',
@@ -450,6 +484,12 @@ return [
         'name'           => 'Name',
         'slug'           => 'Slug',
         'max_members'    => 'Max Members',
+        'max_workspaces' => 'Workspaces (branches)',
+        'max_rooms'      => 'Rooms',
+        'max_products'   => 'Products',
+        'features'       => 'Default Features',
+        'features_hint'  => 'Enabled automatically for owners on this plan.',
+        'unlimited_hint' => '0 = unlimited',
         'price_per_month' => 'Price Per Month',
         'sort_order'     => 'Sort Order',
         'create_plan'    => 'Create Plan',
@@ -457,6 +497,135 @@ return [
         'up_to_members'  => 'Up to :count Members',
         'members'        => 'Members',
         'active_owners'  => 'Active Owners',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Subscription — owner plan picker & renewal requests
+    |--------------------------------------------------------------------------
+    */
+    'subscription' => [
+        'expired_hint'             => 'Your subscription has ended, so the panel is locked. Pick a plan below and send a renewal request — we will activate it once payment is confirmed.',
+        'choose_plan'              => 'Choose a plan',
+        'choose_plan_hint'         => 'Select a plan and how long you want it for.',
+        'current'                  => 'Current',
+        'current_expires'          => 'Your current plan runs until',
+        'stacks_hint'              => 'Renewing early adds to the time you have left.',
+        'free'                     => 'Free',
+        'duration'                 => 'Duration',
+        'months'                   => 'month(s)',
+        'total'                    => 'Total:',
+        'note_placeholder'         => 'Anything we should know? (optional)',
+        'request_renewal'          => 'Send renewal request',
+        'no_online_payment_hint'   => 'Online payment is not available yet. An administrator will contact you to arrange payment, then activate your plan.',
+        'request_sent'             => 'Renewal request sent. An administrator will review it shortly.',
+        'request_already_pending'  => 'You already have a renewal request awaiting review.',
+        'request_cancelled'        => 'Renewal request cancelled.',
+        'request_pending_title'    => 'Renewal request under review',
+        'request_pending_hint'     => 'An administrator will confirm payment and activate your plan. You will be notified once it is done.',
+        'requested_on'             => 'Requested',
+        'cancel_request'           => 'Cancel this request',
+        'cancel_request_confirm'   => 'Cancel your renewal request?',
+        'your_requests'            => 'Your requests',
+        'plans_title'              => 'Plans & Renewal',
+        'renew_subscription'       => 'Renew subscription',
+        'unlimited'                => 'Unlimited',
+        'selected'                 => 'Selected',
+        'your_plan'                => 'Your plan',
+        'summary'                  => 'Summary',
+        'billed_total'             => 'Total to pay',
+        'per_month_each'           => 'per month',
+        'days_left'                => ':count days left',
+        'expired_since'            => 'Expired :date',
+        'members_in_use'           => ':used of :total members used',
+        'no_plans'                 => 'No plans are available right now. Please contact your administrator.',
+
+        'status_pending'           => 'Pending',
+        'status_approved'          => 'Approved',
+        'status_rejected'          => 'Rejected',
+        'status_cancelled'         => 'Cancelled',
+
+        'request_rejected_title'   => 'Renewal request declined',
+        'request_rejected_body'    => 'Your renewal request was not approved. Please contact your administrator.',
+
+        // Admin side
+        'admin_requests'           => 'Renewal Requests',
+        'awaiting_approval'        => 'Awaiting approval',
+        'approve_hint'             => 'Approving extends the subscription immediately and records the payment.',
+        'no_pending_requests'      => 'No renewal requests waiting.',
+        'approve'                  => 'Approve',
+        'approve_confirm'          => 'Approve this renewal and extend the subscription?',
+        'reject'                   => 'Reject',
+        'confirm_reject'           => 'Confirm reject',
+        'reject_reason'            => 'Reason (shown to the owner)',
+        'reject_reason_placeholder' => 'e.g. payment not received',
+        'request_history'          => 'Recently handled',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Feature labels
+    |--------------------------------------------------------------------------
+    */
+    'feature' => [
+        'hotspot'   => 'Hotspot Wi-Fi users',
+        'workspace' => 'Workspaces & rooms',
+        'booking'   => 'Bookings & shared sessions',
+    ],
+
+    'plan_limit' => [
+        'workspaces' => "You've reached your plan's workspace limit. Contact your administrator to upgrade.",
+        'rooms'      => "You've reached your plan's room limit. Contact your administrator to upgrade.",
+        'products'   => "You've reached your plan's product limit. Contact your administrator to upgrade.",
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Sales & Products
+    |--------------------------------------------------------------------------
+    */
+    'sales' => [
+        'sales'             => 'Sales',
+        'sale'              => 'Sale',
+        'products'          => 'Products',
+        'product'           => 'Product',
+        'service'           => 'Service',
+        'add_product'       => 'Add Product',
+        'edit_product'      => 'Edit Product',
+        'back_to_products'  => 'Back to Products',
+        'back_to_sales'     => 'Back to Sales',
+        'no_products'       => 'No products yet. Add your first product or service to start selling.',
+        'no_sales'          => 'No sales recorded yet.',
+        'name'              => 'Name',
+        'type'              => 'Type',
+        'type_hint'         => 'Services (e.g. printing, rental) sell without stock limits.',
+        'price'             => 'Price',
+        'sku'               => 'SKU / Code',
+        'description'       => 'Description',
+        'is_active'         => 'Active (available for sale)',
+        'delete_confirm'    => 'Delete this product? Past sales keep their records.',
+        'product_created'   => 'Product created successfully.',
+        'product_updated'   => 'Product updated successfully.',
+        'product_deleted'   => 'Product deleted successfully.',
+        'items_extras'      => 'Items & Extras',
+        'items'             => 'Items',
+        'item'              => 'Item',
+        'no_items_yet'      => 'No items added to this booking yet.',
+        'no_products_hint'  => 'No active products to add.',
+        'add'               => 'Add',
+        'qty'               => 'Qty',
+        'unit_price'        => 'Unit Price',
+        'item_added'        => 'Item added.',
+        'item_removed'      => 'Item removed.',
+        'room_charge'       => 'Room charge',
+        'grand_total'       => 'Grand Total',
+        'total'             => 'Total',
+        'this_month'        => 'Sales This Month',
+        'date'              => 'Date',
+        'customer'          => 'Customer',
+        'walk_in'           => 'Walk-in',
+        'booking'           => 'Booking',
+        'from_booking'      => 'From booking #:id',
     ],
 
     /*
@@ -474,6 +643,16 @@ return [
         'subscription'         => 'Subscription',
         'expires'              => 'Expires',
         'days_remaining'       => 'Days Remaining',
+
+        // Brand image
+        'brand_image'          => 'Brand Image',
+        'brand_image_hint'     => 'Shown next to your business name across the panel.',
+        'brand_image_rules'    => 'JPG, PNG or WebP · up to 2 MB · square images look best.',
+        'upload_image'         => 'Upload image',
+        'remove_image'         => 'Remove image',
+        'remove_image_confirm' => 'Remove your brand image?',
+        'logo_updated'         => 'Brand image updated.',
+        'logo_removed'         => 'Brand image removed.',
     ],
 
     /*
@@ -505,6 +684,30 @@ return [
         'mark_unavailable'       => 'Mark Unavailable',
         'delete_workspace_confirm' => 'Are you sure you want to delete this workspace?',
         'delete_room_confirm'    => 'Are you sure you want to delete this room?',
+
+        // Show screen
+        'details'                => 'Details',
+        'total_rooms'            => 'Rooms',
+        'available_rooms'        => 'Available',
+        'total_capacity'         => 'Total capacity',
+        'price_range'            => 'Price range',
+        'seats'                  => 'seats',
+        'seats_free'             => ':count of :total seats free',
+        'seats_full'             => 'All seats in use',
+        'no_rooms_of_type'       => 'No rooms of this type.',
+        'open_room'              => 'Open room',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Room types
+    |--------------------------------------------------------------------------
+    */
+    'room_type' => [
+        'meeting'  => 'Meeting Room',
+        'training' => 'Training Room',
+        'shared'   => 'Shared Space',
+        'office'   => 'Private Office',
     ],
 
     /*
@@ -600,6 +803,37 @@ return [
         'phone_hint'             => 'Phone number cannot be changed after creation.',
         'speed_change_hint'      => 'Changing the speed will update the user on the MikroTik router.',
         'phone_cannot_be_changed' => 'Phone cannot be changed.',
+
+        // Inline quick-add from the booking screens
+        'no_match'                => 'No member matches that search.',
+        'add_new_member'          => 'Add a new member',
+        'quick_add_title'         => 'New member',
+        'quick_add_hint'          => 'Added to your member list too.',
+        'add_and_select'          => 'Add & select',
+        'quick_add_failed'        => 'Could not add the member. Please try again.',
+        'quick_add_session_lost'  => 'Your session expired. Please reload the page and sign in again.',
+
+        // Member profile page
+        'member_since'            => 'Member since',
+        'contact_information'     => 'Contact Information',
+        'router_username'         => 'Router username',
+        'no_email'                => 'No email on file',
+        'no_notes'                => 'No notes yet',
+        'internet_plan'           => 'Internet Plan',
+        'no_speed_profile'        => 'No speed profile assigned',
+        'session_in_progress'     => 'Session in progress',
+        'booking_history'         => 'Booking History',
+        'view_all_bookings'       => 'View all bookings',
+        'activity'                => 'Activity',
+        'activity_booking'        => 'Booked',
+        'activity_session_open'   => 'Opened a shared session in',
+        'activity_session_closed' => 'Closed a shared session in',
+        'activity_account_created' => 'Account created',
+        'minutes'                 => 'min',
+        'shared_minutes'          => 'shared minutes',
+        'total_bookings'          => 'Total Bookings',
+        'total_spent'             => 'Total Spent',
+        'last_booking'            => 'Last Booking',
     ],
 
     /*
@@ -637,6 +871,12 @@ return [
         'run_your_space'           => 'Run Your Coworking Space',
         'from_one_place'           => 'From One Place',
         'hero_description'         => 'Manage your coworking space, internet users, and room bookings all from a single dashboard.',
+        'hero_badge'               => 'Wi-Fi · Rooms · Bookings — unified',
+        'hero_visual_alt'          => 'Link Space Panel managing a coworking space',
+        'chip_live'                => 'Live now',
+        'chip_online'              => 'online',
+        'chip_today'               => 'Today',
+        'chip_bookings'            => 'bookings',
         'start_free_trial'         => 'Start Free Trial',
         'see_how_it_works'         => 'See How It Works',
         'no_cli_needed'            => 'No CLI Needed',
@@ -661,10 +901,44 @@ return [
         'secure_multi_tenant'      => 'Secure & Multi-Tenant',
         'simple_transparent_pricing' => 'Simple & Transparent Pricing',
         'start_free_scale'         => 'Start Free, Scale as You Grow',
+        'pricing_title'            => 'Pay for the size you\'ve grown to',
+        'pricing_subtitle'         => 'Plans are based on the number of active users in your panel. Start free, upgrade only when your space is bigger.',
+        'most_popular'             => 'Most Popular',
+        'per_month'                => 'EGP / month',
+        'plan_forever'             => 'forever',
+        'plan_lets_talk'           => 'Let\'s talk',
+        'contact_us'               => 'Contact Us',
+        'plan_starter'             => 'Starter',
+        'plan_starter_users'       => 'Up to 10 users',
+        'plan_starter_price'       => 'Free',
+        'plan_starter_f1'          => 'Full platform access',
+        'plan_starter_f2'          => 'Rooms & bookings',
+        'plan_starter_f3'          => 'Products & billing',
+        'plan_growth'              => 'Growth',
+        'plan_growth_users'        => 'Up to 100 users',
+        'plan_growth_price'        => '300',
+        'plan_growth_f1'           => 'Everything in Starter',
+        'plan_growth_f2'           => 'Multi-room management',
+        'plan_growth_f3'           => 'Occupancy & revenue reports',
+        'plan_growth_f4'           => 'MikroTik integration',
+        'plan_scale'               => 'Scale',
+        'plan_scale_users'         => 'Up to 300 users',
+        'plan_scale_price'         => '700',
+        'plan_scale_f1'            => 'Everything in Growth',
+        'plan_scale_f2'            => 'Multi-branch support',
+        'plan_scale_f3'            => 'Advanced analytics',
+        'plan_scale_f4'            => 'Priority support',
+        'plan_enterprise'          => 'Enterprise',
+        'plan_enterprise_users'    => 'Beyond 300 users',
+        'plan_enterprise_price'    => 'Custom',
+        'plan_enterprise_f1'       => 'Everything in Scale',
+        'plan_enterprise_f2'       => 'Custom integrations',
+        'plan_enterprise_f3'       => 'Dedicated onboarding',
+        'plan_enterprise_f4'       => 'SLA & account manager',
         'testimonials'             => 'Testimonials',
         'loved_by_space_operators' => 'Loved by Space Operators',
         'ready_to_transform'       => 'Ready to Transform Your Space?',
-        'join_500_spaces'          => 'Join 500+ Coworking Spaces',
+        'cta_subtitle'             => 'Manage your internet, rooms, and bookings from one dashboard.',
         'no_credit_card_needed'    => 'No Credit Card Needed',
         'footer_text'              => 'Link Space Panel — All-in-one coworking management platform.',
         'all_rights_reserved'      => 'All rights reserved.',

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\HotspotUser;
 use App\Models\Room;
+use App\Models\Sale;
 use App\Models\SharedSession;
 use App\Models\SpeedProfile;
 use App\Models\Workspace;
@@ -47,6 +48,7 @@ class DashboardController extends Controller
             'todayBookings'  => 0,
             'pendingBookings'=> 0,
             'monthRevenue'   => 0,
+            'productRevenue' => 0,
         ];
 
         if ($owner->hasFeature('workspace')) {
@@ -71,6 +73,16 @@ class DashboardController extends Controller
             $viewData['openSharedSessions'] = SharedSession::where('owner_id', $ownerId)
                 ->where('status', 'open')
                 ->count();
+        }
+
+        // Product sales are a separate additive revenue stream (never folded into
+        // bookings.total_price, so summing both here does not double-count).
+        if ($owner->hasFeature('sales')) {
+            $viewData['productRevenue'] = Sale::where('owner_id', $ownerId)
+                ->where('status', 'completed')
+                ->whereMonth('sold_at', now()->month)
+                ->whereYear('sold_at', now()->year)
+                ->sum('total');
         }
 
         return view('dashboard.index', $viewData);

@@ -67,6 +67,9 @@ class OwnerController extends Controller
             'is_active'               => true,
         ]);
 
+        // Turn on the plan's default features for this owner.
+        $owner->applyPlanFeatures();
+
         Subscription::create([
             'owner_id'    => $owner->id,
             'admin_id'    => auth('admin')->id(),

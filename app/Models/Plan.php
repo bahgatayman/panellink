@@ -14,6 +14,10 @@ class Plan extends Model
         'name',
         'slug',
         'max_members',
+        'features',
+        'max_workspaces',
+        'max_rooms',
+        'max_products',
         'price_per_month',
         'is_active',
         'sort_order',
@@ -25,8 +29,23 @@ class Plan extends Model
             'is_active'       => 'boolean',
             'price_per_month' => 'decimal:2',
             'max_members'     => 'integer',
+            'features'        => 'array',
+            'max_workspaces'  => 'integer',
+            'max_rooms'       => 'integer',
+            'max_products'    => 'integer',
             'sort_order'      => 'integer',
         ];
+    }
+
+    /** Feature keys enabled by default for owners on this plan. */
+    public function defaultFeatures(): array
+    {
+        return $this->features ?? [];
+    }
+
+    public function hasFeature(string $key): bool
+    {
+        return in_array($key, $this->features ?? [], true);
     }
 
     public function isFree(): bool

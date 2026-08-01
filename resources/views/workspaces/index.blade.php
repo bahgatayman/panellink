@@ -38,12 +38,16 @@
     @else
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             @foreach($workspaces as $workspace)
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="group bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition hover:shadow-md hover:border-blue-200">
                     <div class="h-2 {{ $workspace->is_active ? 'bg-green-400' : 'bg-gray-300' }}"></div>
-                    <div class="p-6">
+
+                    {{-- The card body is one real link, so the whole space is clickable
+                         while the action row below keeps its own controls. --}}
+                    <a href="{{ route('workspaces.show', $workspace) }}"
+                       class="block p-6 transition hover:bg-gray-50/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset">
                         <div class="flex items-start justify-between mb-3">
-                            <h3 class="font-semibold text-gray-900">{{ $workspace->name }}</h3>
-                            <span class="text-xs px-2 py-1 rounded-full
+                            <h3 class="font-semibold text-gray-900 group-hover:text-blue-700 transition">{{ $workspace->name }}</h3>
+                            <span class="text-xs px-2 py-1 rounded-full shrink-0
                                 {{ $workspace->is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500' }}">
                                 {{ $workspace->is_active ? __('app.status.active') : __('app.status.inactive') }}
                             </span>
@@ -59,11 +63,15 @@
                                 {{ $workspace->city }}
                             </p>
                         @endif
-                        <p class="text-sm text-gray-400">{{ $workspace->rooms_count }} {{ __('app.workspace.rooms') }}</p>
-                    </div>
+                        <div class="flex items-center justify-between">
+                            <p class="text-sm text-gray-400">{{ $workspace->rooms_count }} {{ __('app.workspace.rooms') }}</p>
+                            <svg class="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </a>
+
                     <div class="px-6 pb-4 flex gap-3">
-                        <a href="{{ route('workspaces.show', $workspace) }}"
-                            class="text-sm text-blue-600 hover:text-blue-800 font-medium">{{ __('app.common.view') }}</a>
                         <a href="{{ route('workspaces.edit', $workspace) }}"
                             class="text-sm text-gray-600 hover:text-gray-800">{{ __('app.common.edit') }}</a>
                         <form method="POST" action="{{ route('workspaces.toggle', $workspace) }}">
