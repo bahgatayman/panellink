@@ -121,7 +121,11 @@ Route::middleware(['auth:owner', 'subscription.active'])->group(function () {
     });
 
     Route::get('/settings', [SettingsController::class, 'index']);
-    Route::post('/settings/test-connection', [SettingsController::class, 'testConnection']);
+    // Router configuration is only writable/testable when the hotspot feature is on.
+    Route::middleware('feature:hotspot')->group(function () {
+        Route::post('/settings', [SettingsController::class, 'update']);
+        Route::post('/settings/test-connection', [SettingsController::class, 'testConnection']);
+    });
 
     Route::get('/profile', [ProfileController::class, 'index']);
 

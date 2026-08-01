@@ -5,12 +5,13 @@
 @section('content')
     <h1 class="text-2xl font-bold text-gray-900 mb-6">Welcome, {{ $owner->business_name }}</h1>
 
-    @if ($mikrotikError)
+    @if ($owner->hasFeature('hotspot') && $mikrotikError)
         <div class="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg mb-6">
             MikroTik unreachable — live stats unavailable
         </div>
     @endif
 
+    @if ($owner->hasFeature('hotspot'))
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
             <div class="flex items-center justify-between">
@@ -82,6 +83,7 @@
             {{ __('app.label.manage_speed_profiles') }}
         </a>
     </div>
+    @endif
 
     @if(auth('owner')->user()->hasFeature('booking'))
         <h2 class="text-lg font-semibold text-gray-700 mb-4">{{ __('app.label.booking_overview') }}</h2>

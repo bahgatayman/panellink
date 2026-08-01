@@ -701,6 +701,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Settings
+    |--------------------------------------------------------------------------
+    */
+    'settings' => [
+        'no_settings'            => 'No configurable settings yet. Router settings appear here when the Hotspot feature is enabled.',
+        'password_keep_hint'     => 'Leave blank to keep the current password.',
+        'mikrotik_optional_hint' => 'optional — only needed for the Hotspot feature',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Notifications
     |--------------------------------------------------------------------------
     */

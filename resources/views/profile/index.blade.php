@@ -30,12 +30,13 @@
                 </div>
 
                 <!-- MikroTik Info -->
+                @if ($owner->hasFeature('hotspot'))
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                     <h2 class="text-lg font-semibold text-gray-800 mb-4">{{ __('app.profile.mikrotik_connection') }}</h2>
                     <dl class="space-y-3 text-sm">
                         <div class="flex justify-between">
                             <dt class="text-gray-500">{{ __('app.label.mikrotik_host') }}</dt>
-                            <dd class="text-gray-900">{{ $owner->mikrotik_host }}</dd>
+                            <dd class="text-gray-900">{{ $owner->mikrotik_host ?: '—' }}</dd>
                         </div>
                         <div class="flex justify-between">
                             <dt class="text-gray-500">{{ __('app.label.mikrotik_port') }}</dt>
@@ -43,10 +44,11 @@
                         </div>
                         <div class="flex justify-between">
                             <dt class="text-gray-500">{{ __('app.label.mikrotik_username') }}</dt>
-                            <dd class="text-gray-900">{{ $owner->mikrotik_username }}</dd>
+                            <dd class="text-gray-900">{{ $owner->mikrotik_username ?: '—' }}</dd>
                         </div>
                     </dl>
                 </div>
+                @endif
             </div>
 
             <!-- Plan & Subscription -->
