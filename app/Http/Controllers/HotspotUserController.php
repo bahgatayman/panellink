@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class HotspotUserController extends Controller
@@ -44,17 +45,18 @@ class HotspotUserController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $owner = auth('owner')->user();
+
         $validated = $request->validate([
             'name'  => 'required|string|max:255',
-            'phone' => 'required|string|max:20|unique:hotspot_users,phone',
+            'phone' => ['required', 'string', 'max:20',
+                Rule::unique('hotspot_users', 'phone')->where('owner_id', $owner->id)],
             'email' => 'nullable|email|max:255',
             'notes' => 'nullable|string|max:500',
         ]);
 
         $phone = (string) $validated['phone'];
         $password = $phone;
-
-        $owner = auth('owner')->user();
 
         if (!$owner->plan) {
             return back()->withInput()->with('error',
@@ -66,18 +68,24 @@ class HotspotUserController extends Controller
                 "You have reached your plan limit of {$owner->plan->max_members} members. Please upgrade your plan to add more users.");
         }
 
-        $defaultProfile = SpeedProfile::where('owner_id', $owner->id)
-            ->where('is_default', true)
-            ->first();
+        // Router provisioning + default speed profile apply to hotspot owners only.
+        // Booking-only owners create the customer record with no MikroTik interaction.
+        $defaultProfile = null;
 
-        if (!$defaultProfile) {
-            return back()->withInput()->with('error', 'Please set a default speed profile first before adding users.');
-        }
+        if ($owner->hasFeature('hotspot')) {
+            $defaultProfile = SpeedProfile::where('owner_id', $owner->id)
+                ->where('is_default', true)
+                ->first();
 
-        try {
-            $this->sync->createUser($owner, $phone, $password, $defaultProfile->name);
-        } catch (\Exception $e) {
-            return back()->withInput()->with('error', 'MikroTik error: ' . $e->getMessage());
+            if (!$defaultProfile) {
+                return back()->withInput()->with('error', 'Please set a default speed profile first before adding users.');
+            }
+
+            try {
+                $this->sync->createUser($owner, $phone, $password, $defaultProfile->name);
+            } catch (\Exception $e) {
+                return back()->withInput()->with('error', 'MikroTik error: ' . $e->getMessage());
+            }
         }
 
         HotspotUser::create([
@@ -85,15 +93,20 @@ class HotspotUserController extends Controller
             'name'             => $validated['name'],
             'phone'            => $phone,
             'password'         => $password,
-            'speed_download'   => $defaultProfile->speed_download,
-            'speed_upload'     => $defaultProfile->speed_upload,
-            'speed_profile_id' => $defaultProfile->id,
+            'speed_download'   => $defaultProfile->speed_download ?? '10M',
+            'speed_upload'     => $defaultProfile->speed_upload ?? '5M',
+            'speed_profile_id' => $defaultProfile?->id,
             'status'           => 'active',
             'email'            => $validated['email'] ?? null,
             'notes'            => $validated['notes'] ?? null,
         ]);
 
-        return redirect('/users')->with('success', "User {$validated['name']} added successfully");
+        $message = "User {$validated['name']} added successfully";
+        if ($owner->hasFeature('hotspot') && !$owner->hasRouterConfigured()) {
+            $message .= ' — configure your MikroTik router in Settings to sync users.';
+        }
+
+        return redirect('/users')->with('success', $message);
     }
 
     public function show(int $id): View

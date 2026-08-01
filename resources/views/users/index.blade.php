@@ -1,10 +1,10 @@
 @extends('layouts.app')
 
-@section('page-title', __('app.user.hotspot_users'))
+@section('page-title', $owner->hasFeature('hotspot') ? __('app.user.hotspot_users') : __('app.common.members'))
 
 @section('content')
     <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">{{ __('app.user.hotspot_users') }}</h1>
+        <h1 class="text-2xl font-bold text-gray-900">{{ $owner->hasFeature('hotspot') ? __('app.user.hotspot_users') : __('app.common.members') }}</h1>
         <a href="/users/create" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium shadow-sm">
             {{ __('app.btn.add_user') }}
         </a>
@@ -40,8 +40,10 @@
                     <tr>
                         <th class="px-4 py-3">{{ __('app.table.th.name') }}</th>
                         <th class="px-4 py-3">{{ __('app.table.th.phone') }}</th>
+                        @if($owner->hasFeature('hotspot'))
                         <th class="px-4 py-3">{{ __('app.table.th.download') }}</th>
                         <th class="px-4 py-3">{{ __('app.table.th.upload') }}</th>
+                        @endif
                         <th class="px-4 py-3">{{ __('app.table.th.status') }}</th>
                         <th class="px-4 py-3">{{ __('app.table.th.created') }}</th>
                         <th class="px-4 py-3">{{ __('app.table.th.actions') }}</th>
@@ -52,8 +54,10 @@
                         <tr class="hover:bg-gray-50 transition">
                             <td class="px-4 py-3 font-medium text-gray-900">{{ $user->name }}</td>
                             <td class="px-4 py-3">{{ $user->phone }}</td>
+                            @if($owner->hasFeature('hotspot'))
                             <td class="px-4 py-3">{{ $user->speed_download }}</td>
                             <td class="px-4 py-3">{{ $user->speed_upload }}</td>
+                            @endif
                             <td class="px-4 py-3">
                                 @if ($user->status === 'active')
                                     <span class="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">{{ __('app.status.active') }}</span>

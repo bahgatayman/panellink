@@ -72,7 +72,9 @@
                 <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">{{ __('app.user.phone') }}</label>
                 <input type="text" name="phone" id="phone" value="{{ old('phone') }}" required inputmode="numeric"
                        class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                @if($owner->hasFeature('hotspot'))
                 <p class="text-xs text-gray-400 mt-2">This will be the MikroTik login username. Password will be set to the phone number automatically.</p>
+                @endif
                 @error('phone')
                     <p class="text-red-600 text-xs mt-1">{{ $message }}</p>
                 @enderror
@@ -96,7 +98,7 @@
             </div>
 
             <button type="submit" class="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition font-medium shadow-sm">
-                {{ __('app.btn.add_user') }} &amp; {{ __('app.user.update_speed_on_mikrotik') }}
+                {{ __('app.btn.add_user') }}@if($owner->hasFeature('hotspot')) &amp; {{ __('app.user.update_speed_on_mikrotik') }}@endif
             </button>
         </form>
     </div>

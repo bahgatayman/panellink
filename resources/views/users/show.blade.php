@@ -50,6 +50,7 @@
                     <dd class="text-sm text-gray-600">{{ $user->notes }}</dd>
                 </div>
                 @endif
+                @if ($owner->hasFeature('hotspot'))
                 <div class="flex justify-between">
                     <dt class="text-sm text-gray-500">{{ __('app.label.speed_download') }}</dt>
                     <dd class="text-sm font-medium text-gray-900">{{ $user->speed_download }}</dd>
@@ -58,6 +59,7 @@
                     <dt class="text-sm text-gray-500">{{ __('app.label.speed_upload') }}</dt>
                     <dd class="text-sm font-medium text-gray-900">{{ $user->speed_upload }}</dd>
                 </div>
+                @endif
                 <div class="flex justify-between">
                     <dt class="text-sm text-gray-500">{{ __('app.common.status') }}</dt>
                     <dd>
@@ -85,6 +87,7 @@
         </div>
 
         <div class="space-y-6">
+        @if ($owner->hasFeature('hotspot'))
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ __('app.user.change_speed') }}</h2>
 
@@ -111,6 +114,7 @@
                 </button>
             </form>
         </div>
+        @endif
 
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ __('app.user.recent_bookings') }}</h2>

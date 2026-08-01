@@ -43,13 +43,15 @@
                     </svg>
                     <span>{{ __('app.nav.dashboard') }}</span>
                 </a>
-                @if($currentOwner->hasFeature('hotspot'))
+                @if($currentOwner->hasFeature('hotspot') || $currentOwner->hasFeature('booking'))
                     <a href="/users" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('users*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
                         <span>{{ __('app.nav.users') }}</span>
                     </a>
+                @endif
+                @if($currentOwner->hasFeature('hotspot'))
                     <a href="/sessions" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('sessions*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>

@@ -59,8 +59,10 @@ Route::middleware(['auth:owner', 'subscription.active'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index']);
     Route::get('/users/search', [HotspotUserController::class, 'search']);
 
-    // Hotspot feature routes
-    Route::middleware('feature:hotspot')->group(function () {
+    // Member/customer registry — HotspotUser is the shared customer entity that
+    // BOOKING owners also need. Available with either feature; router sync is
+    // applied inside the controller only for hotspot owners.
+    Route::middleware('feature:hotspot,booking')->group(function () {
         Route::get('/users', [HotspotUserController::class, 'index']);
         Route::get('/users/create', [HotspotUserController::class, 'create']);
         Route::post('/users', [HotspotUserController::class, 'store']);
@@ -69,6 +71,10 @@ Route::middleware(['auth:owner', 'subscription.active'])->group(function () {
         Route::put('/users/{id}', [HotspotUserController::class, 'update']);
         Route::delete('/users/{id}', [HotspotUserController::class, 'destroy']);
         Route::post('/users/{id}/toggle-status', [HotspotUserController::class, 'toggleStatus']);
+    });
+
+    // Hotspot-only: router-backed actions.
+    Route::middleware('feature:hotspot')->group(function () {
         Route::post('/users/{id}/speed', [HotspotUserController::class, 'updateSpeed']);
         Route::get('/speed-profiles', [SpeedProfileController::class, 'index']);
         Route::get('/speed-profiles/create', [SpeedProfileController::class, 'create']);
