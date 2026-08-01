@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Booking extends Model
 {
@@ -48,6 +49,17 @@ class Booking extends Model
     public function hotspotUser(): BelongsTo
     {
         return $this->belongsTo(HotspotUser::class, 'hotspot_user_id');
+    }
+
+    public function sale(): HasOne
+    {
+        return $this->hasOne(Sale::class);
+    }
+
+    /** Room charge plus any attached product sales. */
+    public function grandTotal(): float
+    {
+        return (float) $this->total_price + (float) ($this->sale?->total ?? 0);
     }
 
     public function statusColor(): string

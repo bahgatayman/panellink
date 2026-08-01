@@ -8,7 +8,12 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CheckFeature
 {
-    public function handle(Request $request, Closure $next, string $featureKey): Response
+    /**
+     * Grant access when the owner has ANY of the given feature keys.
+     * Single-key usage (`feature:hotspot`) is unchanged; multi-key
+     * (`feature:hotspot,booking`) means "any of these".
+     */
+    public function handle(Request $request, Closure $next, string ...$featureKeys): Response
     {
         $owner = auth('owner')->user();
 
@@ -16,13 +21,15 @@ class CheckFeature
             return redirect()->route('login');
         }
 
-        if (!$owner->hasFeature($featureKey)) {
-            return redirect()->route('dashboard')->with(
-                'error',
-                'You do not have access to this feature. Please contact your administrator.'
-            );
+        foreach ($featureKeys as $key) {
+            if ($owner->hasFeature($key)) {
+                return $next($request);
+            }
         }
 
-        return $next($request);
+        return redirect('/dashboard')->with(
+            'error',
+            'You do not have access to this feature. Please contact your administrator.'
+        );
     }
 }

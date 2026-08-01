@@ -5,16 +5,21 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\HotspotUser;
 use App\Models\Room;
+use App\Models\Sale;
 use App\Models\SharedSession;
 use App\Models\SpeedProfile;
 use App\Models\Workspace;
-use App\Services\MikroTikService;
+use App\Services\HotspotSyncService;
 use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
+    public function __construct(private HotspotSyncService $sync)
+    {
+    }
+
     public function index(): View
     {
         $owner = Auth::guard('owner')->user();
@@ -28,15 +33,7 @@ class DashboardController extends Controller
         $mikrotikError  = null;
 
         try {
-            $mikrotik = new MikroTikService(
-                $owner->mikrotik_host,
-                $owner->mikrotik_port,
-                $owner->mikrotik_username,
-                $owner->mikrotik_password,
-            );
-            $mikrotik->connect();
-            $activeSessions = count($mikrotik->getActiveUsers());
-            $mikrotik->disconnect();
+            $activeSessions = count($this->sync->activeUsers($owner));
         } catch (Exception $e) {
             $mikrotikError = $e->getMessage();
         }
@@ -51,6 +48,7 @@ class DashboardController extends Controller
             'todayBookings'  => 0,
             'pendingBookings'=> 0,
             'monthRevenue'   => 0,
+            'productRevenue' => 0,
         ];
 
         if ($owner->hasFeature('workspace')) {
@@ -75,6 +73,16 @@ class DashboardController extends Controller
             $viewData['openSharedSessions'] = SharedSession::where('owner_id', $ownerId)
                 ->where('status', 'open')
                 ->count();
+        }
+
+        // Product sales are a separate additive revenue stream (never folded into
+        // bookings.total_price, so summing both here does not double-count).
+        if ($owner->hasFeature('sales')) {
+            $viewData['productRevenue'] = Sale::where('owner_id', $ownerId)
+                ->where('status', 'completed')
+                ->whereMonth('sold_at', now()->month)
+                ->whereYear('sold_at', now()->year)
+                ->sum('total');
         }
 
         return view('dashboard.index', $viewData);

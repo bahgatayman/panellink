@@ -6,19 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Link Space Panel — {{ __('app.landing.product_demo') }}</title>
     <link rel="icon" type="image/webp" href="/logo.webp">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
-                    colors: {
-                        surface: { 50: '#fafaf9', 100: '#f5f5f4', 200: '#e7e5e4', 300: '#d6d3d1', 400: '#a8a29e', 500: '#78716c', 600: '#57534e', 700: '#44403c', 800: '#292524', 900: '#1c1917' },
-                    },
-                },
-            },
-        }
-    </script>
+    @include('partials.theme')
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
@@ -30,7 +18,7 @@
         html { scroll-behavior: smooth; }
         body {
             font-family: 'Inter', system-ui, sans-serif;
-            background: #fafaf9;
+            background: transparent;
             color: #1c1917;
             -webkit-font-smoothing: antialiased;
         }
@@ -40,7 +28,7 @@
         @endif
 
         .text-gradient {
-            background: linear-gradient(135deg, #4338ca 0%, #6d28d9 50%, #7c3aed 100%);
+            background: linear-gradient(135deg, #163c85 0%, #3f68af 50%, #6f96d1 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -74,7 +62,7 @@
             background: none;
         }
         .screen-tab:hover { color: #1c1917; background: #f5f5f4; }
-        .screen-tab.active { color: #4338ca; background: #eef2ff; }
+        .screen-tab.active { color: #163c85; background: #eef3fb; }
 
         .screen-panel { display: none; }
         .screen-panel.active { display: block; }
@@ -103,7 +91,7 @@
             border: 1px solid #e7e5e4;
             transition: all 0.3s;
         }
-        .flow-step:hover { border-color: #c7d2fe; box-shadow: 0 8px 32px -8px rgba(67, 56, 202, 0.08); }
+        .flow-step:hover { border-color: #b0c6e6; box-shadow: 0 8px 32px -8px rgba(22, 60, 133, 0.08); }
 
         .cta-btn {
             display: inline-flex;
@@ -118,13 +106,13 @@
             border: none;
         }
         .cta-primary {
-            background: #4338ca;
+            background: #163c85;
             color: white;
-            box-shadow: 0 4px 16px -4px rgba(67, 56, 202, 0.25);
+            box-shadow: 0 4px 16px -4px rgba(22, 60, 133, 0.25);
         }
         .cta-primary:hover {
-            background: #4338ca;
-            box-shadow: 0 8px 24px -4px rgba(67, 56, 202, 0.3);
+            background: #123068;
+            box-shadow: 0 8px 24px -4px rgba(22, 60, 133, 0.3);
             transform: translateY(-1px);
         }
         .cta-secondary {
@@ -132,16 +120,7 @@
             color: #1c1917;
             border: 1px solid #e7e5e4;
         }
-        .cta-secondary:hover { border-color: #c7d2fe; box-shadow: 0 4px 16px -4px rgba(0,0,0,0.06); transform: translateY(-1px); }
-
-        .testimonial-card {
-            background: white;
-            border: 1px solid #e7e5e4;
-            border-radius: 16px;
-            padding: 28px;
-            transition: all 0.3s;
-        }
-        .testimonial-card:hover { border-color: #e0e7ff; box-shadow: 0 8px 24px -8px rgba(67, 56, 202, 0.06); }
+        .cta-secondary:hover { border-color: #b0c6e6; box-shadow: 0 4px 16px -4px rgba(0,0,0,0.06); transform: translateY(-1px); }
 
         .pricing-card {
             background: white;
@@ -150,10 +129,10 @@
             padding: 32px;
             transition: all 0.3s;
         }
-        .pricing-card:hover { border-color: #c7d2fe; box-shadow: 0 12px 32px -8px rgba(67, 56, 202, 0.08); }
+        .pricing-card:hover { border-color: #b0c6e6; box-shadow: 0 12px 32px -8px rgba(22, 60, 133, 0.08); }
         .pricing-card.featured {
-            border-color: #a5b4fc;
-            box-shadow: 0 0 0 1px #c7d2fe, 0 24px 50px -18px rgba(67, 56, 202, 0.30);
+            border-color: #88a6d8;
+            box-shadow: 0 0 0 1px #b0c6e6, 0 24px 50px -18px rgba(22, 60, 133, 0.30);
         }
         @media (min-width: 640px) {
             .pricing-card.featured { transform: scale(1.05); z-index: 1; }
@@ -172,11 +151,18 @@
         /* Offset anchor targets so the fixed nav doesn't cover section headings */
         section[id] { scroll-margin-top: 5rem; }
 
-        /* Hero background image + ambient depth */
-        .hero-bg {
-            background-image: url('/images/hero-bg.svg');
-            background-size: cover;
-            background-position: center top;
+        /* Real photo behind the whole page (fixed) + readability overlay */
+        .page-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background: #0d244e url('/images/workspace-bg.jpg') center / cover no-repeat;
+        }
+        .page-bg::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(247,248,250,0.80) 0%, rgba(247,248,250,0.88) 45%, rgba(238,243,251,0.93) 100%);
         }
         .hero-glow {
             position: absolute;
@@ -202,6 +188,9 @@
 </head>
 <body>
 
+    <!-- Fixed real workspace photo behind every section -->
+    <div class="page-bg" aria-hidden="true"></div>
+
     <!-- ═══════════════════════════════════════════
          NAVIGATION
          ═══════════════════════════════════════════ -->
@@ -222,10 +211,10 @@
                     <button onclick="openDemoModal()" class="cta-primary !py-2.5 !px-5 text-sm">{{ __('app.landing.get_started') }}</button>
                     <form method="POST" action="{{ route('language.switch', $isRtl ? 'en' : 'ar') }}" class="flex items-center gap-1.5 ml-2">
                         @csrf
-                        <button type="submit" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none {{ $isRtl ? 'bg-indigo-600' : 'bg-gray-300' }}" role="switch" aria-checked="{{ $isRtl ? 'true' : 'false' }}">
+                        <button type="submit" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none {{ $isRtl ? 'bg-brand-600' : 'bg-gray-300' }}" role="switch" aria-checked="{{ $isRtl ? 'true' : 'false' }}">
                             <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out {{ $isRtl ? 'translate-x-[18px]' : 'translate-x-[3px]' }}"></span>
                         </button>
-                        <span class="text-xs font-medium {{ $isRtl ? 'text-indigo-600' : 'text-surface-500' }}">{{ $isRtl ? 'AR' : 'EN' }}</span>
+                        <span class="text-xs font-medium {{ $isRtl ? 'text-brand-600' : 'text-surface-500' }}">{{ $isRtl ? 'AR' : 'EN' }}</span>
                     </form>
                 </div>
 
@@ -239,7 +228,7 @@
                 <a href="#product" class="block text-sm font-medium text-surface-600 py-2">{{ __('app.landing.product') }}</a>
                 <a href="#how-it-works" class="block text-sm font-medium text-surface-600 py-2">{{ __('app.landing.how_it_works') }}</a>
                 <a href="#pricing" class="block text-sm font-medium text-surface-600 py-2">{{ __('app.landing.pricing') }}</a>
-                <a href="/login" class="block text-sm font-medium text-indigo-600 py-2">{{ __('app.landing.sign_in') }}</a>
+                <a href="/login" class="block text-sm font-medium text-brand-600 py-2">{{ __('app.landing.sign_in') }}</a>
                 <button onclick="openDemoModal(); toggleMobile();" class="w-full cta-primary justify-center text-sm">{{ __('app.landing.get_started') }}</button>
             </div>
         </div>
@@ -248,58 +237,46 @@
     <!-- ═══════════════════════════════════════════
          IDENTITY SCREEN
          ═══════════════════════════════════════════ -->
-    <section class="hero-bg relative min-h-screen flex items-center justify-center pt-16 px-5 sm:px-8 overflow-hidden">
+    <section class="relative min-h-screen flex items-center pt-24 pb-20 px-5 sm:px-8 overflow-hidden">
         <!-- ambient floating glows -->
-        <div class="hero-glow g1 bg-indigo-300/40" style="width:440px;height:440px;top:-40px;{{ $isRtl ? 'right' : 'left' }}:-90px;"></div>
-        <div class="hero-glow g2 bg-violet-300/40" style="width:480px;height:480px;bottom:-140px;{{ $isRtl ? 'left' : 'right' }}:-110px;"></div>
+        <div class="hero-glow g1 bg-brand-300/40" style="width:460px;height:460px;top:-70px;{{ $isRtl ? 'right' : 'left' }}:-130px;"></div>
+        <div class="hero-glow g2 bg-brand-400/25" style="width:540px;height:540px;bottom:-180px;{{ $isRtl ? 'left' : 'right' }}:-150px;"></div>
 
         <div class="relative z-10 max-w-3xl mx-auto text-center">
-            <div class="fade-in">
-                <div class="inline-flex items-center gap-2.5 bg-white/70 backdrop-blur-md rounded-full pl-2.5 pr-4 py-1.5 mb-8 border border-white/80 shadow-sm shadow-indigo-500/5">
-                    <span class="relative flex h-2 w-2">
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                    <span class="text-xs font-semibold text-surface-700">{{ __('app.landing.now_with_smart_booking') }}</span>
-                </div>
-            </div>
+            <span class="inline-flex items-center gap-2 rounded-full bg-white/80 backdrop-blur border border-brand-100 px-3.5 py-1.5 mb-7 shadow-sm shadow-brand-500/5 fade-in">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+                <span class="text-xs font-semibold text-brand-700">{{ __('app.landing.hero_badge') }}</span>
+            </span>
 
-            <h1 class="text-[clamp(2.5rem,6vw,4.5rem)] font-extrabold tracking-tight leading-[1.08] mb-6 fade-in" style="transition-delay:0.05s">
+            <h1 class="text-[clamp(2.5rem,6vw,4.5rem)] font-extrabold tracking-tight leading-[1.08] mb-6 fade-in">
                 <span class="text-surface-900">{{ __('app.landing.run_your_space') }}</span>
                 <br>
                 <span class="text-gradient">{{ __('app.landing.from_one_place') }}</span>
             </h1>
 
-            <p class="text-base sm:text-lg text-surface-500 max-w-lg mx-auto leading-relaxed mb-10 fade-in" style="transition-delay:0.1s">
+            <p class="text-base sm:text-lg text-surface-600 max-w-lg mx-auto leading-relaxed mb-10 fade-in" style="transition-delay:0.1s">
                 {{ __('app.landing.hero_description') }}
             </p>
 
-            <div class="flex flex-col sm:flex-row gap-3 justify-center mb-16 fade-in" style="transition-delay:0.15s">
+            <div class="flex flex-col sm:flex-row gap-3 justify-center mb-14 fade-in" style="transition-delay:0.15s">
                 <button onclick="openDemoModal()" class="cta-primary justify-center">
-                    {{ __('app.landing.start_free_trial') }}
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                    {{ __('app.landing.get_started') }}
+                    <svg class="w-4 h-4 {{ $isRtl ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
                 </button>
-                <button onclick="document.getElementById('product').scrollIntoView({behavior:'smooth'})" class="cta-secondary justify-center">
+                <button onclick="document.getElementById('product').scrollIntoView({behavior:'smooth'})" class="cta-secondary justify-center bg-white/85 backdrop-blur">
                     {{ __('app.landing.see_how_it_works') }}
                 </button>
             </div>
 
-            <div class="flex flex-wrap justify-center gap-x-8 gap-y-3 text-sm text-surface-400 fade-in" style="transition-delay:0.2s">
-                <span class="flex items-center gap-2">
-                    <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                    {{ __('app.landing.no_cli_needed') }}
-                </span>
-                <span class="flex items-center gap-2">
-                    <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                    {{ __('app.landing.real_time_sync') }}
-                </span>
-                <span class="flex items-center gap-2">
-                    <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                    {{ __('app.landing.five_minute_setup') }}
-                </span>
-            </div>
         </div>
 
+        <!-- scroll cue -->
+        <button onclick="document.getElementById('product').scrollIntoView({behavior:'smooth'})" class="scroll-cue absolute bottom-5 left-1/2 -translate-x-1/2 text-surface-500 hover:text-brand-600 transition hidden lg:block" aria-label="{{ __('app.landing.see_how_it_works') }}">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+        </button>
     </section>
 
     <!-- ═══════════════════════════════════════════
@@ -310,8 +287,8 @@
             <div class="fade-in bg-white/75 backdrop-blur-md border border-surface-100 rounded-2xl shadow-sm shadow-surface-200/50 px-4 py-6 sm:px-8">
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-y-6 gap-x-4 text-center sm:divide-x divide-surface-100">
                     <div class="px-2">
-                        <p class="text-2xl sm:text-3xl font-extrabold text-surface-900 tracking-tight">500+</p>
-                        <p class="text-xs text-surface-400 mt-1">Coworking spaces</p>
+                        <p class="text-2xl sm:text-3xl font-extrabold text-surface-900 tracking-tight">Real-time</p>
+                        <p class="text-xs text-surface-400 mt-1">Live sessions &amp; sync</p>
                     </div>
                     <div class="px-2">
                         <p class="text-2xl sm:text-3xl font-extrabold text-surface-900 tracking-tight">3-in-1</p>
@@ -336,7 +313,7 @@
     <section id="product" class="py-20 sm:py-28 px-5 sm:px-8">
         <div class="max-w-6xl mx-auto">
             <div class="text-center mb-16 fade-in">
-                <span class="inline-block text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full mb-4">{{ __('app.landing.product_experience') }}</span>
+                <span class="inline-block text-xs font-semibold text-brand-600 bg-brand-50 px-3 py-1 rounded-full mb-4">{{ __('app.landing.product_experience') }}</span>
                 <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-surface-900">{{ __('app.landing.explore_the_system') }}</h2>
                 <p class="mt-3 text-surface-500 text-base sm:text-lg">Click through each module to see how Link Space Panel works.</p>
             </div>
@@ -373,20 +350,20 @@
 
                                     <div class="space-y-2">
                                         <div class="mockup-row bg-white border border-surface-200">
-                                            <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-[0.6rem] font-bold text-indigo-700">AA</div>
+                                            <div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-[0.6rem] font-bold text-brand-700">AA</div>
                                             <div class="flex-1 min-w-0">
                                                 <p class="text-sm font-medium text-surface-900 truncate">Ahmed Ali</p>
                                                 <p class="text-[0.65rem] text-surface-400">+20 100 000 0001</p>
                                             </div>
-                                            <span class="text-[0.6rem] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Active</span>
+                                            <span class="text-[0.6rem] font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Active</span>
                                         </div>
                                         <div class="mockup-row bg-white border border-surface-200">
-                                            <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-[0.6rem] font-bold text-purple-700">SM</div>
+                                            <div class="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-[0.6rem] font-bold text-brand-700">SM</div>
                                             <div class="flex-1 min-w-0">
                                                 <p class="text-sm font-medium text-surface-900 truncate">Sara Mahmoud</p>
                                                 <p class="text-[0.65rem] text-surface-400">+20 101 000 0002</p>
                                             </div>
-                                            <span class="text-[0.6rem] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Active</span>
+                                            <span class="text-[0.6rem] font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Active</span>
                                         </div>
                                         <div class="mockup-row bg-white border border-surface-200">
                                             <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-[0.6rem] font-bold text-amber-700">MK</div>
@@ -405,7 +382,7 @@
                                     <p class="text-[0.65rem] font-medium text-surface-400 uppercase tracking-wider">Active Sessions</p>
                                     <p class="text-2xl font-bold text-surface-900 mt-1">24</p>
                                     <div class="flex items-center gap-1.5 mt-2">
-                                        <span class="flex items-center gap-1 text-[0.6rem] text-emerald-600 font-medium">
+                                        <span class="flex items-center gap-1 text-[0.6rem] text-green-600 font-medium">
                                             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
                                             +12%
                                         </span>
@@ -416,7 +393,7 @@
                                     <p class="text-[0.65rem] font-medium text-surface-400 uppercase tracking-wider">Bandwidth Usage</p>
                                     <p class="text-2xl font-bold text-surface-900 mt-1">240 <span class="text-sm font-normal text-surface-400">Mbps</span></p>
                                     <div class="mt-3 h-1.5 bg-surface-200 rounded-full overflow-hidden">
-                                        <div class="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full" style="width:24%"></div>
+                                        <div class="h-full bg-gradient-to-r from-brand-400 to-brand-600 rounded-full" style="width:24%"></div>
                                     </div>
                                 </div>
                                 <div class="mockup-stat">
@@ -431,12 +408,12 @@
                     <!-- Tab 1: Room Management -->
                     <div class="screen-panel" id="tab-1">
                         <div class="grid sm:grid-cols-3 gap-4">
-                            <div class="bg-surface-50 rounded-xl p-5 border border-surface-100 hover:border-indigo-200 transition">
+                            <div class="bg-surface-50 rounded-xl p-5 border border-surface-100 hover:border-brand-200 transition">
                                 <div class="flex items-center justify-between mb-3">
-                                    <div class="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center">
-                                        <svg class="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                                    <div class="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center">
+                                        <svg class="w-4 h-4 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
                                     </div>
-                                    <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                                    <span class="w-2 h-2 bg-green-500 rounded-full"></span>
                                 </div>
                                 <h4 class="text-sm font-semibold text-surface-900">Meeting Room A</h4>
                                 <p class="text-[0.7rem] text-surface-400 mt-1">Capacity: 8 · ج.م 150/hr</p>
@@ -444,30 +421,30 @@
                                     <p class="text-[0.65rem] text-surface-500">Next: <span class="font-medium text-surface-700">10:00 - 12:00</span></p>
                                 </div>
                             </div>
-                            <div class="bg-surface-50 rounded-xl p-5 border border-surface-100 hover:border-indigo-200 transition">
+                            <div class="bg-surface-50 rounded-xl p-5 border border-surface-100 hover:border-brand-200 transition">
                                 <div class="flex items-center justify-between mb-3">
-                                    <div class="w-9 h-9 rounded-lg bg-purple-50 flex items-center justify-center">
-                                        <svg class="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                                    <div class="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center">
+                                        <svg class="w-4 h-4 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                                     </div>
                                     <span class="w-2 h-2 bg-amber-500 rounded-full"></span>
                                 </div>
                                 <h4 class="text-sm font-semibold text-surface-900">Private Office B</h4>
                                 <p class="text-[0.7rem] text-surface-400 mt-1">Capacity: 4 · ج.م 200/hr</p>
                                 <div class="mt-3 pt-3 border-t border-surface-200">
-                                    <p class="text-[0.65rem] text-surface-500">Now: <span class="font-medium text-emerald-600">Sara M. · Active</span></p>
+                                    <p class="text-[0.65rem] text-surface-500">Now: <span class="font-medium text-green-600">Sara M. · Active</span></p>
                                 </div>
                             </div>
-                            <div class="bg-surface-50 rounded-xl p-5 border border-surface-100 hover:border-indigo-200 transition">
+                            <div class="bg-surface-50 rounded-xl p-5 border border-surface-100 hover:border-brand-200 transition">
                                 <div class="flex items-center justify-between mb-3">
-                                    <div class="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
-                                        <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                                    <div class="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center">
+                                        <svg class="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                                     </div>
-                                    <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                                    <span class="w-2 h-2 bg-green-500 rounded-full"></span>
                                 </div>
                                 <h4 class="text-sm font-semibold text-surface-900">Hot Desk Area</h4>
                                 <p class="text-[0.7rem] text-surface-400 mt-1">Capacity: 20 · ج.م 50/hr</p>
                                 <div class="mt-3 pt-3 border-t border-surface-200">
-                                    <p class="text-[0.65rem] text-surface-500">Available: <span class="font-medium text-emerald-600">12 seats open</span></p>
+                                    <p class="text-[0.65rem] text-surface-500">Available: <span class="font-medium text-green-600">12 seats open</span></p>
                                 </div>
                             </div>
                         </div>
@@ -492,7 +469,7 @@
                                         <p class="text-sm font-medium text-surface-900">Private Office B</p>
                                         <p class="text-[0.65rem] text-surface-400">Sara Mahmoud</p>
                                     </div>
-                                    <span class="text-[0.6rem] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Active</span>
+                                    <span class="text-[0.6rem] font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Active</span>
                                 </div>
                                 <div class="flex items-center gap-4 p-3 bg-white rounded-lg border border-surface-200">
                                     <span class="text-xs font-mono text-surface-500 w-20 shrink-0">16:00-18:00</span>
@@ -541,12 +518,12 @@
 
                             <div>
                                 <h4 class="text-sm font-semibold text-surface-900 mb-4">Conflict Prevention</h4>
-                                <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-4 mb-4">
+                                <div class="bg-green-50 border border-green-100 rounded-xl p-4 mb-4">
                                     <div class="flex items-start gap-3">
-                                        <svg class="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        <svg class="w-4 h-4 text-green-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                         <div>
-                                            <p class="text-sm font-medium text-emerald-800">No conflicts found</p>
-                                            <p class="text-[0.7rem] text-emerald-600 mt-0.5">Meeting Room A is available for this time slot</p>
+                                            <p class="text-sm font-medium text-green-800">No conflicts found</p>
+                                            <p class="text-[0.7rem] text-green-600 mt-0.5">Meeting Room A is available for this time slot</p>
                                         </div>
                                     </div>
                                 </div>
@@ -557,14 +534,14 @@
                                         <div class="flex items-center gap-3">
                                             <span class="text-[0.65rem] font-mono text-surface-400 w-16">08:00</span>
                                             <div class="flex-1 h-2 bg-surface-200 rounded-full overflow-hidden">
-                                                <div class="h-full bg-emerald-400 rounded-full" style="width:100%"></div>
+                                                <div class="h-full bg-green-400 rounded-full" style="width:100%"></div>
                                             </div>
                                             <span class="text-[0.6rem] text-surface-400 w-12 text-right">Open</span>
                                         </div>
                                         <div class="flex items-center gap-3">
                                             <span class="text-[0.65rem] font-mono text-surface-400 w-16">10:00</span>
                                             <div class="flex-1 h-2 bg-surface-200 rounded-full overflow-hidden">
-                                                <div class="h-full bg-indigo-400 rounded-full" style="width:40%"></div>
+                                                <div class="h-full bg-brand-400 rounded-full" style="width:40%"></div>
                                             </div>
                                             <span class="text-[0.6rem] text-surface-400 w-12 text-right">Booked</span>
                                         </div>
@@ -578,7 +555,7 @@
                                         <div class="flex items-center gap-3">
                                             <span class="text-[0.65rem] font-mono text-surface-400 w-16">16:00</span>
                                             <div class="flex-1 h-2 bg-surface-200 rounded-full overflow-hidden">
-                                                <div class="h-full bg-emerald-400 rounded-full" style="width:100%"></div>
+                                                <div class="h-full bg-green-400 rounded-full" style="width:100%"></div>
                                             </div>
                                             <span class="text-[0.6rem] text-surface-400 w-12 text-right">Open</span>
                                         </div>
@@ -595,32 +572,32 @@
     <!-- ═══════════════════════════════════════════
          HOW IT WORKS — Guided Flow
          ═══════════════════════════════════════════ -->
-    <section id="how-it-works" class="py-20 sm:py-28 px-5 sm:px-8 bg-white border-y border-surface-100">
+    <section id="how-it-works" class="py-20 sm:py-28 px-5 sm:px-8 bg-white/75 backdrop-blur-sm border-y border-white/60">
         <div class="max-w-6xl mx-auto">
             <div class="text-center mb-16 fade-in">
-                <span class="inline-block text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full mb-4">{{ __('app.landing.simple_setup') }}</span>
+                <span class="inline-block text-xs font-semibold text-brand-600 bg-brand-50 px-3 py-1 rounded-full mb-4">{{ __('app.landing.simple_setup') }}</span>
                 <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-surface-900">{{ __('app.landing.go_live_in_three_steps') }}</h2>
                 <p class="mt-3 text-surface-500 text-base sm:text-lg">Connect, configure, manage — in that order.</p>
             </div>
 
             <div class="grid sm:grid-cols-3 gap-6 fade-in">
                 <div class="flow-step">
-                    <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center mb-5">
-                        <span class="text-lg font-bold text-indigo-600">1</span>
+                    <div class="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center mb-5">
+                        <span class="text-lg font-bold text-brand-600">1</span>
                     </div>
                     <h3 class="text-base font-bold text-surface-900 mb-2">{{ __('app.landing.connect_your_router') }}</h3>
                     <p class="text-sm text-surface-500 leading-relaxed">Enter your MikroTik router's IP and credentials. We verify the connection instantly — no configuration needed on your end.</p>
                 </div>
                 <div class="flow-step">
-                    <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center mb-5">
-                        <span class="text-lg font-bold text-purple-600">2</span>
+                    <div class="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center mb-5">
+                        <span class="text-lg font-bold text-brand-600">2</span>
                     </div>
                     <h3 class="text-base font-bold text-surface-900 mb-2">{{ __('app.landing.configure_your_space') }}</h3>
                     <p class="text-sm text-surface-500 leading-relaxed">Define workspaces, rooms, pricing, and speed profiles. Everything is set up visually in your dashboard.</p>
                 </div>
                 <div class="flow-step">
-                    <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mb-5">
-                        <span class="text-lg font-bold text-emerald-600">3</span>
+                    <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center mb-5">
+                        <span class="text-lg font-bold text-green-600">3</span>
                     </div>
                     <h3 class="text-base font-bold text-surface-900 mb-2">{{ __('app.landing.start_managing') }}</h3>
                     <p class="text-sm text-surface-500 leading-relaxed">Take bookings, manage users, monitor live sessions, and grow your coworking business — all from one dashboard.</p>
@@ -636,14 +613,14 @@
         <div class="max-w-6xl mx-auto">
             <div class="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
                 <div class="fade-in">
-                    <span class="inline-block text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full mb-4">Dashboard</span>
+                    <span class="inline-block text-xs font-semibold text-brand-600 bg-brand-50 px-3 py-1 rounded-full mb-4">Dashboard</span>
                     <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-surface-900 mb-4">{{ __('app.landing.everything_at_a_glance') }}</h2>
                     <p class="text-surface-500 text-base sm:text-lg mb-8 leading-relaxed">Your command center for the entire coworking operation. Real-time data, quick actions, full visibility.</p>
 
                     <div class="space-y-5">
                         <div class="flex items-start gap-4">
-                            <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
-                                <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                            <div class="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+                                <svg class="w-5 h-5 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                             </div>
                             <div>
                                 <p class="text-sm font-semibold text-surface-900">Live Usage Stats</p>
@@ -651,8 +628,8 @@
                             </div>
                         </div>
                         <div class="flex items-start gap-4">
-                            <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center shrink-0">
-                                <svg class="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                            <div class="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+                                <svg class="w-5 h-5 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                             </div>
                             <div>
                                 <p class="text-sm font-semibold text-surface-900">Today's Bookings</p>
@@ -660,8 +637,8 @@
                             </div>
                         </div>
                         <div class="flex items-start gap-4">
-                            <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
-                                <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center shrink-0">
+                                <svg class="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             </div>
                             <div>
                                 <p class="text-sm font-semibold text-surface-900">Monthly Revenue</p>
@@ -678,7 +655,7 @@
                                 <p class="text-xs text-surface-400 font-medium">Dashboard</p>
                                 <p class="text-base font-bold text-surface-900 mt-0.5">Good morning, SpaceHub</p>
                             </div>
-                            <span class="text-[0.65rem] font-medium text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full">All Systems Go</span>
+                            <span class="text-[0.65rem] font-medium text-green-600 bg-green-50 px-3 py-1.5 rounded-full">All Systems Go</span>
                         </div>
 
                         <div class="grid grid-cols-2 gap-3 mb-5">
@@ -688,7 +665,7 @@
                             </div>
                             <div class="bg-surface-50 rounded-xl p-4">
                                 <p class="text-[0.65rem] text-surface-400">Online Now</p>
-                                <p class="text-xl font-bold text-indigo-600 mt-0.5">24</p>
+                                <p class="text-xl font-bold text-brand-600 mt-0.5">24</p>
                             </div>
                             <div class="bg-surface-50 rounded-xl p-4">
                                 <p class="text-[0.65rem] text-surface-400">Today's Bookings</p>
@@ -696,12 +673,12 @@
                             </div>
                             <div class="bg-surface-50 rounded-xl p-4">
                                 <p class="text-[0.65rem] text-surface-400">Month Revenue</p>
-                                <p class="text-xl font-bold text-emerald-600 mt-0.5">ج.م 3,240</p>
+                                <p class="text-xl font-bold text-green-600 mt-0.5">ج.م 3,240</p>
                             </div>
                         </div>
 
                         <div class="flex gap-3">
-                            <button onclick="openDemoModal()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-center text-sm font-semibold py-3 rounded-xl transition">New Booking</button>
+                            <button onclick="openDemoModal()" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white text-center text-sm font-semibold py-3 rounded-xl transition">New Booking</button>
                             <button onclick="openDemoModal()" class="flex-1 bg-surface-100 hover:bg-surface-200 text-surface-700 text-center text-sm font-semibold py-3 rounded-xl transition">View Reports</button>
                         </div>
                     </div>
@@ -713,33 +690,33 @@
     <!-- ═══════════════════════════════════════════
          WHY LINKSPACE
          ═══════════════════════════════════════════ -->
-    <section class="relative overflow-hidden py-20 sm:py-28 px-5 sm:px-8 bg-surface-900 text-white">
-        <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-[640px] h-[420px] bg-indigo-600/20 blur-[130px] rounded-full pointer-events-none"></div>
-        <div class="absolute bottom-0 right-0 w-[420px] h-[320px] bg-violet-600/10 blur-[120px] rounded-full pointer-events-none"></div>
+    <section class="relative overflow-hidden py-20 sm:py-28 px-5 sm:px-8 bg-surface-900/90 backdrop-blur-sm text-white">
+        <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-[640px] h-[420px] bg-brand-600/20 blur-[130px] rounded-full pointer-events-none"></div>
+        <div class="absolute bottom-0 right-0 w-[420px] h-[320px] bg-brand-600/10 blur-[120px] rounded-full pointer-events-none"></div>
         <div class="relative max-w-6xl mx-auto">
             <div class="text-center mb-16 fade-in">
-                <span class="inline-block text-xs font-semibold text-indigo-300 bg-white/5 px-3 py-1 rounded-full mb-4">{{ __('app.landing.why_linkspace') }}</span>
+                <span class="inline-block text-xs font-semibold text-brand-300 bg-white/5 px-3 py-1 rounded-full mb-4">{{ __('app.landing.why_linkspace') }}</span>
                 <h2 class="text-3xl sm:text-4xl font-bold tracking-tight">{{ __('app.landing.built_for_spaces') }}</h2>
             </div>
 
             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 fade-in">
                 <div class="bg-white/5 backdrop-blur-sm rounded-2xl p-7 border border-white/5 hover:bg-white/[0.07] transition">
-                    <div class="w-11 h-11 rounded-xl bg-indigo-500/10 flex items-center justify-center mb-4">
-                        <svg class="w-5 h-5 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    <div class="w-11 h-11 rounded-xl bg-brand-500/10 flex items-center justify-center mb-4">
+                        <svg class="w-5 h-5 text-brand-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                     </div>
                     <h3 class="text-base font-bold mb-2">{{ __('app.landing.no_technical_skills') }}</h3>
                     <p class="text-sm text-surface-400 leading-relaxed">Forget CLI commands. Link Space Panel connects via API and gives you a beautiful interface to manage everything.</p>
                 </div>
                 <div class="bg-white/5 backdrop-blur-sm rounded-2xl p-7 border border-white/5 hover:bg-white/[0.07] transition">
-                    <div class="w-11 h-11 rounded-xl bg-purple-500/10 flex items-center justify-center mb-4">
-                        <svg class="w-5 h-5 text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    <div class="w-11 h-11 rounded-xl bg-brand-500/10 flex items-center justify-center mb-4">
+                        <svg class="w-5 h-5 text-brand-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
                     <h3 class="text-base font-bold mb-2">{{ __('app.landing.real_time_everything') }}</h3>
                     <p class="text-sm text-surface-400 leading-relaxed">User changes sync instantly. Live session data, booking updates — no delays, no manual steps.</p>
                 </div>
                 <div class="bg-white/5 backdrop-blur-sm rounded-2xl p-7 border border-white/5 hover:bg-white/[0.07] transition sm:col-span-2 lg:col-span-1">
-                    <div class="w-11 h-11 rounded-xl bg-amber-500/10 flex items-center justify-center mb-4">
-                        <svg class="w-5 h-5 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    <div class="w-11 h-11 rounded-xl bg-brand-500/10 flex items-center justify-center mb-4">
+                        <svg class="w-5 h-5 text-brand-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     </div>
                     <h3 class="text-base font-bold mb-2">{{ __('app.landing.secure_multi_tenant') }}</h3>
                     <p class="text-sm text-surface-400 leading-relaxed">Every space is isolated. Your data, customers, and configurations stay private and completely separate.</p>
@@ -754,122 +731,77 @@
     <section id="pricing" class="py-20 sm:py-28 px-5 sm:px-8">
         <div class="max-w-6xl mx-auto">
             <div class="text-center mb-16 fade-in">
-                <span class="inline-block text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full mb-4">{{ __('app.landing.pricing') }}</span>
-                <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-surface-900">{{ __('app.landing.simple_transparent_pricing') }}</h2>
-                <p class="mt-3 text-surface-500 text-base sm:text-lg">{{ __('app.landing.start_free_scale') }}</p>
+                <span class="inline-block text-xs font-semibold text-brand-600 bg-brand-50 px-3 py-1 rounded-full mb-4">{{ __('app.landing.pricing') }}</span>
+                <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-surface-900">{{ __('app.landing.pricing_title') }}</h2>
+                <p class="mt-3 text-surface-500 text-base sm:text-lg max-w-2xl mx-auto">{{ __('app.landing.pricing_subtitle') }}</p>
             </div>
 
-            <div class="grid sm:grid-cols-3 gap-6 max-w-5xl mx-auto fade-in">
-                <div class="pricing-card">
-                    <h3 class="text-base font-bold text-surface-900 mb-1">Starter</h3>
-                    <p class="text-sm text-surface-400 mb-4">For small spaces</p>
-                    <p class="text-4xl font-black text-surface-900 mb-1">Free</p>
-                    <p class="text-sm text-surface-400 mb-6">Forever free</p>
-                    <ul class="space-y-3 mb-8">
-                        <li class="flex items-center gap-2.5 text-sm text-surface-600"><svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> 50 hotspot users</li>
-                        <li class="flex items-center gap-2.5 text-sm text-surface-600"><svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> 1 workspace</li>
-                        <li class="flex items-center gap-2.5 text-sm text-surface-600"><svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> 10 rooms</li>
-                        <li class="flex items-center gap-2.5 text-sm text-surface-600"><svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Basic support</li>
-                    </ul>
-                    <button onclick="openDemoModal()" class="w-full cta-secondary justify-center font-semibold">{{ __('app.landing.get_started') }}</button>
-                </div>
-
-                <div class="pricing-card featured relative">
-                    <span class="absolute -top-3 left-1/2 -translate-x-1/2 text-[0.62rem] font-bold text-white bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-1 rounded-full shadow-md shadow-indigo-500/30 whitespace-nowrap">★ Most Popular</span>
-                    <h3 class="text-base font-bold text-surface-900 mb-1">Professional</h3>
-                    <p class="text-sm text-surface-400 mb-4">For growing spaces</p>
-                    <p class="text-4xl font-black text-surface-900 mb-1">ج.م 999<span class="text-base font-medium text-surface-400">/mo</span></p>
-                    <p class="text-sm text-surface-400 mb-6">Everything you need</p>
-                    <ul class="space-y-3 mb-8">
-                        <li class="flex items-center gap-2.5 text-sm text-surface-600"><svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Unlimited users</li>
-                        <li class="flex items-center gap-2.5 text-sm text-surface-600"><svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Unlimited workspaces</li>
-                        <li class="flex items-center gap-2.5 text-sm text-surface-600"><svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Booking engine</li>
-                        <li class="flex items-center gap-2.5 text-sm text-surface-600"><svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Priority support</li>
-                    </ul>
-                    <button onclick="openDemoModal()" class="w-full cta-primary justify-center font-semibold">{{ __('app.landing.start_free_trial') }}</button>
-                </div>
-
-                <div class="pricing-card">
-                    <h3 class="text-base font-bold text-surface-900 mb-1">Enterprise</h3>
-                    <p class="text-sm text-surface-400 mb-4">For multi-location</p>
-                    <p class="text-4xl font-black text-surface-900 mb-1">Custom</p>
-                    <p class="text-sm text-surface-400 mb-6">Contact us</p>
-                    <ul class="space-y-3 mb-8">
-                        <li class="flex items-center gap-2.5 text-sm text-surface-600"><svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Everything in Pro</li>
-                        <li class="flex items-center gap-2.5 text-sm text-surface-600"><svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Multi-location</li>
-                        <li class="flex items-center gap-2.5 text-sm text-surface-600"><svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Custom integrations</li>
-                        <li class="flex items-center gap-2.5 text-sm text-surface-600"><svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Dedicated support</li>
-                    </ul>
-                    <button onclick="openDemoModal()" class="w-full cta-secondary justify-center font-semibold">Contact Us</button>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══════════════════════════════════════════
-         TESTIMONIALS
-         ═══════════════════════════════════════════ -->
-    <section class="py-20 sm:py-28 px-5 sm:px-8 bg-white border-y border-surface-100">
-        <div class="max-w-6xl mx-auto">
-            <div class="text-center mb-16 fade-in">
-                <span class="inline-block text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full mb-4">{{ __('app.landing.testimonials') }}</span>
-                <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-surface-900">{{ __('app.landing.loved_by_space_operators') }}</h2>
-            </div>
-
-            <div class="grid sm:grid-cols-3 gap-5 fade-in">
-                <div class="testimonial-card">
-                    <div class="flex items-center gap-0.5 mb-4">
-                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+            @php
+                $plans = [
+                    [
+                        'name'        => __('app.landing.plan_starter'),
+                        'users'       => __('app.landing.plan_starter_users'),
+                        'price'       => __('app.landing.plan_starter_price'),
+                        'unit'        => __('app.landing.plan_forever'),
+                        'price_class' => 'text-green-600',
+                        'featured'    => false,
+                        'cta'         => __('app.landing.get_started'),
+                        'features'    => [__('app.landing.plan_starter_f1'), __('app.landing.plan_starter_f2'), __('app.landing.plan_starter_f3')],
+                    ],
+                    [
+                        'name'        => __('app.landing.plan_growth'),
+                        'users'       => __('app.landing.plan_growth_users'),
+                        'price'       => __('app.landing.plan_growth_price'),
+                        'unit'        => __('app.landing.per_month'),
+                        'price_class' => 'text-brand-400',
+                        'featured'    => true,
+                        'cta'         => __('app.landing.get_started'),
+                        'features'    => [__('app.landing.plan_growth_f1'), __('app.landing.plan_growth_f2'), __('app.landing.plan_growth_f3'), __('app.landing.plan_growth_f4')],
+                    ],
+                    [
+                        'name'        => __('app.landing.plan_scale'),
+                        'users'       => __('app.landing.plan_scale_users'),
+                        'price'       => __('app.landing.plan_scale_price'),
+                        'unit'        => __('app.landing.per_month'),
+                        'price_class' => 'text-brand-600',
+                        'featured'    => false,
+                        'cta'         => __('app.landing.get_started'),
+                        'features'    => [__('app.landing.plan_scale_f1'), __('app.landing.plan_scale_f2'), __('app.landing.plan_scale_f3'), __('app.landing.plan_scale_f4')],
+                    ],
+                    [
+                        'name'        => __('app.landing.plan_enterprise'),
+                        'users'       => __('app.landing.plan_enterprise_users'),
+                        'price'       => __('app.landing.plan_enterprise_price'),
+                        'unit'        => __('app.landing.plan_lets_talk'),
+                        'price_class' => 'text-brand-600',
+                        'featured'    => false,
+                        'cta'         => __('app.landing.contact_us'),
+                        'features'    => [__('app.landing.plan_enterprise_f1'), __('app.landing.plan_enterprise_f2'), __('app.landing.plan_enterprise_f3'), __('app.landing.plan_enterprise_f4')],
+                    ],
+                ];
+            @endphp
+            <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto fade-in items-stretch">
+                @foreach($plans as $plan)
+                    @php $feat = $plan['featured']; @endphp
+                    <div class="pricing-card flex flex-col {{ $feat ? 'featured relative !bg-brand-900 !border-transparent' : '' }}">
+                        @if($feat)
+                            <span class="absolute -top-3 {{ $isRtl ? 'right-1/2 translate-x-1/2' : 'left-1/2 -translate-x-1/2' }} text-[0.62rem] font-bold text-brand-900 bg-brand-400 px-3.5 py-1 rounded-full shadow-md shadow-brand-900/20 whitespace-nowrap uppercase tracking-wide">{{ __('app.landing.most_popular') }}</span>
+                        @endif
+                        <h3 class="text-base font-bold mb-0.5 {{ $feat ? 'text-white' : 'text-surface-900' }}">{{ $plan['name'] }}</h3>
+                        <p class="text-sm mb-5 {{ $feat ? 'text-white/60' : 'text-surface-400' }}">{{ $plan['users'] }}</p>
+                        <p class="text-4xl font-black leading-none mb-1 {{ $plan['price_class'] }}">{{ $plan['price'] }}</p>
+                        <p class="text-sm mb-5 {{ $feat ? 'text-white/60' : 'text-surface-400' }}">{{ $plan['unit'] }}</p>
+                        <ul class="space-y-3 mb-8 flex-1 pt-5 border-t {{ $feat ? 'border-white/10' : 'border-surface-100' }}">
+                            @foreach($plan['features'] as $feature)
+                                <li class="flex items-center gap-2.5 text-sm {{ $feat ? 'text-white font-medium' : 'text-surface-600' }}">
+                                    <svg class="w-4 h-4 shrink-0 {{ $feat ? 'text-green-400' : 'text-green-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                    {{ $feature }}
+                                </li>
+                            @endforeach
+                        </ul>
+                        <button onclick="openDemoModal()" class="w-full justify-center font-semibold {{ $feat ? 'inline-flex items-center bg-white text-brand-900 hover:bg-brand-50 rounded-xl px-4 py-3 transition' : 'cta-secondary' }}">{{ $plan['cta'] }}</button>
                     </div>
-                    <p class="text-sm text-surface-600 mb-5 leading-relaxed">"Link Space Panel transformed how we manage our coworking space. The booking system alone saved us hours of manual work every week."</p>
-                    <div class="flex items-center gap-3 pt-4 border-t border-surface-100">
-                        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">AK</div>
-                        <div>
-                            <p class="text-sm font-semibold text-surface-900">Ahmed Khalid</p>
-                            <p class="text-[0.7rem] text-surface-400">SpaceHub Coworking, Cairo</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="testimonial-card">
-                    <div class="flex items-center gap-0.5 mb-4">
-                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                    </div>
-                    <p class="text-sm text-surface-600 mb-5 leading-relaxed">"The MikroTik integration is flawless. We went from spending hours on user management to doing it all in minutes."</p>
-                    <div class="flex items-center gap-3 pt-4 border-t border-surface-100">
-                        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white text-xs font-bold">SM</div>
-                        <div>
-                            <p class="text-sm font-semibold text-surface-900">Sara Mahmoud</p>
-                            <p class="text-[0.7rem] text-surface-400">WorkBase, Alexandria</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="testimonial-card">
-                    <div class="flex items-center gap-0.5 mb-4">
-                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                    </div>
-                    <p class="text-sm text-surface-600 mb-5 leading-relaxed">"The calendar view and conflict prevention are game-changers. No more double-bookings or scheduling headaches."</p>
-                    <div class="flex items-center gap-3 pt-4 border-t border-surface-100">
-                        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white text-xs font-bold">OY</div>
-                        <div>
-                            <p class="text-sm font-semibold text-surface-900">Omar Youssef</p>
-                            <p class="text-[0.7rem] text-surface-400">The Desk, Giza</p>
-                        </div>
-                    </div>
-                </div>
+                @endforeach
             </div>
         </div>
     </section>
@@ -879,17 +811,17 @@
          ═══════════════════════════════════════════ -->
     <section class="py-20 sm:py-28 px-5 sm:px-8">
         <div class="max-w-5xl mx-auto fade-in">
-            <div class="relative overflow-hidden rounded-3xl px-6 py-16 sm:py-20 text-center shadow-2xl shadow-indigo-500/20"
-                 style="background: radial-gradient(120% 120% at 0% 0%, #6d28d9 0%, transparent 45%), radial-gradient(120% 120% at 100% 100%, #4f46e5 0%, transparent 48%), linear-gradient(135deg, #4338ca 0%, #6d28d9 55%, #7c3aed 100%);">
+            <div class="relative overflow-hidden rounded-3xl px-6 py-16 sm:py-20 text-center shadow-2xl shadow-brand-500/20"
+                 style="background: radial-gradient(120% 120% at 0% 0%, #3f68af 0%, transparent 45%), radial-gradient(120% 120% at 100% 100%, #163c85 0%, transparent 48%), linear-gradient(135deg, #163c85 0%, #3f68af 55%, #6f96d1 100%);">
                 <div class="absolute inset-0 opacity-[0.14]" style="background-image:url('/images/hero-bg.svg'); background-size:cover; mix-blend-mode:soft-light;"></div>
                 <div class="absolute -top-16 -left-16 w-64 h-64 rounded-full bg-white/10 blur-3xl pointer-events-none"></div>
-                <div class="absolute -bottom-20 -right-10 w-72 h-72 rounded-full bg-fuchsia-300/20 blur-3xl pointer-events-none"></div>
+                <div class="absolute -bottom-20 -right-10 w-72 h-72 rounded-full bg-brand-300/20 blur-3xl pointer-events-none"></div>
 
                 <div class="relative z-10">
                     <h2 class="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white mb-4 max-w-2xl mx-auto" style="text-wrap:balance">{{ __('app.landing.ready_to_transform') }}</h2>
-                    <p class="text-indigo-100 text-base sm:text-lg mb-9 max-w-xl mx-auto leading-relaxed">{{ __('app.landing.join_500_spaces') }}</p>
+                    <p class="text-brand-100 text-base sm:text-lg mb-9 max-w-xl mx-auto leading-relaxed">{{ __('app.landing.cta_subtitle') }}</p>
                     <div class="flex flex-col sm:flex-row gap-3 justify-center">
-                        <button onclick="openDemoModal()" class="group inline-flex items-center justify-center gap-2 bg-white text-indigo-700 font-semibold text-sm px-7 py-3.5 rounded-xl hover:bg-indigo-50 transition shadow-lg shadow-indigo-950/20">
+                        <button onclick="openDemoModal()" class="group inline-flex items-center justify-center gap-2 bg-white text-brand-700 font-semibold text-sm px-7 py-3.5 rounded-xl hover:bg-brand-50 transition shadow-lg shadow-brand-900/30">
                             {{ __('app.landing.start_free_trial') }}
                             <svg class="w-4 h-4 transition group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
                         </button>
@@ -897,7 +829,7 @@
                             {{ __('app.landing.request_demo') }}
                         </button>
                     </div>
-                    <p class="text-xs text-indigo-200 mt-5">{{ __('app.landing.no_credit_card_needed') }} · 14-day free trial · Cancel anytime</p>
+                    <p class="text-xs text-brand-200 mt-5">{{ __('app.landing.no_credit_card_needed') }} · 14-day free trial · Cancel anytime</p>
                 </div>
             </div>
         </div>
@@ -932,8 +864,8 @@
          ═══════════════════════════════════════════ -->
     @if (session('success'))
         <div id="flash-message" class="fixed top-24 left-1/2 -translate-x-1/2 z-50 max-w-md w-full mx-4">
-            <div class="bg-white rounded-2xl shadow-2xl border border-emerald-100 px-6 py-4 flex items-center gap-3">
-                <svg class="w-5 h-5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <div class="bg-white rounded-2xl shadow-2xl border border-green-100 px-6 py-4 flex items-center gap-3">
+                <svg class="w-5 h-5 text-green-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <p class="text-sm text-surface-800 font-medium">{{ session('success') }}</p>
                 <button onclick="this.parentElement.parentElement.remove()" class="ml-auto text-surface-400 hover:text-surface-600 transition">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -954,7 +886,7 @@
             </button>
 
             <div class="text-center mb-6">
-                <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/20">
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-500/20">
                     <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                 </div>
                 <h3 class="text-xl font-bold text-surface-900">{{ __('app.landing.demo_modal_title') }}</h3>
@@ -966,27 +898,27 @@
                 <div>
                     <label class="block text-sm font-medium text-surface-700 mb-1.5">{{ __('app.landing.your_full_name') }} *</label>
                     <input type="text" name="name" required placeholder="{{ __('app.placeholder.full_name') }}"
-                           class="w-full border border-surface-200 rounded-xl px-4 py-3 text-sm text-surface-900 placeholder-surface-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition">
+                           class="w-full border border-surface-200 rounded-xl px-4 py-3 text-sm text-surface-900 placeholder-surface-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-surface-700 mb-1.5">{{ __('app.landing.your_email') }} *</label>
                     <input type="email" name="email" required placeholder="{{ __('app.placeholder.email') }}"
-                           class="w-full border border-surface-200 rounded-xl px-4 py-3 text-sm text-surface-900 placeholder-surface-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition">
+                           class="w-full border border-surface-200 rounded-xl px-4 py-3 text-sm text-surface-900 placeholder-surface-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-surface-700 mb-1.5">{{ __('app.landing.your_phone') }}</label>
                     <input type="text" name="phone" placeholder="{{ __('app.placeholder.phone') }}"
-                           class="w-full border border-surface-200 rounded-xl px-4 py-3 text-sm text-surface-900 placeholder-surface-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition">
+                           class="w-full border border-surface-200 rounded-xl px-4 py-3 text-sm text-surface-900 placeholder-surface-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-surface-700 mb-1.5">{{ __('app.landing.company_space_name') }}</label>
                     <input type="text" name="company" placeholder="{{ __('app.placeholder.business_name') }}"
-                           class="w-full border border-surface-200 rounded-xl px-4 py-3 text-sm text-surface-900 placeholder-surface-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition">
+                           class="w-full border border-surface-200 rounded-xl px-4 py-3 text-sm text-surface-900 placeholder-surface-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-surface-700 mb-1.5">{{ __('app.landing.message') }}</label>
                     <textarea name="message" rows="3" placeholder="{{ __('app.placeholder.space_description') }}"
-                              class="w-full border border-surface-200 rounded-xl px-4 py-3 text-sm text-surface-900 placeholder-surface-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition"></textarea>
+                              class="w-full border border-surface-200 rounded-xl px-4 py-3 text-sm text-surface-900 placeholder-surface-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition"></textarea>
                 </div>
                 <button type="submit" class="w-full cta-primary justify-center !py-3.5">
                     {{ __('app.landing.send_request') }}

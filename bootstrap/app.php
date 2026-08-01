@@ -21,12 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'feature'             => \App\Http\Middleware\CheckFeature::class,
         ]);
 
-        $middleware->redirectGuestsTo(function (Illuminate\Http\Request $request) {
-            if ($request->is('admin/*') || $request->routeIs('admin.*')) {
-                return route('admin.login');
-            }
-            return route('login');
-        });
+        // Single sign-in page for every guard.
+        $middleware->redirectGuestsTo(fn () => route('login'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

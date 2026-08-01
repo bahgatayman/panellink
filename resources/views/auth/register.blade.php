@@ -54,28 +54,6 @@
             </div>
         </div>
 
-        <div class="space-y-4">
-            <p class="group-lbl">{{ __('app.auth.mikrotik_connection') }}</p>
-            <div>
-                <label for="mikrotik_host" class="lbl">{{ __('app.auth.router_ip') }}</label>
-                <input type="text" name="mikrotik_host" id="mikrotik_host" value="{{ old('mikrotik_host') }}" required placeholder="192.168.88.1" class="field">
-            </div>
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                <div>
-                    <label for="mikrotik_port" class="lbl">{{ __('app.auth.api_port') }}</label>
-                    <input type="number" name="mikrotik_port" id="mikrotik_port" value="{{ old('mikrotik_port', 8728) }}" required class="field">
-                </div>
-                <div>
-                    <label for="mikrotik_username" class="lbl">{{ __('app.label.mikrotik_username') }}</label>
-                    <input type="text" name="mikrotik_username" id="mikrotik_username" value="{{ old('mikrotik_username') }}" required class="field">
-                </div>
-                <div class="col-span-2 sm:col-span-1">
-                    <label for="mikrotik_password" class="lbl">{{ __('app.label.mikrotik_password') }}</label>
-                    <input type="password" name="mikrotik_password" id="mikrotik_password" required class="field">
-                </div>
-            </div>
-        </div>
-
         <button type="submit" class="btn-primary">
             {{ __('app.auth.create_account') }}
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>

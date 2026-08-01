@@ -42,10 +42,10 @@ class OwnerController extends Controller
             'email'             => 'required|email|unique:owners,email',
             'password'          => 'required|string|min:8',
             'business_name'     => 'required|string|max:255',
-            'mikrotik_host'     => 'required|string',
-            'mikrotik_port'     => 'required|integer',
-            'mikrotik_username' => 'required|string',
-            'mikrotik_password' => 'required|string',
+            'mikrotik_host'     => 'nullable|string',
+            'mikrotik_port'     => 'nullable|integer',
+            'mikrotik_username' => 'nullable|string',
+            'mikrotik_password' => 'nullable|string',
             'plan_id'           => 'required|exists:plans,id',
             'months'            => 'required|integer|min:1|max:24',
         ]);
@@ -57,15 +57,18 @@ class OwnerController extends Controller
             'email'             => $validated['email'],
             'password'          => bcrypt($validated['password']),
             'business_name'     => $validated['business_name'],
-            'mikrotik_host'     => $validated['mikrotik_host'],
-            'mikrotik_port'     => $validated['mikrotik_port'],
-            'mikrotik_username' => $validated['mikrotik_username'],
-            'mikrotik_password' => $validated['mikrotik_password'],
+            'mikrotik_host'     => $validated['mikrotik_host'] ?? null,
+            'mikrotik_port'     => $validated['mikrotik_port'] ?? 8728,
+            'mikrotik_username' => $validated['mikrotik_username'] ?? null,
+            'mikrotik_password' => $validated['mikrotik_password'] ?? null,
             'plan_id'                 => $plan->id,
             'subscription_starts_at'  => now(),
             'subscription_expires_at' => now()->addMonths((int) $validated['months']),
             'is_active'               => true,
         ]);
+
+        // Turn on the plan's default features for this owner.
+        $owner->applyPlanFeatures();
 
         Subscription::create([
             'owner_id'    => $owner->id,

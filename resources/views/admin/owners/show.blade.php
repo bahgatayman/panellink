@@ -31,14 +31,16 @@
                     <dt class="text-gray-500">{{ __('app.label.business') }}</dt>
                     <dd class="text-gray-900 font-medium">{{ $owner->business_name }}</dd>
                 </div>
+                @if ($owner->hasFeature('hotspot'))
                 <div class="flex justify-between">
                     <dt class="text-gray-500">{{ __('app.label.mikrotik_host') }}</dt>
-                    <dd class="text-gray-900">{{ $owner->mikrotik_host }}:{{ $owner->mikrotik_port }}</dd>
+                    <dd class="text-gray-900">{{ $owner->mikrotik_host ? $owner->mikrotik_host.':'.$owner->mikrotik_port : '—' }}</dd>
                 </div>
                 <div class="flex justify-between">
                     <dt class="text-gray-500">{{ __('app.label.mikrotik_username') }}</dt>
-                    <dd class="text-gray-900">{{ $owner->mikrotik_username }}</dd>
+                    <dd class="text-gray-900">{{ $owner->mikrotik_username ?: '—' }}</dd>
                 </div>
+                @endif
                 <div class="flex justify-between">
                     <dt class="text-gray-500">{{ __('app.user.hotspot_users') }}</dt>
                     <dd class="text-gray-900">

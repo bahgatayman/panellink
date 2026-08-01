@@ -40,29 +40,32 @@
             </div>
 
             <div>
-                <h2 class="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-100">{{ __('app.auth.mikrotik_connection') }}</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <h2 class="text-lg font-semibold text-gray-800 mb-1 pb-2 border-b border-gray-100">
+                    {{ __('app.auth.mikrotik_connection') }}
+                    <span class="text-xs font-normal text-gray-400">— {{ __('app.settings.mikrotik_optional_hint') }}</span>
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('app.label.mikrotik_host') }}</label>
-                        <input type="text" name="mikrotik_host" value="{{ old('mikrotik_host') }}" required placeholder="{{ __('app.placeholder.router_ip') }}"
+                        <input type="text" name="mikrotik_host" value="{{ old('mikrotik_host') }}" placeholder="{{ __('app.placeholder.router_ip') }}"
                                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
                         @error('mikrotik_host') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('app.label.mikrotik_port') }}</label>
-                        <input type="number" name="mikrotik_port" value="{{ old('mikrotik_port', 8728) }}" required
+                        <input type="number" name="mikrotik_port" value="{{ old('mikrotik_port', 8728) }}"
                                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
                         @error('mikrotik_port') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('app.label.mikrotik_username') }}</label>
-                        <input type="text" name="mikrotik_username" value="{{ old('mikrotik_username') }}" required
+                        <input type="text" name="mikrotik_username" value="{{ old('mikrotik_username') }}"
                                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
                         @error('mikrotik_username') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('app.label.mikrotik_password') }}</label>
-                        <input type="password" name="mikrotik_password" required
+                        <input type="password" name="mikrotik_password"
                                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
                         @error('mikrotik_password') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>

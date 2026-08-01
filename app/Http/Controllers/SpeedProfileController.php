@@ -4,13 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\HotspotUser;
 use App\Models\SpeedProfile;
-use App\Services\MikroTikService;
+use App\Services\HotspotSyncService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class SpeedProfileController extends Controller
 {
+    public function __construct(private HotspotSyncService $sync)
+    {
+    }
+
     public function index(): View
     {
         $profiles = SpeedProfile::where('owner_id', auth('owner')->id())
@@ -58,17 +62,9 @@ class SpeedProfileController extends Controller
         ]);
 
         $owner = auth('owner')->user();
-        $mikrotik = new MikroTikService(
-            $owner->mikrotik_host,
-            $owner->mikrotik_port,
-            $owner->mikrotik_username,
-            $owner->mikrotik_password,
-        );
 
         try {
-            $mikrotik->connect();
-            $mikrotik->createHotspotProfile($profile->name, $profile->speed_download, $profile->speed_upload);
-            $mikrotik->disconnect();
+            $this->sync->createProfile($owner, $profile->name, $profile->speed_download, $profile->speed_upload);
         } catch (\Exception $e) {
             $profile->delete();
             return back()->withInput()->with('error', "Profile saved but MikroTik sync failed: {$e->getMessage()}. Profile was not created.");
@@ -113,44 +109,15 @@ class SpeedProfileController extends Controller
         $profile->update($validated);
 
         $owner = auth('owner')->user();
-        $mikrotik = new MikroTikService(
-            $owner->mikrotik_host,
-            $owner->mikrotik_port,
-            $owner->mikrotik_username,
-            $owner->mikrotik_password,
-        );
 
-        $assignedUsers = collect();
-        $syncErrors = [];
+        $assignedUsers = HotspotUser::where('owner_id', auth('owner')->id())
+            ->where('speed_profile_id', $profile->id)
+            ->get();
 
         try {
-            $mikrotik->connect();
-
-            $mikrotik->updateHotspotProfile(
-                $profile->name,
-                $profile->speed_download,
-                $profile->speed_upload
-            );
-
-            $assignedUsers = HotspotUser::where('owner_id', auth('owner')->id())
-                ->where('speed_profile_id', $profile->id)
-                ->get();
-
-            foreach ($assignedUsers as $user) {
-                try {
-                    $mikrotik->setUserSpeed($user->phone, $profile->name);
-                    $user->update([
-                        'speed_download' => $profile->speed_download,
-                        'speed_upload'   => $profile->speed_upload,
-                    ]);
-                } catch (\Exception $e) {
-                    $syncErrors[] = $user->name . ': ' . $e->getMessage();
-                }
-            }
+            $syncErrors = $this->sync->syncProfileToUsers($owner, $profile, $assignedUsers);
         } catch (\Exception $e) {
             return back()->with('error', 'Profile updated in DB but MikroTik sync failed: ' . $e->getMessage());
-        } finally {
-            $mikrotik->disconnect();
         }
 
         if (!empty($syncErrors)) {
@@ -175,17 +142,9 @@ class SpeedProfileController extends Controller
         }
 
         $owner = auth('owner')->user();
-        $mikrotik = new MikroTikService(
-            $owner->mikrotik_host,
-            $owner->mikrotik_port,
-            $owner->mikrotik_username,
-            $owner->mikrotik_password,
-        );
 
         try {
-            $mikrotik->connect();
-            $mikrotik->deleteHotspotProfile($profile->name);
-            $mikrotik->disconnect();
+            $this->sync->deleteProfile($owner, $profile->name);
         } catch (\Exception $e) {
             return back()->with('error', "Could not delete profile from MikroTik: {$e->getMessage()}");
         }

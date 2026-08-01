@@ -7,16 +7,28 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Link Space Panel - {{ $owner->business_name ?? __('app.auth.linkspace') }}</title>
     <link rel="icon" type="image/webp" href="/logo.webp">
-    <script src="https://cdn.tailwindcss.com"></script>
+    @include('partials.theme')
     @if($isRtl)
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>body { font-family: 'Cairo', sans-serif; }</style>
     @endif
+    <style>
+        /* App shell pinned to the viewport: the sidebar and top bar stay put and
+           only <main> scrolls. min-h-screen was a *minimum*, so tall pages grew
+           the shell and scrolled the whole document, chrome included.
+           dvh keeps mobile browser bars from adding phantom height over 100vh. */
+        html, body { height: 100%; }
+        .app-shell {
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+        }
+    </style>
 </head>
 <body class="bg-[#f8fafc] font-sans antialiased">
-    <div class="min-h-screen flex flex-col lg:flex-row">
+    <div class="app-shell flex flex-col lg:flex-row">
         <!-- Mobile header -->
-        <div class="lg:hidden flex items-center justify-between bg-[#0f172a] px-4 py-3">
+        <div class="lg:hidden shrink-0 flex items-center justify-between bg-brand-900 px-4 py-3">
             <img src="/logo.webp" alt="Link Space Panel" class="h-7 w-auto brightness-0 invert">
             <div class="flex items-center gap-2">
                 <button id="menu-toggle" class="text-white p-2 focus:outline-none">
@@ -31,11 +43,12 @@
         <div id="sidebar-overlay" class="lg:hidden fixed inset-0 bg-black/50 z-10 hidden" onclick="closeSidebar()"></div>
 
         <!-- Sidebar -->
-        <aside id="sidebar" class="fixed lg:static inset-y-0 {{ $isRtl ? 'right-0' : 'left-0' }} z-20 w-[260px] bg-gradient-to-b from-[#0f172a] to-[#1e293b] text-white flex flex-col shrink-0 transition-transform duration-300 {{ $isRtl ? 'translate-x-full' : '-translate-x-full' }} lg:translate-x-0">
-            <div class="flex items-center justify-center px-6 py-6 border-b border-white/10">
+        <aside id="sidebar" class="fixed lg:static inset-y-0 {{ $isRtl ? 'right-0' : 'left-0' }} z-20 w-[260px] bg-gradient-to-b from-brand-900 to-brand-700 text-white flex flex-col shrink-0 transition-transform duration-300 {{ $isRtl ? 'translate-x-full' : '-translate-x-full' }} lg:translate-x-0">
+            <div class="shrink-0 flex items-center justify-center px-6 py-6 border-b border-white/10">
                 <img src="/logo.webp" alt="Link Space Panel" class="h-8 w-auto brightness-0 invert">
             </div>
-            <nav class="flex-1 px-3 py-4 space-y-1">
+            {{-- Long menus scroll inside the sidebar so the profile/logout block stays pinned. --}}
+            <nav class="flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-1">
                 @php $currentOwner = auth('owner')->user(); @endphp
                 <a href="/dashboard" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('dashboard') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -43,13 +56,15 @@
                     </svg>
                     <span>{{ __('app.nav.dashboard') }}</span>
                 </a>
-                @if($currentOwner->hasFeature('hotspot'))
+                @if($currentOwner->hasFeature('hotspot') || $currentOwner->hasFeature('booking'))
                     <a href="/users" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('users*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
                         <span>{{ __('app.nav.users') }}</span>
                     </a>
+                @endif
+                @if($currentOwner->hasFeature('hotspot'))
                     <a href="/sessions" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('sessions*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
@@ -85,6 +100,20 @@
                         <span>{{ __('app.nav.shared_sessions') }}</span>
                     </a>
                 @endif
+                @if($currentOwner->hasFeature('sales'))
+                    <a href="/products" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('products*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                        </svg>
+                        <span>{{ __('app.nav.products') }}</span>
+                    </a>
+                    <a href="/sales" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('sales*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+                        </svg>
+                        <span>{{ __('app.nav.sales') }}</span>
+                    </a>
+                @endif
                 <a href="/settings" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('settings*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
@@ -92,7 +121,7 @@
                     <span>{{ __('app.nav.settings') }}</span>
                 </a>
             </nav>
-            <div class="px-4 py-4 border-t border-white/10">
+            <div class="shrink-0 px-4 py-4 border-t border-white/10">
                 <a href="/profile" class="flex items-center gap-2 text-sm text-gray-300 hover:text-white transition mb-2 {{ request()->is('profile') ? 'text-blue-400' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
@@ -107,8 +136,8 @@
         </aside>
 
         <!-- Main -->
-        <div class="flex-1 flex flex-col min-w-0">
-            <header class="bg-white shadow-sm px-4 lg:px-6 py-4 flex items-center justify-between">
+        <div class="flex-1 flex flex-col min-w-0 min-h-0">
+            <header class="shrink-0 bg-white shadow-sm px-4 lg:px-6 py-4 flex items-center justify-between">
                 <h1 class="text-lg font-semibold text-gray-800">@yield('page-title', __('app.nav.dashboard'))</h1>
                 <div class="flex items-center gap-3">
                     <!-- Notification bell -->
@@ -174,11 +203,21 @@
                         </button>
                         <span class="text-xs font-medium {{ $isRtl ? 'text-indigo-600' : 'text-gray-500' }}">{{ $isRtl ? 'AR' : 'EN' }}</span>
                     </form>
-                    <span class="text-sm text-gray-500 truncate">{{ $owner->business_name }}</span>
+                    <a href="/profile" class="flex items-center gap-2 min-w-0 group" title="{{ __('app.nav.my_profile') }}">
+                        @if ($owner->logoUrl())
+                            <img src="{{ $owner->logoUrl() }}" alt="{{ $owner->business_name }}"
+                                 class="w-8 h-8 rounded-full object-cover border border-gray-200 shrink-0">
+                        @else
+                            <span class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-blue-400 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                                {{ $owner->initials() }}
+                            </span>
+                        @endif
+                        <span class="text-sm text-gray-500 group-hover:text-gray-700 truncate">{{ $owner->business_name }}</span>
+                    </a>
                 </div>
             </header>
 
-            <main class="flex-1 overflow-y-auto p-4 lg:p-6">
+            <main class="flex-1 min-h-0 overflow-y-auto p-4 lg:p-6">
                 @if(auth('owner')->user()->subscriptionStatus() === 'expiring_soon')
                     <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 flex items-center gap-3">
                         <svg class="w-5 h-5 text-yellow-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -214,6 +253,31 @@
         const overlay = document.getElementById('sidebar-overlay');
         sidebar.classList.toggle('{{ $isRtl ? "translate-x-full" : "-translate-x-full" }}');
         overlay.classList.toggle('hidden');
+    });
+
+    // Whole-row navigation for any table row marked `class="row-link" data-href="…"`.
+    // Each such row still contains a real <a>, so this only adds a convenience
+    // layer — it is never the only way to reach the record.
+    document.querySelectorAll('tr.row-link').forEach(row => {
+        const ignore = event => event.target.closest('a, button, form, input, select, label');
+
+        row.addEventListener('click', event => {
+            if (ignore(event)) return;                        // let real controls act
+            if (window.getSelection().toString()) return;     // don't navigate mid-selection
+
+            if (event.metaKey || event.ctrlKey) {
+                window.open(row.dataset.href, '_blank', 'noopener');
+            } else {
+                window.location.href = row.dataset.href;
+            }
+        });
+
+        // Middle-click opens a new tab, matching normal link behaviour.
+        row.addEventListener('auxclick', event => {
+            if (event.button !== 1 || ignore(event)) return;
+            event.preventDefault();
+            window.open(row.dataset.href, '_blank', 'noopener');
+        });
     });
     </script>
 </body>

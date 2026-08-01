@@ -6,15 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', __('app.auth.login')) · Link Space Panel</title>
     <link rel="icon" type="image/webp" href="/logo.webp">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: { extend: {
-                fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
-                colors: { surface: { 50:'#fafaf9',100:'#f5f5f4',200:'#e7e5e4',300:'#d6d3d1',400:'#a8a29e',500:'#78716c',600:'#57534e',700:'#44403c',800:'#292524',900:'#1c1917' } },
-            } },
-        }
-    </script>
+    <link rel="preload" as="image" href="/images/auth-bg.svg">
+    @include('partials.theme')
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         @if($isRtl)
@@ -29,88 +22,97 @@
             transition: border-color .15s, box-shadow .15s;
         }
         .field::placeholder { color: #b3b0ab; }
-        .field:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.14); }
+        .field:focus { outline: none; border-color: #163c85; box-shadow: 0 0 0 3px rgba(22,60,133,.14); }
         .lbl { display: block; font-size: 0.8rem; font-weight: 600; color: #44403c; margin-bottom: 0.4rem; }
         .group-lbl { font-size: 0.68rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: #a8a29e; }
 
         .btn-primary {
             width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
             padding: 0.72rem 1rem; border-radius: 0.7rem; font-weight: 600; font-size: 0.9rem;
-            color: #fff; background: linear-gradient(135deg, #4f46e5 0%, #6d28d9 100%);
-            box-shadow: 0 10px 22px -10px rgba(79,70,229,.55); border: none; cursor: pointer;
+            color: #fff; background: linear-gradient(135deg, #163c85 0%, #3f68af 100%);
+            box-shadow: 0 10px 22px -10px rgba(22,60,133,.55); border: none; cursor: pointer;
             transition: box-shadow .2s, transform .2s;
         }
-        .btn-primary:hover { box-shadow: 0 14px 28px -10px rgba(79,70,229,.65); transform: translateY(-1px); }
+        .btn-primary:hover { box-shadow: 0 14px 28px -10px rgba(22,60,133,.65); transform: translateY(-1px); }
         .btn-primary svg { transition: transform .2s; }
         .btn-primary:hover svg { transform: translateX(3px); }
 
-        .brand-panel { background: linear-gradient(150deg, #4338ca 0%, #5b21b6 55%, #7c3aed 100%); }
-        .brand-grid {
-            background-image:
-                linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px);
-            background-size: 46px 46px;
-            -webkit-mask-image: radial-gradient(120% 100% at 30% 0%, #000 40%, transparent 85%);
-                    mask-image: radial-gradient(120% 100% at 30% 0%, #000 40%, transparent 85%);
+        /* Full-bleed branded scene behind the centered card. */
+        .auth-scene {
+            position: fixed; inset: 0; z-index: -1;
+            background: #0d244e url('/images/auth-bg.svg') center / cover no-repeat;
         }
+        .auth-scene::after {
+            content: ''; position: absolute; inset: 0;
+            background: radial-gradient(70% 60% at 50% 45%, rgba(8,24,51,.30) 0%, rgba(8,24,51,.62) 100%);
+        }
+
+        .auth-card {
+            background: rgba(255,255,255,.97);
+            border: 1px solid rgba(255,255,255,.6);
+            border-radius: 1.25rem;
+            box-shadow: 0 30px 70px -25px rgba(4,12,28,.65), 0 0 0 1px rgba(8,24,51,.05);
+            backdrop-filter: blur(6px);
+        }
+
+        /* Lock the shell to the viewport: the page itself never scrolls.
+           dvh so mobile URL bars don't add phantom overflow on top of 100vh. */
+        html, body { height: 100%; }
+        .auth-shell {
+            height: 100vh; height: 100dvh;
+            display: grid; grid-template-rows: auto 1fr auto;
+            overflow: hidden;
+        }
+        /* Only this row scrolls, and only when the card outgrows it (long forms
+           on short screens). `margin:auto` centers instead of `align-items`,
+           which would make the overflowing top unreachable. */
+        .auth-main { display: flex; overflow-y: auto; overscroll-behavior: contain; }
+        .auth-main > * { margin: auto; }
+
+        /* Reclaim height on short viewports before resorting to a scrollbar. */
+        @media (max-height: 700px) {
+            .auth-bar { padding-top: .6rem; padding-bottom: .6rem; }
+            .auth-card { padding-top: 1.75rem; padding-bottom: 1.75rem; }
+        }
+
         .auth-fade { animation: authIn .6s cubic-bezier(.16,1,.3,1) both; }
-        @keyframes authIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+        @keyframes authIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
         @media (prefers-reduced-motion: reduce) { .auth-fade { animation: none; } }
     </style>
 </head>
-<body class="min-h-screen bg-surface-50 text-surface-900">
-    <div class="min-h-screen grid lg:grid-cols-[1.05fr_1fr]">
+<body class="text-surface-900">
+    <div class="auth-scene"></div>
 
-        <!-- Brand panel (desktop) -->
-        <div class="brand-panel relative hidden lg:flex flex-col justify-between overflow-hidden p-12 xl:p-16 text-white">
-            <div class="brand-grid absolute inset-0"></div>
-            <div class="absolute -top-24 -left-16 w-96 h-96 rounded-full bg-white/10 blur-3xl pointer-events-none"></div>
-            <div class="absolute -bottom-28 -right-12 w-[30rem] h-[30rem] rounded-full bg-fuchsia-400/20 blur-3xl pointer-events-none"></div>
+    <div class="auth-shell">
 
-            <div class="relative z-10">
-                <img src="/logo.webp" alt="Link Space Panel" class="h-9 w-auto brightness-0 invert">
-            </div>
+        <!-- Top bar: brand + language -->
+        <header class="auth-bar flex items-center justify-between gap-4 px-6 py-4 sm:px-10">
+            <img src="/logo.webp" alt="Link Space Panel" class="h-8 w-auto brightness-0 invert opacity-95">
+            <form method="POST" action="{{ route('language.switch', $isRtl ? 'en' : 'ar') }}" class="flex items-center gap-1.5">
+                @csrf
+                <button type="submit" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none {{ $isRtl ? 'bg-brand-400' : 'bg-white/25' }}" role="switch" aria-checked="{{ $isRtl ? 'true' : 'false' }}">
+                    <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition duration-200 {{ $isRtl ? 'translate-x-[18px]' : 'translate-x-[3px]' }}"></span>
+                </button>
+                <span class="text-xs font-medium text-white/80">{{ $isRtl ? 'AR' : 'EN' }}</span>
+            </form>
+        </header>
 
-            <div class="relative z-10 max-w-md">
-                <h2 class="text-3xl xl:text-4xl font-extrabold leading-[1.15] tracking-tight mb-8" style="text-wrap:balance">{{ __('app.auth.brand_headline') }}</h2>
-                <ul class="space-y-4">
-                    @foreach(['brand_point_1', 'brand_point_2', 'brand_point_3'] as $pt)
-                        <li class="flex items-center gap-3">
-                            <span class="shrink-0 w-6 h-6 rounded-full bg-white/15 flex items-center justify-center">
-                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                            </span>
-                            <span class="text-indigo-50/90 text-sm">{{ __('app.auth.'.$pt) }}</span>
-                        </li>
-                    @endforeach
-                </ul>
-            </div>
-
-            <div class="relative z-10 text-xs text-indigo-200/70">&copy; {{ date('Y') }} Link Space Panel</div>
-        </div>
-
-        <!-- Form panel -->
-        <div class="flex flex-col px-6 py-8 sm:px-10 lg:px-14">
-            <div class="flex items-center justify-between gap-4">
-                <img src="/logo.webp" alt="Link Space Panel" class="h-9 w-auto lg:hidden">
-                <form method="POST" action="{{ route('language.switch', $isRtl ? 'en' : 'ar') }}" class="flex items-center gap-1.5 ms-auto">
-                    @csrf
-                    <button type="submit" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none {{ $isRtl ? 'bg-indigo-600' : 'bg-surface-300' }}" role="switch" aria-checked="{{ $isRtl ? 'true' : 'false' }}">
-                        <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition duration-200 {{ $isRtl ? 'translate-x-[18px]' : 'translate-x-[3px]' }}"></span>
-                    </button>
-                    <span class="text-xs font-medium {{ $isRtl ? 'text-indigo-600' : 'text-surface-500' }}">{{ $isRtl ? 'AR' : 'EN' }}</span>
-                </form>
-            </div>
-
-            <div class="flex-1 flex items-center justify-center py-10">
-                <div class="w-full @yield('formWidth', 'max-w-md') auth-fade">
-                    <div class="mb-8">
+        <!-- Centered card -->
+        <main class="auth-main px-4 py-6 sm:px-6">
+            <div class="w-full @yield('formWidth', 'max-w-md') auth-fade">
+                <div class="auth-card px-6 py-8 sm:px-9 sm:py-10">
+                    <div class="mb-7 text-center">
                         <h1 class="text-2xl sm:text-[1.7rem] font-bold tracking-tight text-surface-900">@yield('heading')</h1>
                         <p class="text-sm text-surface-500 mt-1.5">@yield('subheading')</p>
                     </div>
                     @yield('content')
                 </div>
             </div>
-        </div>
+        </main>
+
+        <footer class="auth-bar px-6 py-4 text-center text-xs text-white/50">
+            &copy; {{ date('Y') }} Link Space Panel
+        </footer>
     </div>
 
     <script>

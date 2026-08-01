@@ -77,8 +77,12 @@
                     </thead>
                     <tbody>
                         @foreach ($bookings as $booking)
-                            <tr class="border-b border-gray-50 {{ $booking->status === 'cancelled' ? 'text-gray-400 line-through' : 'text-gray-900' }}">
-                                <td class="px-4 py-3 font-medium">{{ $booking->booking_date->format('M d, Y') }}</td>
+                            <tr class="row-link border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition {{ $booking->status === 'cancelled' ? 'text-gray-400 line-through' : 'text-gray-900' }}"
+                                data-href="/bookings/{{ $booking->id }}">
+                                <td class="px-4 py-3 font-medium">
+                                    {{-- Real link: keeps the booking keyboard-reachable and ctrl/middle-clickable. --}}
+                                    <a href="/bookings/{{ $booking->id }}" class="hover:text-blue-600">{{ $booking->booking_date->format('M d, Y') }}</a>
+                                </td>
                                 <td class="px-4 py-3 whitespace-nowrap">{{ $booking->timeRange() }}</td>
                                 <td class="px-4 py-3">
                                     <a href="/users/{{ $booking->hotspotUser->id }}" class="text-blue-600 hover:underline font-medium">
@@ -100,11 +104,13 @@
                                     </span>
                                 </td>
                                 <td class="px-4 py-3">
-                                    <div class="flex gap-2">
-                                        <a href="/bookings/{{ $booking->id }}" class="text-blue-600 hover:underline text-xs font-medium">{{ __('app.common.view') }}</a>
+                                    <div class="flex items-center justify-end gap-3">
                                         @if (in_array($booking->status, ['pending', 'confirmed']))
-                                            <a href="/bookings/{{ $booking->id }}/edit" class="text-gray-600 hover:underline text-xs font-medium">{{ __('app.common.edit') }}</a>
+                                            <a href="/bookings/{{ $booking->id }}/edit" class="text-gray-600 hover:text-gray-900 hover:underline text-xs font-medium">{{ __('app.common.edit') }}</a>
                                         @endif
+                                        <svg class="w-4 h-4 text-gray-300 shrink-0 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                        </svg>
                                     </div>
                                 </td>
                             </tr>

@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Booking;
 use App\Models\HotspotUser;
+use App\Models\Product;
 use App\Models\Room;
+use App\Models\SaleItem;
 use App\Services\BookingService;
+use App\Services\SalesService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -113,11 +116,18 @@ class BookingController extends Controller
 
     public function show($id): View
     {
-        $booking = Booking::where('owner_id', auth('owner')->id())
-            ->with(['room.workspace', 'hotspotUser'])
+        $owner = auth('owner')->user();
+
+        $booking = Booking::where('owner_id', $owner->id)
+            ->with(['room.workspace', 'hotspotUser', 'sale.items'])
             ->findOrFail($id);
 
-        return view('bookings.show', compact('booking'));
+        // Catalog for the "add items" picker — only relevant when the sales feature is on.
+        $products = $owner->hasFeature('sales')
+            ? Product::where('owner_id', $owner->id)->where('is_active', true)->orderBy('name')->get()
+            : collect();
+
+        return view('bookings.show', compact('booking', 'products'));
     }
 
     public function edit($id): View
@@ -297,6 +307,50 @@ class BookingController extends Controller
             'total_price'    => $calc['total_price'] ?? null,
             'price_per_hour' => $room->price_per_hour,
         ]);
+    }
+
+    /**
+     * Attach a product/service as a line item to this booking's sale.
+     * Routed under feature:booking + feature:sales.
+     */
+    public function addItem(Request $request, $id, SalesService $sales): RedirectResponse
+    {
+        $ownerId = auth('owner')->id();
+
+        $booking = Booking::where('owner_id', $ownerId)->findOrFail($id);
+
+        $validated = $request->validate([
+            'product_id' => 'required|exists:products,id',
+            'quantity'   => 'required|integer|min:1|max:1000',
+        ]);
+
+        // Scope the product to this owner — never trust a product id from another tenant.
+        $product = Product::where('id', $validated['product_id'])
+            ->where('owner_id', $ownerId)
+            ->firstOrFail();
+
+        $sale = $sales->saleForBooking($booking);
+        $sales->addItem($sale, $product, (int) $validated['quantity']);
+
+        return back()->with('success', __('app.sales.item_added'));
+    }
+
+    /** Remove a line item from this booking's sale. */
+    public function removeItem($id, $itemId, SalesService $sales): RedirectResponse
+    {
+        $ownerId = auth('owner')->id();
+
+        $booking = Booking::where('owner_id', $ownerId)->with('sale')->findOrFail($id);
+
+        if ($booking->sale) {
+            $item = SaleItem::where('id', $itemId)
+                ->where('sale_id', $booking->sale->id)
+                ->firstOrFail();
+
+            $sales->removeItem($item);
+        }
+
+        return back()->with('success', __('app.sales.item_removed'));
     }
 
     private function generateTimeSlots(): array

@@ -24,10 +24,10 @@ class RegisterController extends Controller
             'email' => ['required', 'email', 'unique:owners,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'business_name' => ['required', 'string', 'max:255'],
-            'mikrotik_host' => ['required', 'string'],
-            'mikrotik_port' => ['required', 'integer', 'min:1', 'max:65535'],
-            'mikrotik_username' => ['required', 'string'],
-            'mikrotik_password' => ['required', 'string'],
+            'mikrotik_host' => ['nullable', 'string'],
+            'mikrotik_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'mikrotik_username' => ['nullable', 'string'],
+            'mikrotik_password' => ['nullable', 'string'],
         ]);
 
         $owner = Owner::create([
@@ -35,10 +35,10 @@ class RegisterController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'business_name' => $validated['business_name'],
-            'mikrotik_host' => $validated['mikrotik_host'],
-            'mikrotik_port' => $validated['mikrotik_port'],
-            'mikrotik_username' => $validated['mikrotik_username'],
-            'mikrotik_password' => $validated['mikrotik_password'],
+            'mikrotik_host' => $validated['mikrotik_host'] ?? null,
+            'mikrotik_port' => $validated['mikrotik_port'] ?? 8728,
+            'mikrotik_username' => $validated['mikrotik_username'] ?? null,
+            'mikrotik_password' => $validated['mikrotik_password'] ?? null,
         ]);
 
         Auth::guard('owner')->login($owner);

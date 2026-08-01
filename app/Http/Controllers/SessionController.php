@@ -3,29 +3,24 @@
 namespace App\Http\Controllers;
 
 use App\Models\HotspotUser;
-use App\Services\MikroTikService;
+use App\Services\HotspotSyncService;
 use Exception;
 use Illuminate\View\View;
 
 class SessionController extends Controller
 {
+    public function __construct(private HotspotSyncService $sync)
+    {
+    }
+
     public function index(): View
     {
         $owner = auth('owner')->user();
         $sessions = [];
         $error = null;
 
-        $mikrotik = new MikroTikService(
-            $owner->mikrotik_host,
-            $owner->mikrotik_port,
-            $owner->mikrotik_username,
-            $owner->mikrotik_password,
-        );
-
         try {
-            $mikrotik->connect();
-            $rawSessions = $mikrotik->getActiveUsers();
-            $mikrotik->disconnect();
+            $rawSessions = $this->sync->activeUsers($owner);
 
             $phones = collect($rawSessions)->pluck('phone')->toArray();
             $localUsers = HotspotUser::where('owner_id', $owner->id)

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class SharedSession extends Model
 {
@@ -15,11 +16,11 @@ class SharedSession extends Model
     ];
 
     protected $casts = [
-        'opened_at'     => 'datetime',
-        'closed_at'     => 'datetime',
-        'session_date'  => 'date',
+        'opened_at' => 'datetime',
+        'closed_at' => 'datetime',
+        'session_date' => 'date',
         'total_minutes' => 'decimal:2',
-        'total_price'   => 'decimal:2',
+        'total_price' => 'decimal:2',
     ];
 
     public function owner(): BelongsTo
@@ -42,16 +43,24 @@ class SharedSession extends Model
         return $this->belongsTo(Booking::class);
     }
 
+    /** The running "tab" of products while this session is open. */
+    public function sale(): HasOne
+    {
+        return $this->hasOne(Sale::class);
+    }
+
     public function durationInMinutes(): float
     {
         $end = $this->closed_at ?? now();
+
         return round($this->opened_at->diffInSeconds($end) / 60, 2);
     }
 
     public function currentPrice(): float
     {
         $minutes = $this->durationInMinutes();
-        $hours   = $minutes / 60;
+        $hours = $minutes / 60;
+
         return round($hours * $this->room->price_per_hour, 2);
     }
 
@@ -60,6 +69,7 @@ class SharedSession extends Model
         $minutes = (int) $this->durationInMinutes();
         $h = intdiv($minutes, 60);
         $m = $minutes % 60;
-        return ($h > 0 ? $h . 'h ' : '') . $m . 'm';
+
+        return ($h > 0 ? $h.'h ' : '').$m.'m';
     }
 }

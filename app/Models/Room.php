@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Lang;
 
 class Room extends Model
 {
@@ -60,15 +61,12 @@ class Room extends Model
             ->exists();
     }
 
+    /** Bilingual label; unknown types fall back to the raw value. */
     public function typeLabel(): string
     {
-        return match ($this->type) {
-            'meeting'  => 'Meeting Room',
-            'training' => 'Training Room',
-            'shared'   => 'Shared Space',
-            'office'   => 'Private Office',
-            default    => ucfirst($this->type),
-        };
+        $key = 'app.room_type.' . $this->type;
+
+        return Lang::has($key) ? __($key) : ucfirst((string) $this->type);
     }
 
     public function typeColor(): string

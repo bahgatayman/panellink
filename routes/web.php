@@ -18,10 +18,13 @@ use App\Http\Controllers\WorkspaceController;
 use App\Http\Controllers\RoomController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\SharedSessionController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\SaleController;
 use App\Http\Controllers\Admin\WorkspaceController as AdminWorkspaceController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\PlanController;
 use App\Http\Controllers\Admin\FinancialController;
+use App\Http\Controllers\Admin\NotificationController as AdminNotificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\LanguageController;
@@ -51,24 +54,39 @@ Route::middleware('guest:owner')->group(function () {
 
 Route::post('/logout', [LoginController::class, 'logout'])->name('owner.logout');
 
-// ===================== Subscription Expired =====================
-Route::get('/subscription/expired', [OwnerSubscriptionController::class, 'expired'])->name('subscription.expired');
+// ===================== Subscription (reachable while expired) =====================
+// Deliberately outside `subscription.active`: an owner whose subscription lapsed
+// must still be able to see the plans and ask to renew.
+Route::middleware('auth:owner')->group(function () {
+    Route::get('/subscription/expired', [OwnerSubscriptionController::class, 'expired'])->name('subscription.expired');
+    Route::get('/subscription/plans', [OwnerSubscriptionController::class, 'plans'])->name('subscription.plans');
+    Route::post('/subscription/request', [OwnerSubscriptionController::class, 'requestRenewal'])->name('subscription.request');
+    Route::delete('/subscription/request/{id}', [OwnerSubscriptionController::class, 'cancelRequest'])->name('subscription.request.cancel');
+});
 
 // ===================== Owner Routes (authenticated + subscription check) =====================
 Route::middleware(['auth:owner', 'subscription.active'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index']);
     Route::get('/users/search', [HotspotUserController::class, 'search']);
 
-    // Hotspot feature routes
-    Route::middleware('feature:hotspot')->group(function () {
+    // Member/customer registry — HotspotUser is the shared customer entity that
+    // BOOKING owners also need. Available with either feature; router sync is
+    // applied inside the controller only for hotspot owners.
+    Route::middleware('feature:hotspot,booking')->group(function () {
         Route::get('/users', [HotspotUserController::class, 'index']);
         Route::get('/users/create', [HotspotUserController::class, 'create']);
         Route::post('/users', [HotspotUserController::class, 'store']);
+        // Inline "add member" used by the booking + shared-session pickers.
+        Route::post('/users/quick', [HotspotUserController::class, 'quickStore']);
         Route::get('/users/{id}', [HotspotUserController::class, 'show']);
         Route::get('/users/{id}/edit', [HotspotUserController::class, 'edit']);
         Route::put('/users/{id}', [HotspotUserController::class, 'update']);
         Route::delete('/users/{id}', [HotspotUserController::class, 'destroy']);
         Route::post('/users/{id}/toggle-status', [HotspotUserController::class, 'toggleStatus']);
+    });
+
+    // Hotspot-only: router-backed actions.
+    Route::middleware('feature:hotspot')->group(function () {
         Route::post('/users/{id}/speed', [HotspotUserController::class, 'updateSpeed']);
         Route::get('/speed-profiles', [SpeedProfileController::class, 'index']);
         Route::get('/speed-profiles/create', [SpeedProfileController::class, 'create']);
@@ -108,6 +126,12 @@ Route::middleware(['auth:owner', 'subscription.active'])->group(function () {
         Route::get('/shared-sessions/{session}/close-preview', [SharedSessionController::class, 'closePreview'])->name('shared-sessions.close-preview');
         Route::post('/shared-sessions/{session}/close', [SharedSessionController::class, 'close'])->name('shared-sessions.close');
 
+        // Running-tab items on an open session need BOTH booking and sales features.
+        Route::middleware('feature:sales')->group(function () {
+            Route::post('/shared-sessions/{session}/items', [SharedSessionController::class, 'addItem'])->name('shared-sessions.items.add');
+            Route::delete('/shared-sessions/{session}/items/{item}', [SharedSessionController::class, 'removeItem'])->name('shared-sessions.items.remove');
+        });
+
         Route::get('/bookings/calendar', [BookingController::class, 'calendar']);
         Route::get('/bookings/check-availability', [BookingController::class, 'checkAvailability']);
         Route::get('/bookings', [BookingController::class, 'index']);
@@ -118,12 +142,38 @@ Route::middleware(['auth:owner', 'subscription.active'])->group(function () {
         Route::put('/bookings/{booking}', [BookingController::class, 'update']);
         Route::delete('/bookings/{booking}', [BookingController::class, 'destroy']);
         Route::post('/bookings/{booking}/status', [BookingController::class, 'updateStatus']);
+
+        // Attaching products to a booking needs BOTH booking and sales features.
+        Route::middleware('feature:sales')->group(function () {
+            Route::post('/bookings/{booking}/items', [BookingController::class, 'addItem'])->name('bookings.items.add');
+            Route::delete('/bookings/{booking}/items/{item}', [BookingController::class, 'removeItem'])->name('bookings.items.remove');
+        });
+    });
+
+    // Sales feature routes (product catalog + sales history)
+    Route::middleware('feature:sales')->group(function () {
+        Route::get('/products', [ProductController::class, 'index'])->name('products.index');
+        Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
+        Route::post('/products', [ProductController::class, 'store'])->name('products.store');
+        Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
+        Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
+        Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+        Route::post('/products/{product}/toggle', [ProductController::class, 'toggleActive'])->name('products.toggle');
+
+        Route::get('/sales', [SaleController::class, 'index'])->name('sales.index');
+        Route::get('/sales/{sale}', [SaleController::class, 'show'])->name('sales.show');
     });
 
     Route::get('/settings', [SettingsController::class, 'index']);
-    Route::post('/settings/test-connection', [SettingsController::class, 'testConnection']);
+    // Router configuration is only writable/testable when the hotspot feature is on.
+    Route::middleware('feature:hotspot')->group(function () {
+        Route::post('/settings', [SettingsController::class, 'update']);
+        Route::post('/settings/test-connection', [SettingsController::class, 'testConnection']);
+    });
 
     Route::get('/profile', [ProfileController::class, 'index']);
+    Route::post('/profile/logo', [ProfileController::class, 'updateLogo'])->name('profile.logo.update');
+    Route::delete('/profile/logo', [ProfileController::class, 'destroyLogo'])->name('profile.logo.destroy');
 
     // Notifications (cross-cutting — available to every authenticated owner)
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
@@ -134,10 +184,9 @@ Route::middleware(['auth:owner', 'subscription.active'])->group(function () {
 });
 
 // ===================== Admin Auth =====================
-Route::middleware('guest:admin')->group(function () {
-    Route::get('/admin/login', [AuthController::class, 'showLogin'])->name('admin.login');
-    Route::post('/admin/login', [AuthController::class, 'login']);
-});
+// Unified sign-in: admins use the same /login form as owners. This route only
+// exists to redirect legacy /admin/login links (and guest redirects) there.
+Route::get('/admin/login', fn () => redirect()->route('login'))->name('admin.login');
 
 Route::post('/admin/logout', [AuthController::class, 'logout']);
 
@@ -153,6 +202,15 @@ Route::middleware('auth:admin')->prefix('admin')->group(function () {
     Route::get('/owners/{owner}/users', [OwnerController::class, 'users']);
 
     Route::post('/owners/{owner}/renew', [SubscriptionController::class, 'renew']);
+
+    // Owner-initiated renewal requests
+    Route::get('/subscription-requests', [\App\Http\Controllers\Admin\SubscriptionRequestController::class, 'index'])->name('admin.subscription-requests.index');
+    Route::post('/subscription-requests/{id}/approve', [\App\Http\Controllers\Admin\SubscriptionRequestController::class, 'approve'])->name('admin.subscription-requests.approve');
+    Route::post('/subscription-requests/{id}/reject', [\App\Http\Controllers\Admin\SubscriptionRequestController::class, 'reject'])->name('admin.subscription-requests.reject');
+
+    // Admin → Owner notifications (broadcast)
+    Route::get('/notifications', [AdminNotificationController::class, 'index'])->name('admin.notifications.index');
+    Route::post('/notifications', [AdminNotificationController::class, 'store'])->name('admin.notifications.store');
 
     // Admin Feature Management
     Route::get('/features', [\App\Http\Controllers\Admin\FeatureController::class, 'index']);
