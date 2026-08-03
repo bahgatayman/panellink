@@ -155,13 +155,13 @@
                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
 
-            <button type="submit"
+            <button type="submit" id="plan-submit"
                     class="mt-4 w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition font-medium text-sm shadow-sm">
-                {{ __('app.subscription.request_renewal') }}
+                <span id="plan-submit-label">{{ __('app.subscription.request_renewal') }}</span>
                 <svg class="w-4 h-4 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
             </button>
 
-            <p class="text-xs text-gray-400 mt-3">{{ __('app.subscription.no_online_payment_hint') }}</p>
+            <p id="payment-hint" class="text-xs text-gray-400 mt-3">{{ __('app.subscription.no_online_payment_hint') }}</p>
         </div>
     </form>
 
@@ -170,10 +170,14 @@
         const form    = document.getElementById('plan-form');
         const total   = document.getElementById('plan-total');
         const summary = document.getElementById('summary-line');
+        const submit  = document.getElementById('plan-submit-label');
+        const hint    = document.getElementById('payment-hint');
 
-        const FREE     = @json(__('app.subscription.free'));
-        const MONTHS   = @json(__('app.subscription.months'));
-        const CURRENCY = 'ج.م ';
+        const FREE       = @json(__('app.subscription.free'));
+        const MONTHS     = @json(__('app.subscription.months'));
+        const CTA_PAID   = @json(__('app.subscription.request_renewal'));
+        const CTA_FREE   = @json(__('app.subscription.activate_free'));
+        const CURRENCY   = 'ج.م ';
 
         function money(amount) {
             return CURRENCY + amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -229,6 +233,11 @@
             summary.textContent = checked.dataset.name + ' · ' + term + ' ' + MONTHS
                 + (price > 0 ? ' × ' + money(price) : '');
             total.textContent = amount === 0 ? FREE : money(amount);
+
+            // Free plan is self-serve — no admin approval or payment step.
+            const isFree = price === 0;
+            submit.textContent = isFree ? CTA_FREE : CTA_PAID;
+            hint.classList.toggle('hidden', isFree);
         }
 
         form.addEventListener('change', paint);

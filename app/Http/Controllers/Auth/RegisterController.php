@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\Owner;
+use App\Models\Plan;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -40,6 +41,18 @@ class RegisterController extends Controller
             'mikrotik_username' => $validated['mikrotik_username'] ?? null,
             'mikrotik_password' => $validated['mikrotik_password'] ?? null,
         ]);
+
+        // Start every new owner on the default (free) plan with a 2-week trial so
+        // they land in the panel instead of the subscription-expired wall.
+        if ($plan = Plan::defaultForSignup()) {
+            $owner->update([
+                'plan_id' => $plan->id,
+                'subscription_starts_at' => now(),
+                'subscription_expires_at' => now()->addWeeks(2),
+                'is_active' => true,
+            ]);
+            $owner->applyPlanFeatures();
+        }
 
         Auth::guard('owner')->login($owner);
 

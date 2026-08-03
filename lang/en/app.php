@@ -519,6 +519,8 @@ return [
         'request_renewal'          => 'Send renewal request',
         'no_online_payment_hint'   => 'Online payment is not available yet. An administrator will contact you to arrange payment, then activate your plan.',
         'request_sent'             => 'Renewal request sent. An administrator will review it shortly.',
+        'free_activated'           => 'Your free plan is active. Welcome aboard!',
+        'activate_free'            => 'Activate free plan',
         'request_already_pending'  => 'You already have a renewal request awaiting review.',
         'request_cancelled'        => 'Renewal request cancelled.',
         'request_pending_title'    => 'Renewal request under review',

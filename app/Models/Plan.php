@@ -26,14 +26,14 @@ class Plan extends Model
     protected function casts(): array
     {
         return [
-            'is_active'       => 'boolean',
+            'is_active' => 'boolean',
             'price_per_month' => 'decimal:2',
-            'max_members'     => 'integer',
-            'features'        => 'array',
-            'max_workspaces'  => 'integer',
-            'max_rooms'       => 'integer',
-            'max_products'    => 'integer',
-            'sort_order'      => 'integer',
+            'max_members' => 'integer',
+            'features' => 'array',
+            'max_workspaces' => 'integer',
+            'max_rooms' => 'integer',
+            'max_products' => 'integer',
+            'sort_order' => 'integer',
         ];
     }
 
@@ -41,6 +41,18 @@ class Plan extends Model
     public function defaultFeatures(): array
     {
         return $this->features ?? [];
+    }
+
+    /**
+     * The plan a brand-new owner starts on: the free plan when there is one,
+     * otherwise the cheapest active plan. Null only if no active plans exist.
+     */
+    public static function defaultForSignup(): ?self
+    {
+        return static::where('is_active', true)->where('price_per_month', 0)
+            ->orderBy('sort_order')->first()
+            ?? static::where('is_active', true)
+                ->orderBy('price_per_month')->orderBy('sort_order')->first();
     }
 
     public function hasFeature(string $key): bool
@@ -55,8 +67,11 @@ class Plan extends Model
 
     public function formattedPrice(): string
     {
-        if ($this->isFree()) return 'Free';
-        return 'ج.م ' . number_format($this->price_per_month, 0) . ' / month';
+        if ($this->isFree()) {
+            return 'Free';
+        }
+
+        return 'ج.م '.number_format($this->price_per_month, 0).' / month';
     }
 
     public function owners(): HasMany

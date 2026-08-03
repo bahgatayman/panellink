@@ -16,9 +16,7 @@ use Carbon\Carbon;
  */
 class SubscriptionRenewalService
 {
-    public function __construct(private NotificationService $notifications)
-    {
-    }
+    public function __construct(private NotificationService $notifications) {}
 
     /**
      * Extend (or start) an owner's subscription and record the payment.
@@ -26,8 +24,8 @@ class SubscriptionRenewalService
      * Renewing early stacks on the remaining time rather than discarding it:
      * the new term starts at the current expiry when that is still in the future.
      *
-     * @param  int|null  $months     Term length. Ignored when $until is given.
-     * @param  Carbon|null  $until   Explicit expiry date, for admin overrides.
+     * @param  int|null  $months  Term length. Ignored when $until is given.
+     * @param  Carbon|null  $until  Explicit expiry date, for admin overrides.
      */
     public function renew(
         Owner $owner,
@@ -52,31 +50,35 @@ class SubscriptionRenewalService
         $amountPaid = $plan->price_per_month * $months;
 
         $owner->update([
-            'plan_id'                 => $plan->id,
-            'subscription_starts_at'  => $owner->subscription_starts_at ?? now(),
+            'plan_id' => $plan->id,
+            'subscription_starts_at' => $owner->subscription_starts_at ?? now(),
             'subscription_expires_at' => $newExpiry,
-            'is_active'               => true,
+            'is_active' => true,
         ]);
 
+        // Assign the plan's default features so the owner gets everything the plan
+        // includes. Enable-only: admin-granted extras are left untouched.
+        $owner->applyPlanFeatures();
+
         $subscription = Subscription::create([
-            'owner_id'    => $owner->id,
-            'admin_id'    => $admin?->id,
-            'plan_id'     => $plan->id,
-            'months'      => $months,
+            'owner_id' => $owner->id,
+            'admin_id' => $admin?->id,
+            'plan_id' => $plan->id,
+            'months' => $months,
             'amount_paid' => $amountPaid,
-            'starts_at'   => $startsFrom,
-            'expires_at'  => $newExpiry,
-            'notes'       => $notes,
+            'starts_at' => $startsFrom,
+            'expires_at' => $newExpiry,
+            'notes' => $notes,
         ]);
 
         // Tell the owner in-app, and clear the now-stale expiry warnings so they
         // don't linger on the dashboard after a successful renewal.
         $this->notifications->notify($owner, [
-            'type'       => 'subscription_renewed',
-            'level'      => 'success',
-            'reference'  => "subscription_renewed:{$newExpiry->toDateString()}",
-            'title'      => __('app.notif.gen.sub_renewed_title'),
-            'body'       => __('app.notif.gen.sub_renewed_body', [
+            'type' => 'subscription_renewed',
+            'level' => 'success',
+            'reference' => "subscription_renewed:{$newExpiry->toDateString()}",
+            'title' => __('app.notif.gen.sub_renewed_title'),
+            'body' => __('app.notif.gen.sub_renewed_body', [
                 'plan' => $plan->name,
                 'date' => $newExpiry->format('Y-m-d'),
             ]),

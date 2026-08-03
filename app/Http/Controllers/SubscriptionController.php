@@ -38,27 +38,46 @@ class SubscriptionController extends Controller
 
         $validated = $request->validate([
             'plan_id' => 'required|exists:plans,id',
-            'months'  => 'required|integer|min:1|max:24',
-            'note'    => 'nullable|string|max:500',
+            'months' => 'required|integer|min:1|max:24',
+            'note' => 'nullable|string|max:500',
         ]);
-
-        // One open request at a time — otherwise an impatient owner queues several
-        // up and an admin approves the same renewal twice.
-        if ($this->pendingRequest()) {
-            return back()->with('error', __('app.subscription.request_already_pending'));
-        }
 
         $plan = Plan::where('id', $validated['plan_id'])
             ->where('is_active', true)
             ->firstOrFail();
 
+        // Free plan is self-serve: no payment, so no admin approval and no paid
+        // Subscription record — just activate it and drop the owner into the panel.
+        // Renewing early stacks on any remaining time.
+        if ($plan->isFree()) {
+            $startsFrom = ($owner->subscription_expires_at && $owner->subscription_expires_at->isFuture())
+                ? $owner->subscription_expires_at
+                : now();
+
+            $owner->update([
+                'plan_id' => $plan->id,
+                'subscription_starts_at' => $owner->subscription_starts_at ?? now(),
+                'subscription_expires_at' => $startsFrom->copy()->addMonths((int) $validated['months']),
+                'is_active' => true,
+            ]);
+            $owner->applyPlanFeatures();
+
+            return redirect('/dashboard')->with('success', __('app.subscription.free_activated'));
+        }
+
+        // Paid plans go through admin approval — one open request at a time, else an
+        // impatient owner queues several up and an admin approves the same one twice.
+        if ($this->pendingRequest()) {
+            return back()->with('error', __('app.subscription.request_already_pending'));
+        }
+
         SubscriptionRequest::create([
             'owner_id' => $owner->id,
-            'plan_id'  => $plan->id,
-            'months'   => $validated['months'],
-            'amount'   => $plan->price_per_month * $validated['months'],
-            'status'   => SubscriptionRequest::STATUS_PENDING,
-            'note'     => $validated['note'] ?? null,
+            'plan_id' => $plan->id,
+            'months' => $validated['months'],
+            'amount' => $plan->price_per_month * $validated['months'],
+            'status' => SubscriptionRequest::STATUS_PENDING,
+            'note' => $validated['note'] ?? null,
         ]);
 
         return back()->with('success', __('app.subscription.request_sent'));
@@ -82,8 +101,8 @@ class SubscriptionController extends Controller
         $owner = auth('owner')->user()->load('plan');
 
         return [
-            'owner'          => $owner,
-            'plans'          => Plan::where('is_active', true)
+            'owner' => $owner,
+            'plans' => Plan::where('is_active', true)
                 ->orderBy('sort_order')
                 ->orderBy('price_per_month')
                 ->get(),
