@@ -101,10 +101,12 @@
         <main class="auth-main px-4 py-6 sm:px-6">
             <div class="w-full @yield('formWidth', 'max-w-md') auth-fade">
                 <div class="auth-card px-6 py-8 sm:px-9 sm:py-10">
-                    <div class="mb-7 text-center">
-                        <h1 class="text-2xl sm:text-[1.7rem] font-bold tracking-tight text-surface-900">@yield('heading')</h1>
-                        <p class="text-sm text-surface-500 mt-1.5">@yield('subheading')</p>
-                    </div>
+                    @hasSection('heading')
+                        <div class="mb-7 text-center">
+                            <h1 class="text-2xl sm:text-[1.7rem] font-bold tracking-tight text-surface-900">@yield('heading')</h1>
+                            <p class="text-sm text-surface-500 mt-1.5">@yield('subheading')</p>
+                        </div>
+                    @endif
                     @yield('content')
                 </div>
             </div>

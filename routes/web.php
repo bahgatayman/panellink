@@ -244,3 +244,10 @@ Route::middleware('auth:admin')->prefix('admin')->group(function () {
     // Admin Financial Dashboard
     Route::get('/financial', [FinancialController::class, 'index'])->name('admin.financial.index');
 });
+
+// A truly unmatched path has no route to attach the 'web' middleware group
+// to, so SetLocale (and the session) never runs and the 404 page falls back
+// to the default locale regardless of the visitor's actual session. Routing
+// it through a real (fallback) route fixes that — same 404 response, but
+// now locale-aware.
+Route::fallback(fn () => abort(404));

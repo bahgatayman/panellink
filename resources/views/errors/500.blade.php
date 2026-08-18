@@ -1,0 +1,34 @@
+@extends('layouts.auth')
+
+@section('title', __('app.error.500_title'))
+
+@section('content')
+    @php
+        $isAuthed = auth('admin')->check() || auth('owner')->check();
+        $homeUrl = auth('admin')->check() ? '/admin/dashboard' : (auth('owner')->check() ? '/dashboard' : '/login');
+        $homeLabel = $isAuthed ? __('app.error.go_to_dashboard') : __('app.error.go_to_login');
+    @endphp
+    <div class="text-center">
+        <span class="inline-block text-xs font-mono font-semibold tracking-wider text-red-600 bg-red-50 px-2.5 py-1 rounded-full mb-5">
+            {{ __('app.error.error_code', ['code' => '500']) }}
+        </span>
+
+        <div class="mx-auto mb-5 w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center">
+            <svg class="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+            </svg>
+        </div>
+
+        <h1 class="text-xl font-bold text-surface-900 mb-2">{{ __('app.error.500_heading') }}</h1>
+        <p class="text-sm text-surface-500 mb-8">{{ __('app.error.500_message') }}</p>
+
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <a href="{{ url()->current() }}" class="w-full sm:w-auto bg-brand-600 text-white px-6 py-2.5 rounded-lg hover:bg-brand-700 transition font-medium shadow-sm">
+                {{ __('app.error.refresh_page') }}
+            </a>
+            <a href="{{ $homeUrl }}" class="w-full sm:w-auto text-sm font-semibold text-surface-600 hover:text-surface-800 px-6 py-2.5 transition">
+                {{ $homeLabel }}
+            </a>
+        </div>
+    </div>
+@endsection

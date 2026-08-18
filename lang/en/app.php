@@ -102,6 +102,37 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Error pages
+    |--------------------------------------------------------------------------
+    */
+    'error' => [
+        '404_title' => 'Page Not Found',
+        '404_heading' => 'Page Not Found',
+        '404_message' => "The page you're looking for doesn't exist or may have been moved.",
+        '403_title' => 'Access Denied',
+        '403_heading' => 'Access Denied',
+        '403_message' => "You don't have permission to view this page.",
+        '419_title' => 'Session Expired',
+        '419_heading' => 'Session Expired',
+        '419_message' => 'Your session expired for security reasons. Please refresh the page and try again.',
+        '429_title' => 'Too Many Requests',
+        '429_heading' => 'Too Many Requests',
+        '429_message' => "You've made too many requests in a short time. Please wait a moment and try again.",
+        '500_title' => 'Server Error',
+        '500_heading' => 'Something Went Wrong',
+        '500_message' => 'An unexpected error occurred on our end. Please try again in a moment.',
+        '503_title' => 'Under Maintenance',
+        '503_heading' => "We'll Be Right Back",
+        '503_message' => 'Panel Space is undergoing scheduled maintenance. Please check back shortly.',
+        'error_code' => 'Error :code',
+        'go_to_dashboard' => 'Go to Dashboard',
+        'go_to_login' => 'Go to Login',
+        'go_back' => 'Go Back',
+        'refresh_page' => 'Refresh Page',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Common / CRUD
     |--------------------------------------------------------------------------
     */
