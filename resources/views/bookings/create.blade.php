@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('page-title', __('app.booking.new_booking'))
 
@@ -33,6 +33,7 @@
                                 <optgroup label="{{ $workspaceName }}">
                                     @foreach ($roomsInGroup as $room)
                                         <option value="{{ $room->id }}"
+                                            {{ (string) old('room_id', $selectedRoomId ?? '') === (string) $room->id ? 'selected' : '' }}
                                             data-type="{{ $room->type }}"
                                             data-shared="{{ $room->isShared() ? 'true' : 'false' }}"
                                             data-price="{{ $room->price_per_hour }}"
@@ -51,7 +52,7 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('app.booking.date') }}</label>
                         <input type="date" name="booking_date" id="booking_date"
-                               min="{{ now()->format('Y-m-d') }}" value="{{ old('booking_date') }}" required
+                               min="{{ now()->format('Y-m-d') }}" value="{{ old('booking_date', $selectedDate ?? '') }}" required
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                         @error('booking_date') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
@@ -62,7 +63,7 @@
                                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                             <option value="">{{ __('app.common.select') }} {{ __('app.booking.start_time') }}</option>
                             @foreach ($timeSlots as $value => $label)
-                                <option value="{{ $value }}" {{ old('start_time') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                                <option value="{{ $value }}" {{ old('start_time', $selectedStartTime ?? '') === $value ? 'selected' : '' }}>{{ $label }}</option>
                             @endforeach
                         </select>
                         @error('start_time') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
@@ -74,7 +75,7 @@
                                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                             <option value="">{{ __('app.common.select') }} {{ __('app.booking.end_time') }}</option>
                             @foreach ($timeSlots as $value => $label)
-                                <option value="{{ $value }}" {{ old('end_time') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                                <option value="{{ $value }}" {{ old('end_time', $selectedEndTime ?? '') === $value ? 'selected' : '' }}>{{ $label }}</option>
                             @endforeach
                         </select>
                         @error('end_time') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
@@ -166,5 +167,12 @@
     [roomSelect, dateInput, startSelect, endSelect].forEach(el => {
         el.addEventListener('change', checkAvailability);
     });
+
+    // A click-to-book link from the calendar arrives with all four fields
+    // already filled in — show the availability/price preview immediately
+    // instead of waiting for the owner to touch a field. checkAvailability()
+    // itself is a no-op if any field is still empty, so this is safe on a
+    // blank form too.
+    checkAvailability();
     </script>
 @endsection

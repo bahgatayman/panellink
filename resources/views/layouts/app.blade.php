@@ -48,7 +48,7 @@
                 <img src="/logo.webp" alt="Link Space Panel" class="h-8 w-auto brightness-0 invert">
             </div>
             {{-- Long menus scroll inside the sidebar so the profile/logout block stays pinned. --}}
-            <nav class="flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-1">
+            <nav class="nav-scroll flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-1">
                 @php $currentOwner = auth('owner')->user(); @endphp
                 <a href="/dashboard" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('dashboard') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -87,7 +87,7 @@
                     </a>
                 @endif
                 @if($currentOwner->hasFeature('booking'))
-                    <a href="/bookings" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('bookings*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
+                    <a href="/bookings/calendar" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('bookings*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                         </svg>

@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\SharedSessionCapacityExceededException;
 use App\Models\Booking;
 use App\Models\HotspotUser;
 use App\Models\Product;
 use App\Models\Room;
 use App\Models\SaleItem;
 use App\Models\SharedSession;
+use App\Services\AvailabilityService;
+use App\Services\BusinessHoursService;
 use App\Services\SalesService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -59,7 +62,7 @@ class SharedSessionController extends Controller
         return view('shared-sessions.create', compact('sharedRooms'));
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours): RedirectResponse
     {
         $request->validate([
             'room_id' => 'required|exists:rooms,id',
@@ -69,8 +72,13 @@ class SharedSessionController extends Controller
             'party_size' => 'nullable|integer|min:1',
         ]);
 
-        $ownerId = auth('owner')->id();
+        $owner = auth('owner')->user();
+        $ownerId = $owner->id;
         $partySize = (int) ($request->input('party_size') ?: 1);
+
+        if (! $businessHours->isOpenAt($owner, Carbon::parse($request->session_date.' '.$request->start_time))) {
+            return back()->withInput()->with('error', __('app.session.outside_working_hours'));
+        }
 
         $user = HotspotUser::where('id', $request->hotspot_user_id)
             ->where('owner_id', $ownerId)
@@ -80,48 +88,64 @@ class SharedSessionController extends Controller
         // opening large parties into the room's last few free seats at the same
         // moment must not both pass the check and jointly overbook it.
         // lockForUpdate() genuinely serializes this on MySQL (production); it's a
-        // no-op on SQLite (dev/test), same documented limitation as close()'s
-        // double-close guard.
-        [$roomName, $error] = DB::transaction(function () use ($request, $ownerId, $user, $partySize) {
-            $room = Room::where('id', $request->room_id)
-                ->where('owner_id', $ownerId)
-                ->where('type', 'shared')
-                ->lockForUpdate()
-                ->firstOrFail();
+        // no-op on SQLite (dev/test) — the post-write exceedsCapacity()-style
+        // re-check below is the second, engine-independent layer this doesn't
+        // rely on alone, mirroring BookingController::store()'s identical
+        // defense-in-depth pattern.
+        try {
+            [$roomName, $error] = DB::transaction(function () use ($request, $ownerId, $user, $partySize, $availability) {
+                $room = Room::where('id', $request->room_id)
+                    ->where('owner_id', $ownerId)
+                    ->where('type', 'shared')
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-            if ($partySize > $room->capacity) {
-                return [null, "This room only seats {$room->capacity} people."];
-            }
+                if ($partySize > $room->effectiveCapacity()) {
+                    return [null, "This room only seats {$room->capacity} people."];
+                }
 
-            $available = $room->availableSharedSlots();
-            if ($partySize > $available) {
-                return [null, "Only {$available} of {$room->capacity} seats available right now."];
-            }
+                // The unified "right now" formula — capacity already claimed
+                // by overlapping advance Bookings AND other open sessions,
+                // not just open sessions in isolation. Room::availableSharedSlots()
+                // is blind to the bookings table entirely and is no longer
+                // safe to gate a write with now that shared rooms can be
+                // advance-booked (Phase 5).
+                $available = $availability->availableNow($room);
+                if ($partySize > $available) {
+                    return [null, "Only {$available} of {$room->capacity} seats available right now."];
+                }
 
-            $existing = SharedSession::where('room_id', $room->id)
-                ->where('hotspot_user_id', $user->id)
-                ->where('status', 'open')
-                ->exists();
+                $existing = SharedSession::where('room_id', $room->id)
+                    ->where('hotspot_user_id', $user->id)
+                    ->where('status', 'open')
+                    ->exists();
 
-            if ($existing) {
-                return [null, "{$user->name} already has an open session in this room."];
-            }
+                if ($existing) {
+                    return [null, "{$user->name} already has an open session in this room."];
+                }
 
-            $openedAt = Carbon::parse($request->session_date.' '.$request->start_time);
+                $openedAt = Carbon::parse($request->session_date.' '.$request->start_time);
 
-            SharedSession::create([
-                'owner_id' => $ownerId,
-                'room_id' => $room->id,
-                'hotspot_user_id' => $user->id,
-                'party_size' => $partySize,
-                'session_date' => $request->session_date,
-                'start_time' => $request->start_time,
-                'opened_at' => $openedAt,
-                'status' => 'open',
-            ]);
+                SharedSession::create([
+                    'owner_id' => $ownerId,
+                    'room_id' => $room->id,
+                    'hotspot_user_id' => $user->id,
+                    'party_size' => $partySize,
+                    'session_date' => $request->session_date,
+                    'start_time' => $request->start_time,
+                    'opened_at' => $openedAt,
+                    'status' => 'open',
+                ]);
 
-            return [$room->name, null];
-        });
+                if ($availability->usedCapacityNow($room) > $room->effectiveCapacity()) {
+                    throw new SharedSessionCapacityExceededException;
+                }
+
+                return [$room->name, null];
+            });
+        } catch (SharedSessionCapacityExceededException) {
+            return back()->withInput()->with('error', 'This room is already full. Please try again.');
+        }
 
         if ($error) {
             return back()->withInput()->with('error', $error);

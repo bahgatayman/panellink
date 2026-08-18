@@ -48,8 +48,15 @@ class Room extends Model
 
     public function hasConflict(string $date, string $startTime, string $endTime, ?int $excludeBookingId = null): bool
     {
+        // whereDate(), not where('booking_date', $date): the `date` cast
+        // serializes to 'Y-m-d H:i:s' on write (Eloquent's date-format
+        // config isn't cast-type-aware), so a bare 'Y-m-d' equality check
+        // silently never matches on engines with no native DATE coercion
+        // (SQLite stores the literal string; MySQL's real DATE column type
+        // happens to truncate it back to a bare date on insert, which is
+        // why this was invisible in a MySQL-backed environment).
         return $this->bookings()
-            ->where('booking_date', $date)
+            ->whereDate('booking_date', $date)
             ->where('status', '!=', 'cancelled')
             ->when($excludeBookingId, fn ($q) => $q->where('id', '!=', $excludeBookingId))
             ->where(function ($q) use ($startTime, $endTime) {
@@ -83,6 +90,19 @@ class Room extends Model
     public function isShared(): bool
     {
         return $this->type === 'shared';
+    }
+
+    /**
+     * Capacity that's actually enforceable for booking-conflict purposes.
+     * Non-shared room types are always exclusive (1), regardless of whatever
+     * raw `capacity` value is stored — that column is decorative and
+     * unvalidated per-type today (RoomController accepts 1-999 for any type),
+     * so pinning the effective value here means a fat-fingered capacity can
+     * never silently make an exclusive room double-bookable.
+     */
+    public function effectiveCapacity(): int
+    {
+        return $this->isShared() ? $this->capacity : 1;
     }
 
     public function sharedSessions(): HasMany

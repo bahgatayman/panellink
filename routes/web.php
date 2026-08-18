@@ -1,34 +1,36 @@
 <?php
 
+use App\Http\Controllers\Admin\AuthController;
+use App\Http\Controllers\Admin\BookingController as AdminBookingController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\FeatureController;
+use App\Http\Controllers\Admin\FinancialController;
+use App\Http\Controllers\Admin\NotificationController as AdminNotificationController;
+use App\Http\Controllers\Admin\OwnerController;
+use App\Http\Controllers\Admin\PlanController;
+use App\Http\Controllers\Admin\SubscriptionController;
+use App\Http\Controllers\Admin\SubscriptionRequestController;
+use App\Http\Controllers\Admin\WorkspaceController as AdminWorkspaceController;
+use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
-use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\ResetPasswordController;
-use App\Http\Controllers\Admin\AuthController;
-use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
-use App\Http\Controllers\Admin\OwnerController;
-use App\Http\Controllers\Admin\SubscriptionController;
+use App\Http\Controllers\BookingController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DemoRequestController;
 use App\Http\Controllers\HotspotUserController;
+use App\Http\Controllers\LanguageController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RoomController;
+use App\Http\Controllers\SaleController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SharedSessionController;
 use App\Http\Controllers\SpeedProfileController;
 use App\Http\Controllers\SubscriptionController as OwnerSubscriptionController;
 use App\Http\Controllers\WorkspaceController;
-use App\Http\Controllers\RoomController;
-use App\Http\Controllers\BookingController;
-use App\Http\Controllers\SharedSessionController;
-use App\Http\Controllers\ProductController;
-use App\Http\Controllers\SaleController;
-use App\Http\Controllers\Admin\WorkspaceController as AdminWorkspaceController;
-use App\Http\Controllers\Admin\BookingController as AdminBookingController;
-use App\Http\Controllers\Admin\PlanController;
-use App\Http\Controllers\Admin\FinancialController;
-use App\Http\Controllers\Admin\NotificationController as AdminNotificationController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\LanguageController;
-use App\Http\Controllers\DemoRequestController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -133,6 +135,7 @@ Route::middleware(['auth:owner', 'subscription.active'])->group(function () {
         });
 
         Route::get('/bookings/calendar', [BookingController::class, 'calendar']);
+        Route::get('/bookings/availability', [BookingController::class, 'availabilityLookup']);
         Route::get('/bookings/check-availability', [BookingController::class, 'checkAvailability']);
         Route::get('/bookings', [BookingController::class, 'index']);
         Route::get('/bookings/create', [BookingController::class, 'create']);
@@ -142,6 +145,7 @@ Route::middleware(['auth:owner', 'subscription.active'])->group(function () {
         Route::put('/bookings/{booking}', [BookingController::class, 'update']);
         Route::delete('/bookings/{booking}', [BookingController::class, 'destroy']);
         Route::post('/bookings/{booking}/status', [BookingController::class, 'updateStatus']);
+        Route::post('/bookings/{booking}/check-in', [BookingController::class, 'checkIn']);
 
         // Attaching products to a booking needs BOTH booking and sales features.
         Route::middleware('feature:sales')->group(function () {
@@ -169,6 +173,10 @@ Route::middleware(['auth:owner', 'subscription.active'])->group(function () {
     Route::middleware('feature:hotspot')->group(function () {
         Route::post('/settings', [SettingsController::class, 'update']);
         Route::post('/settings/test-connection', [SettingsController::class, 'testConnection']);
+    });
+    // Working hours are relevant to workspace/booking owners, not hotspot-only ones.
+    Route::middleware('feature:workspace,booking')->group(function () {
+        Route::post('/settings/working-hours', [SettingsController::class, 'updateWorkingHours'])->name('settings.working-hours.update');
     });
 
     Route::get('/profile', [ProfileController::class, 'index']);
@@ -204,18 +212,18 @@ Route::middleware('auth:admin')->prefix('admin')->group(function () {
     Route::post('/owners/{owner}/renew', [SubscriptionController::class, 'renew']);
 
     // Owner-initiated renewal requests
-    Route::get('/subscription-requests', [\App\Http\Controllers\Admin\SubscriptionRequestController::class, 'index'])->name('admin.subscription-requests.index');
-    Route::post('/subscription-requests/{id}/approve', [\App\Http\Controllers\Admin\SubscriptionRequestController::class, 'approve'])->name('admin.subscription-requests.approve');
-    Route::post('/subscription-requests/{id}/reject', [\App\Http\Controllers\Admin\SubscriptionRequestController::class, 'reject'])->name('admin.subscription-requests.reject');
+    Route::get('/subscription-requests', [SubscriptionRequestController::class, 'index'])->name('admin.subscription-requests.index');
+    Route::post('/subscription-requests/{id}/approve', [SubscriptionRequestController::class, 'approve'])->name('admin.subscription-requests.approve');
+    Route::post('/subscription-requests/{id}/reject', [SubscriptionRequestController::class, 'reject'])->name('admin.subscription-requests.reject');
 
     // Admin → Owner notifications (broadcast)
     Route::get('/notifications', [AdminNotificationController::class, 'index'])->name('admin.notifications.index');
     Route::post('/notifications', [AdminNotificationController::class, 'store'])->name('admin.notifications.store');
 
     // Admin Feature Management
-    Route::get('/features', [\App\Http\Controllers\Admin\FeatureController::class, 'index']);
-    Route::post('/features/{feature}/toggle-global', [\App\Http\Controllers\Admin\FeatureController::class, 'toggleGlobal']);
-    Route::post('/owners/{owner}/features/{feature}/toggle', [\App\Http\Controllers\Admin\FeatureController::class, 'toggleForOwner']);
+    Route::get('/features', [FeatureController::class, 'index']);
+    Route::post('/features/{feature}/toggle-global', [FeatureController::class, 'toggleGlobal']);
+    Route::post('/owners/{owner}/features/{feature}/toggle', [FeatureController::class, 'toggleForOwner']);
 
     // Admin Workspace (read-only)
     Route::get('/workspaces', [AdminWorkspaceController::class, 'index'])->name('admin.workspaces.index');

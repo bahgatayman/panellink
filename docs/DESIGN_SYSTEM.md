@@ -101,6 +101,13 @@ Copy these; they encode the agreed spacing, radius, and color tokens.
 <a class="... {{ request()->is('x*') ? 'bg-white/10 border-l-4 border-brand-500' : '' }}">…</a>
 ```
 
+**Scrollbars** — defined globally in `partials/theme.blade.php`; no per-view classes needed.
+
+```
+light surfaces  thumb brand-200 -> brand-400 (hover) -> brand-500 (drag), transparent track
+dark sidebars   add `.nav-scroll` -> thumb brand-400 -> brand-300 (hover)
+```
+
 ---
 
 ## 4. Conventions

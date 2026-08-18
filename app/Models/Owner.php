@@ -12,7 +12,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 class Owner extends Authenticatable
 {
-    use HasFactory, HasApiTokens, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
         'name',
@@ -39,11 +39,11 @@ class Owner extends Authenticatable
     protected function casts(): array
     {
         return [
-            'mikrotik_port'          => 'integer',
-            'password'               => 'hashed',
+            'mikrotik_port' => 'integer',
+            'password' => 'hashed',
             'subscription_starts_at' => 'datetime',
-            'subscription_expires_at'=> 'datetime',
-            'is_active'              => 'boolean',
+            'subscription_expires_at' => 'datetime',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -77,6 +77,11 @@ class Owner extends Authenticatable
         return $this->hasMany(SharedSession::class);
     }
 
+    public function workingHours(): HasMany
+    {
+        return $this->hasMany(WorkingHour::class);
+    }
+
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
@@ -103,21 +108,30 @@ class Owner extends Authenticatable
 
     public function canAddMoreUsers(): bool
     {
-        if (!$this->plan) return false;
+        if (! $this->plan) {
+            return false;
+        }
         $currentCount = $this->hotspotUsers()->count();
+
         return $currentCount < $this->plan->max_members;
     }
 
     public function remainingUserSlots(): int
     {
-        if (!$this->plan) return 0;
+        if (! $this->plan) {
+            return 0;
+        }
         $currentCount = $this->hotspotUsers()->count();
+
         return max(0, $this->plan->max_members - $currentCount);
     }
 
     public function usagePercentage(): float
     {
-        if (!$this->plan || $this->plan->max_members == 0) return 0;
+        if (! $this->plan || $this->plan->max_members == 0) {
+            return 0;
+        }
+
         return round(($this->hotspotUsers()->count() / $this->plan->max_members) * 100, 1);
     }
 
@@ -154,7 +168,7 @@ class Owner extends Authenticatable
     public function logoUrl(): ?string
     {
         return $this->logo_path
-            ? asset('storage/' . $this->logo_path)
+            ? asset('storage/'.$this->logo_path)
             : null;
     }
 
@@ -265,22 +279,37 @@ class Owner extends Authenticatable
 
     public function isSubscriptionActive(): bool
     {
-        if (!$this->subscription_expires_at) return false;
+        if (! $this->subscription_expires_at) {
+            return false;
+        }
+
         return $this->is_active && $this->subscription_expires_at->isFuture();
     }
 
     public function daysUntilExpiry(): int
     {
-        if (!$this->subscription_expires_at) return 0;
+        if (! $this->subscription_expires_at) {
+            return 0;
+        }
+
         return (int) max(0, now()->diffInDays($this->subscription_expires_at, false));
     }
 
     public function subscriptionStatus(): string
     {
-        if (!$this->subscription_expires_at) return 'never';
-        if (!$this->is_active) return 'disabled';
-        if ($this->subscription_expires_at->isPast()) return 'expired';
-        if ($this->daysUntilExpiry() <= 7) return 'expiring_soon';
+        if (! $this->subscription_expires_at) {
+            return 'never';
+        }
+        if (! $this->is_active) {
+            return 'disabled';
+        }
+        if ($this->subscription_expires_at->isPast()) {
+            return 'expired';
+        }
+        if ($this->daysUntilExpiry() <= 7) {
+            return 'expiring_soon';
+        }
+
         return 'active';
     }
 }

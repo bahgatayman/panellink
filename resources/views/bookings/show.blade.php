@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('page-title', __('app.booking.bookings') . ' #' . str_pad($booking->id, 4, '0', STR_PAD_LEFT))
 
@@ -22,10 +22,7 @@
                         <h1 class="text-2xl font-bold text-gray-900">{{ __('app.booking.bookings') }} #{{ str_pad($booking->id, 4, '0', STR_PAD_LEFT) }}</h1>
                         <p class="text-sm text-gray-500 mt-1">{{ __('app.table.th.created') }} {{ $booking->created_at->format('M d, Y h:i A') }}</p>
                     </div>
-                    @php
-                        $colors = ['yellow' => 'bg-yellow-100 text-yellow-800', 'blue' => 'bg-blue-100 text-blue-800', 'green' => 'bg-green-100 text-green-800', 'red' => 'bg-red-100 text-red-800'];
-                    @endphp
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium {{ $colors[$booking->statusColor()] ?? 'bg-gray-100 text-gray-800' }}">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium {{ $booking->statusBadgeClass() }}">
                         {{ $booking->statusLabel() }}
                     </span>
                 </div>

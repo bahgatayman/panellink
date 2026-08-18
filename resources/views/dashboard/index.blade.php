@@ -3,7 +3,15 @@
 @section('page-title', __('app.section.dashboard'))
 
 @section('content')
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Welcome, {{ $owner->business_name }}</h1>
+    <div class="flex flex-wrap items-center gap-3 mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">Welcome, {{ $owner->business_name }}</h1>
+        @if ($hasConfiguredWorkingHours ?? false)
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium {{ $isOpenNow ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500' }}">
+                <span class="w-1.5 h-1.5 rounded-full {{ $isOpenNow ? 'bg-green-500' : 'bg-gray-400' }}"></span>
+                {{ $isOpenNow ? __('app.label.open_now') : __('app.label.closed_now') }}
+            </span>
+        @endif
+    </div>
 
     @if ($owner->hasFeature('hotspot') && $mikrotikError)
         <div class="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg mb-6">

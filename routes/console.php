@@ -10,3 +10,7 @@ Artisan::command('inspire', function () {
 
 // Regenerate owner alerts hourly (the layout also refreshes on-demand, throttled).
 Schedule::command('notifications:refresh')->hourly();
+
+// Auto-complete exclusive-room bookings once their scheduled end time has
+// passed. Shared rooms are excluded — see CompleteExpiredBookings' docblock.
+Schedule::command('bookings:complete-expired')->everyFifteenMinutes();

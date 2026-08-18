@@ -6,6 +6,9 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 class="text-2xl font-bold text-gray-900">{{ __('app.booking.bookings') }}</h1>
         <div class="flex gap-2">
+            <a href="/bookings/availability" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition text-sm font-medium">
+                {{ __('app.booking.quick_availability') }}
+            </a>
             <a href="/bookings/calendar" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition text-sm font-medium">
                 {{ __('app.btn.calendar_view') }}
             </a>
@@ -99,10 +102,7 @@
                                 <td class="px-4 py-3">{{ $booking->total_hours }} {{ __('app.common.hours') }}</td>
                                 <td class="px-4 py-3 font-medium">ج.م {{ number_format($booking->total_price, 2) }}</td>
                                 <td class="px-4 py-3">
-                                    @php
-                                        $colors = ['yellow' => 'bg-yellow-100 text-yellow-800', 'blue' => 'bg-blue-100 text-blue-800', 'green' => 'bg-green-100 text-green-800', 'red' => 'bg-red-100 text-red-800'];
-                                    @endphp
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $colors[$booking->statusColor()] ?? 'bg-gray-100 text-gray-800' }}">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $booking->statusBadgeClass() }}">
                                         {{ $booking->statusLabel() }}
                                     </span>
                                 </td>
