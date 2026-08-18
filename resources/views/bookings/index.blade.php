@@ -88,6 +88,9 @@
                                     <a href="/users/{{ $booking->hotspotUser->id }}" class="text-blue-600 hover:underline font-medium">
                                         {{ $booking->hotspotUser->name }}
                                     </a>
+                                    @if ($booking->party_size > 1)
+                                        <span class="text-gray-400 text-xs">&middot; {{ __('app.session.party_of', ['count' => $booking->party_size]) }}</span>
+                                    @endif
                                 </td>
                                 <td class="px-4 py-3">
                                     <span class="text-gray-600">{{ $booking->room->workspace?->name }} /</span>

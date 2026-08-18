@@ -29,17 +29,18 @@
         <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
             <p class="text-sm font-semibold text-gray-900">{{ $room->name }}</p>
             <p class="text-xs text-gray-500 mb-2">{{ $room->workspace->name }}</p>
+            @php $occupiedSeats = $room->occupied_seats ?? 0; @endphp
             <div class="flex items-center justify-between mb-1">
                 <span class="text-xs text-gray-500">{{ __('app.session.occupied') }}</span>
                 <span class="text-xs font-medium
-                    {{ $room->open_sessions_count >= $room->capacity ? 'text-red-600' : 'text-green-600' }}">
-                    {{ $room->open_sessions_count }}/{{ $room->capacity }}
+                    {{ $occupiedSeats >= $room->capacity ? 'text-red-600' : 'text-green-600' }}">
+                    {{ $occupiedSeats }}/{{ $room->capacity }}
                 </span>
             </div>
             <div class="w-full bg-gray-100 rounded-full h-1.5">
                 @php
                     $pct = $room->capacity > 0
-                        ? ($room->open_sessions_count / $room->capacity) * 100
+                        ? ($occupiedSeats / $room->capacity) * 100
                         : 0;
                 @endphp
                 <div class="h-1.5 rounded-full
@@ -81,7 +82,14 @@
                         @foreach ($openSessions as $session)
                         <tr data-opened-at="{{ $session->opened_at->toIso8601String() }}"
                             data-price-per-hour="{{ $session->room->price_per_hour }}">
-                            <td class="px-4 py-3 font-medium text-gray-900">{{ $session->hotspotUser->name }}</td>
+                            <td class="px-4 py-3 font-medium text-gray-900">
+                                {{ $session->hotspotUser->name }}
+                                @if ($session->party_size > 1)
+                                    <span class="ml-1 inline-flex items-center gap-0.5 text-xs font-normal text-gray-500" title="{{ __('app.session.party_size') }}">
+                                        &middot; {{ __('app.session.party_of', ['count' => $session->party_size]) }}
+                                    </span>
+                                @endif
+                            </td>
                             <td class="px-4 py-3 text-gray-600">{{ $session->hotspotUser->phone }}</td>
                             <td class="px-4 py-3">{{ $session->room->name }}</td>
                             <td class="px-4 py-3 text-gray-600">{{ $session->room->workspace->name }}</td>
@@ -119,6 +127,10 @@
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-500">{{ __('app.session.room') }}</span>
                         <span id="modal-room" class="font-medium text-gray-900"></span>
+                    </div>
+                    <div id="modal-party-row" class="flex justify-between text-sm hidden">
+                        <span class="text-gray-500">{{ __('app.session.party_size') }}</span>
+                        <span id="modal-party" class="font-medium text-gray-900"></span>
                     </div>
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-500">{{ __('app.session.time') }}</span>
@@ -240,6 +252,15 @@
     function populatePreview(data) {
         document.getElementById('modal-user').textContent     = data.user_name + ' (' + data.user_phone + ')';
         document.getElementById('modal-room').textContent     = data.room_name;
+
+        const partyRow = document.getElementById('modal-party-row');
+        if (data.party_size > 1) {
+            document.getElementById('modal-party').textContent = data.party_size;
+            partyRow.classList.remove('hidden');
+        } else {
+            partyRow.classList.add('hidden');
+        }
+
         document.getElementById('modal-time').textContent     = data.start_time + ' → ' + data.end_time;
         document.getElementById('modal-duration').textContent = data.duration;
         document.getElementById('modal-rate').textContent     = 'ج.م ' + data.price_per_hour + ' / hr';
@@ -293,26 +314,28 @@
     }
 
     document.getElementById('confirm-close-btn').addEventListener('click', function() {
-        if (!currentSessionId || !currentCloseData) return;
+        if (!currentSessionId) return;
         this.disabled    = true;
         this.textContent = 'Saving...';
 
+        // The server computes the final total itself (from opened_at → now()) and
+        // rejects a session that's already closed — nothing billing-relevant is
+        // sent from here anymore.
         fetch(`/shared-sessions/${currentSessionId}/close`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
             },
-            body: JSON.stringify({
-                closed_at:     currentCloseData.closed_at_datetime,
-                total_minutes: currentCloseData.total_minutes,
-                total_price:   currentCloseData.total_price_raw,
-            }),
         })
         .then(r => r.json())
         .then(data => {
             if (data.success) {
                 closeModal();
+                location.reload();
+            } else {
+                closeModal();
+                alert(data.message || '{{ __('app.session.failed_to_close_session') }}');
                 location.reload();
             }
         })

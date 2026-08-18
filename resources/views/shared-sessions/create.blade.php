@@ -20,13 +20,23 @@
                             class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                         <option value="">{{ __('app.placeholder.select_room') }}</option>
                         @foreach($sharedRooms as $room)
-                        <option value="{{ $room->id }}" {{ old('room_id') == $room->id ? 'selected' : '' }}>
+                        <option value="{{ $room->id }}" {{ old('room_id') == $room->id ? 'selected' : '' }}
+                                data-capacity="{{ $room->capacity }}" data-available="{{ max(0, $room->capacity - ($room->occupied_seats ?? 0)) }}">
                             {{ $room->workspace->name }} &rarr; {{ $room->name }}
-                            ({{ $room->open_sessions_count ?? 0 }}/{{ $room->capacity }} {{ __('app.session.occupied') }})
+                            ({{ $room->occupied_seats ?? 0 }}/{{ $room->capacity }} {{ __('app.session.occupied') }})
                         </option>
                         @endforeach
                     </select>
                     @error('room_id') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('app.session.party_size') }}</label>
+                    <input type="number" name="party_size" id="party-size-input" min="1"
+                        value="{{ old('party_size', 1) }}" required
+                        class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    <p class="text-xs text-gray-400 mt-1">{{ __('app.session.party_size_hint') }}</p>
+                    @error('party_size') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                 </div>
 
                 <div class="mb-5 relative">
@@ -78,9 +88,29 @@
                 </div>
             </div>
             <div class="mt-6 pt-4 border-t border-blue-100">
-                <p class="text-xs text-gray-500">Room capacity = max simultaneous open sessions</p>
+                <p class="text-xs text-gray-500">{{ __('app.session.capacity_hint') }}</p>
             </div>
         </div>
     </div>
 
+    <script>
+    (function () {
+        const roomSelect = document.querySelector('select[name="room_id"]');
+        const partyInput = document.getElementById('party-size-input');
+
+        function syncMax() {
+            const opt = roomSelect.options[roomSelect.selectedIndex];
+            const available = opt ? parseInt(opt.dataset.available || '0', 10) : null;
+            if (available) {
+                partyInput.max = available;
+                if (parseInt(partyInput.value, 10) > available) partyInput.value = available;
+            } else {
+                partyInput.removeAttribute('max');
+            }
+        }
+
+        roomSelect.addEventListener('change', syncMax);
+        syncMax();
+    })();
+    </script>
 @endsection

@@ -27,7 +27,7 @@ class Room extends Model
     {
         return [
             'price_per_hour' => 'decimal:2',
-            'is_available'   => 'boolean',
+            'is_available' => 'boolean',
         ];
     }
 
@@ -51,11 +51,11 @@ class Room extends Model
         return $this->bookings()
             ->where('booking_date', $date)
             ->where('status', '!=', 'cancelled')
-            ->when($excludeBookingId, fn($q) => $q->where('id', '!=', $excludeBookingId))
+            ->when($excludeBookingId, fn ($q) => $q->where('id', '!=', $excludeBookingId))
             ->where(function ($q) use ($startTime, $endTime) {
                 $q->where(function ($q2) use ($startTime, $endTime) {
                     $q2->where('start_time', '<', $endTime)
-                       ->where('end_time', '>', $startTime);
+                        ->where('end_time', '>', $startTime);
                 });
             })
             ->exists();
@@ -64,7 +64,7 @@ class Room extends Model
     /** Bilingual label; unknown types fall back to the raw value. */
     public function typeLabel(): string
     {
-        $key = 'app.room_type.' . $this->type;
+        $key = 'app.room_type.'.$this->type;
 
         return Lang::has($key) ? __($key) : ucfirst((string) $this->type);
     }
@@ -72,11 +72,11 @@ class Room extends Model
     public function typeColor(): string
     {
         return match ($this->type) {
-            'meeting'  => 'blue',
+            'meeting' => 'blue',
             'training' => 'purple',
-            'shared'   => 'green',
-            'office'   => 'orange',
-            default    => 'gray',
+            'shared' => 'green',
+            'office' => 'orange',
+            default => 'gray',
         };
     }
 
@@ -95,10 +95,18 @@ class Room extends Model
         return $this->sharedSessions()->where('status', 'open');
     }
 
+    /**
+     * Seats free right now. Sums each open session's party_size rather than
+     * counting rows — a party of 5 must consume 5 seats, not 1 — so a room
+     * doesn't silently accept more people than it physically holds. Safe for
+     * pre-party-size data: every legacy session has party_size=1, so the sum
+     * equals the old row count for any data that predates this field.
+     */
     public function availableSharedSlots(): int
     {
-        $openCount = $this->openSharedSessions()->count();
-        return max(0, $this->capacity - $openCount);
+        $occupiedSeats = (int) $this->openSharedSessions()->sum('party_size');
+
+        return max(0, $this->capacity - $occupiedSeats);
     }
 
     public function isSharedFull(): bool

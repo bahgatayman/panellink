@@ -775,6 +775,11 @@ return [
         'session_close_instructions' => 'Review the session details and confirm to close and calculate the total.',
         'room_capacity_note'       => 'This room can hold up to :capacity people at a time.',
         'failed_to_close_session'  => 'Failed to close session. Please try again.',
+        'already_closed'           => 'This session has already been closed.',
+        'party_size'               => 'Number of People',
+        'party_size_hint'          => 'How many people are sharing this session? Defaults to 1.',
+        'party_of'                 => 'party of :count',
+        'capacity_hint'            => 'Room capacity = number of seats available for shared sessions.',
     ],
 
     /*

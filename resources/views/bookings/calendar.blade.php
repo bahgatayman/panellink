@@ -86,7 +86,12 @@
                         @foreach ($bookings[$selectedDate]->sortBy('start_time') as $booking)
                             <tr class="border-b border-gray-50">
                                 <td class="px-4 py-3 whitespace-nowrap font-medium">{{ $booking->timeRange() }}</td>
-                                <td class="px-4 py-3">{{ $booking->hotspotUser->name }}</td>
+                                <td class="px-4 py-3">
+                                    {{ $booking->hotspotUser->name }}
+                                    @if ($booking->party_size > 1)
+                                        <span class="text-gray-400 text-xs">&middot; {{ __('app.session.party_of', ['count' => $booking->party_size]) }}</span>
+                                    @endif
+                                </td>
                                 <td class="px-4 py-3">{{ $booking->room->workspace?->name }} / {{ $booking->room->name }}</td>
                                 <td class="px-4 py-3">
                                     @php

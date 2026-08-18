@@ -10,6 +10,7 @@ use App\Models\Room;
 use App\Models\Sale;
 use App\Models\SharedSession;
 use App\Models\Workspace;
+use Carbon\Carbon;
 use Database\Seeders\FeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -22,6 +23,12 @@ class SharedSessionSalesTest extends TestCase
     {
         parent::setUp();
         $this->seed(FeatureSeeder::class);
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
     }
 
     private function owner(array $planOverrides = []): Owner
@@ -110,18 +117,19 @@ class SharedSessionSalesTest extends TestCase
     public function test_closing_a_session_moves_the_tab_to_the_booking(): void
     {
         $owner = $this->owner();
-        $session = $this->openSession($owner);
+
+        // close() computes the time charge itself from opened_at → now(); freeze
+        // the clock so the session's real elapsed time is exactly one hour.
+        Carbon::setTestNow(Carbon::parse('2026-08-01 12:00:00'));
+        $session = $this->openSession($owner); // opened_at = now()->subHour()
         $product = $this->product($owner, ['price' => 25]);
 
         $this->actingAs($owner, 'owner')
             ->postJson("/shared-sessions/{$session->id}/items", ['product_id' => $product->id, 'quantity' => 2]);
 
         $this->actingAs($owner, 'owner')
-            ->postJson("/shared-sessions/{$session->id}/close", [
-                'closed_at' => now()->toDateTimeString(),
-                'total_minutes' => 60,
-                'total_price' => 60, // one hour at 60/hr
-            ])->assertOk()->assertJson(['success' => true]);
+            ->postJson("/shared-sessions/{$session->id}/close")
+            ->assertOk()->assertJson(['success' => true]);
 
         $session->refresh();
         $booking = $session->booking;

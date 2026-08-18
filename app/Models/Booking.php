@@ -16,6 +16,7 @@ class Booking extends Model
         'owner_id',
         'room_id',
         'hotspot_user_id',
+        'party_size',
         'booking_date',
         'start_time',
         'end_time',
@@ -29,10 +30,11 @@ class Booking extends Model
     protected function casts(): array
     {
         return [
-            'booking_date'   => 'date',
+            'booking_date' => 'date',
             'price_per_hour' => 'decimal:2',
-            'total_hours'    => 'decimal:2',
-            'total_price'    => 'decimal:2',
+            'total_hours' => 'decimal:2',
+            'total_price' => 'decimal:2',
+            'party_size' => 'integer',
         ];
     }
 
@@ -65,11 +67,11 @@ class Booking extends Model
     public function statusColor(): string
     {
         return match ($this->status) {
-            'pending'   => 'yellow',
+            'pending' => 'yellow',
             'confirmed' => 'blue',
             'completed' => 'green',
             'cancelled' => 'red',
-            default     => 'gray',
+            default => 'gray',
         };
     }
 
@@ -81,7 +83,7 @@ class Booking extends Model
     public function timeRange(): string
     {
         return Carbon::parse($this->start_time)->format('h:i A')
-            . ' - '
-            . Carbon::parse($this->end_time)->format('h:i A');
+            .' - '
+            .Carbon::parse($this->end_time)->format('h:i A');
     }
 }

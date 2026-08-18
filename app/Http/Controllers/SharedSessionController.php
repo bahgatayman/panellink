@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class SharedSessionController extends Controller
@@ -27,11 +28,13 @@ class SharedSessionController extends Controller
             ->orderBy('opened_at', 'asc')
             ->get();
 
+        // occupied_seats sums party_size, not row count — a party of 5 must
+        // register as 5 seats used, not 1 (see Room::availableSharedSlots()).
         $sharedRooms = Room::where('owner_id', $owner->id)
             ->where('type', 'shared')
-            ->withCount(['sharedSessions as open_sessions_count' => function ($q) {
+            ->withSum(['sharedSessions as occupied_seats' => function ($q) {
                 $q->where('status', 'open');
-            }])
+            }], 'party_size')
             ->with('workspace')
             ->get();
 
@@ -47,9 +50,9 @@ class SharedSessionController extends Controller
     {
         $sharedRooms = Room::where('owner_id', auth('owner')->id())
             ->where('type', 'shared')
-            ->withCount(['sharedSessions as open_sessions_count' => function ($q) {
+            ->withSum(['sharedSessions as occupied_seats' => function ($q) {
                 $q->where('status', 'open');
-            }])
+            }], 'party_size')
             ->with('workspace')
             ->get();
 
@@ -63,46 +66,69 @@ class SharedSessionController extends Controller
             'hotspot_user_id' => 'required|exists:hotspot_users,id',
             'session_date' => 'required|date',
             'start_time' => 'required|date_format:H:i',
+            'party_size' => 'nullable|integer|min:1',
         ]);
 
-        $room = Room::where('id', $request->room_id)
-            ->where('owner_id', auth('owner')->id())
-            ->where('type', 'shared')
-            ->firstOrFail();
+        $ownerId = auth('owner')->id();
+        $partySize = (int) ($request->input('party_size') ?: 1);
 
         $user = HotspotUser::where('id', $request->hotspot_user_id)
-            ->where('owner_id', auth('owner')->id())
+            ->where('owner_id', $ownerId)
             ->firstOrFail();
 
-        if ($room->isSharedFull()) {
-            return back()->withInput()->with('error',
-                "Room is at full capacity ({$room->capacity}). Close a session first.");
+        // The capacity check and the insert must happen atomically: two staff
+        // opening large parties into the room's last few free seats at the same
+        // moment must not both pass the check and jointly overbook it.
+        // lockForUpdate() genuinely serializes this on MySQL (production); it's a
+        // no-op on SQLite (dev/test), same documented limitation as close()'s
+        // double-close guard.
+        [$roomName, $error] = DB::transaction(function () use ($request, $ownerId, $user, $partySize) {
+            $room = Room::where('id', $request->room_id)
+                ->where('owner_id', $ownerId)
+                ->where('type', 'shared')
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($partySize > $room->capacity) {
+                return [null, "This room only seats {$room->capacity} people."];
+            }
+
+            $available = $room->availableSharedSlots();
+            if ($partySize > $available) {
+                return [null, "Only {$available} of {$room->capacity} seats available right now."];
+            }
+
+            $existing = SharedSession::where('room_id', $room->id)
+                ->where('hotspot_user_id', $user->id)
+                ->where('status', 'open')
+                ->exists();
+
+            if ($existing) {
+                return [null, "{$user->name} already has an open session in this room."];
+            }
+
+            $openedAt = Carbon::parse($request->session_date.' '.$request->start_time);
+
+            SharedSession::create([
+                'owner_id' => $ownerId,
+                'room_id' => $room->id,
+                'hotspot_user_id' => $user->id,
+                'party_size' => $partySize,
+                'session_date' => $request->session_date,
+                'start_time' => $request->start_time,
+                'opened_at' => $openedAt,
+                'status' => 'open',
+            ]);
+
+            return [$room->name, null];
+        });
+
+        if ($error) {
+            return back()->withInput()->with('error', $error);
         }
-
-        $existing = SharedSession::where('room_id', $room->id)
-            ->where('hotspot_user_id', $user->id)
-            ->where('status', 'open')
-            ->exists();
-
-        if ($existing) {
-            return back()->withInput()->with('error',
-                "{$user->name} already has an open session in this room.");
-        }
-
-        $openedAt = Carbon::parse($request->session_date.' '.$request->start_time);
-
-        SharedSession::create([
-            'owner_id' => auth('owner')->id(),
-            'room_id' => $room->id,
-            'hotspot_user_id' => $user->id,
-            'session_date' => $request->session_date,
-            'start_time' => $request->start_time,
-            'opened_at' => $openedAt,
-            'status' => 'open',
-        ]);
 
         return redirect()->route('shared-sessions.index')
-            ->with('success', "Session opened for {$user->name} in {$room->name}.");
+            ->with('success', "Session opened for {$user->name} in {$roomName}.");
     }
 
     public function closePreview(int $sessionId): JsonResponse
@@ -130,6 +156,7 @@ class SharedSessionController extends Controller
             'user_name' => $session->hotspotUser->name,
             'user_phone' => $session->hotspotUser->phone,
             'room_name' => $session->room->name,
+            'party_size' => $session->party_size,
             'start_time' => $session->opened_at->format('h:i A'),
             'end_time' => $closedAt->format('h:i A'),
             'closed_at_datetime' => $closedAt->toDateTimeString(),
@@ -208,57 +235,82 @@ class SharedSessionController extends Controller
         ])->all();
     }
 
-    public function close(Request $request, int $sessionId, SalesService $sales): JsonResponse
+    /**
+     * Close an open session. Money is always computed here, server-side, from
+     * opened_at → now(): the client is never trusted for total_minutes/total_price
+     * (it previously posted its own preview-time numbers straight into the
+     * booking — a browser should never be the source of truth for a charge).
+     *
+     * The status flip is a single atomic UPDATE guarded by WHERE status='open',
+     * checked for affected rows, before anything else runs. That closes the
+     * double-close race (two concurrent clicks/requests): only one request can
+     * ever see affected=1 and proceed; the other sees 0 and is rejected. This
+     * works identically on SQLite (dev/test) and MySQL (production) — a single
+     * UPDATE statement is atomic on both — unlike lockForUpdate(), which SQLite
+     * does not honor.
+     */
+    public function close(int $sessionId, SalesService $sales): JsonResponse
     {
-        $request->validate([
-            'closed_at' => 'required|date',
-            'total_minutes' => 'required|numeric|min:0',
-            'total_price' => 'required|numeric|min:0',
-        ]);
+        $ownerId = auth('owner')->id();
+        $closedAt = now();
 
-        $session = SharedSession::where('id', $sessionId)
-            ->where('owner_id', auth('owner')->id())
-            ->where('status', 'open')
-            ->with(['room', 'hotspotUser', 'sale'])
-            ->firstOrFail();
+        return DB::transaction(function () use ($sessionId, $ownerId, $closedAt, $sales) {
+            $claimed = SharedSession::where('id', $sessionId)
+                ->where('owner_id', $ownerId)
+                ->where('status', 'open')
+                ->update(['status' => 'closed', 'closed_at' => $closedAt]);
 
-        $closedAt = Carbon::parse($request->input('closed_at'));
-        $totalHours = round((float) $request->input('total_minutes') / 60, 2);
-        $totalPrice = (float) $request->input('total_price');
+            if ($claimed === 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('app.session.already_closed'),
+                ], 409);
+            }
 
-        $booking = Booking::create([
-            'owner_id' => auth('owner')->id(),
-            'room_id' => $session->room_id,
-            'hotspot_user_id' => $session->hotspot_user_id,
-            'booking_date' => $session->session_date,
-            'start_time' => $session->start_time,
-            'end_time' => $closedAt->format('H:i'),
-            'price_per_hour' => $session->room->price_per_hour,
-            'total_hours' => $totalHours,
-            'total_price' => $totalPrice,
-            'status' => 'completed',
-            'notes' => 'Auto-created from shared session.',
-        ]);
+            $session = SharedSession::where('id', $sessionId)
+                ->where('owner_id', $ownerId)
+                ->with(['room', 'hotspotUser', 'sale'])
+                ->firstOrFail();
 
-        $session->update([
-            'closed_at' => $closedAt,
-            'total_minutes' => $request->input('total_minutes'),
-            'total_price' => $totalPrice,
-            'status' => 'closed',
-            'booking_id' => $booking->id,
-        ]);
+            // Same precision as closePreview() — the two must never disagree on
+            // what a session is about to cost.
+            $totalMinutes = round($session->opened_at->diffInSeconds($closedAt) / 60, 2);
+            $totalHours = round($totalMinutes / 60, 4);
+            $totalPrice = round($totalHours * $session->room->price_per_hour, 2);
 
-        // Move the running tab (if any) onto the booking, keeping its line items.
-        if ($session->sale) {
-            $sales->transferToBooking($session->sale, $booking);
-        }
+            $booking = Booking::create([
+                'owner_id' => $ownerId,
+                'room_id' => $session->room_id,
+                'hotspot_user_id' => $session->hotspot_user_id,
+                'party_size' => $session->party_size,
+                'booking_date' => $session->session_date,
+                'start_time' => $session->start_time,
+                'end_time' => $closedAt->format('H:i'),
+                'price_per_hour' => $session->room->price_per_hour,
+                'total_hours' => $totalHours,
+                'total_price' => $totalPrice,
+                'status' => 'completed',
+                'notes' => 'Auto-created from shared session.',
+            ]);
 
-        $grandTotal = $totalPrice + (float) ($session->sale?->total ?? 0);
+            $session->update([
+                'total_minutes' => $totalMinutes,
+                'total_price' => $totalPrice,
+                'booking_id' => $booking->id,
+            ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Session closed. Total: ج.م '.number_format($grandTotal, 2),
-            'booking_id' => $booking->id,
-        ]);
+            // Move the running tab (if any) onto the booking, keeping its line items.
+            if ($session->sale) {
+                $sales->transferToBooking($session->sale, $booking);
+            }
+
+            $grandTotal = $totalPrice + (float) ($session->sale?->total ?? 0);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Session closed. Total: ج.م '.number_format($grandTotal, 2),
+                'booking_id' => $booking->id,
+            ]);
+        });
     }
 }

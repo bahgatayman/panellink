@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class SharedSession extends Model
 {
     protected $fillable = [
-        'owner_id', 'room_id', 'hotspot_user_id',
+        'owner_id', 'room_id', 'hotspot_user_id', 'party_size',
         'session_date', 'start_time',
         'opened_at', 'closed_at', 'total_minutes', 'total_price',
         'status', 'booking_id',
@@ -21,6 +21,7 @@ class SharedSession extends Model
         'session_date' => 'date',
         'total_minutes' => 'decimal:2',
         'total_price' => 'decimal:2',
+        'party_size' => 'integer',
     ];
 
     public function owner(): BelongsTo
