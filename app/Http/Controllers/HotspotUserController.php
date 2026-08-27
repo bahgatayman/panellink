@@ -7,31 +7,30 @@ use App\Models\HotspotUser;
 use App\Models\Owner;
 use App\Models\SharedSession;
 use App\Models\SpeedProfile;
+use App\Services\ActivityLogger;
 use App\Services\HotspotSyncService;
+use App\Support\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class HotspotUserController extends Controller
 {
-    public function __construct(private HotspotSyncService $sync)
-    {
-    }
+    public function __construct(private HotspotSyncService $sync, private ActivityLogger $activityLogger) {}
 
     public function index(Request $request): View
     {
         $search = $request->query('search');
 
-        $users = HotspotUser::where('owner_id', auth('owner')->id())
+        $users = HotspotUser::where('owner_id', TenantContext::id())
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('phone', 'like', "%{$search}%");
+                        ->orWhere('phone', 'like', "%{$search}%");
                 });
             })
             ->latest()
@@ -50,10 +49,10 @@ class HotspotUserController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
 
         $validated = $request->validate([
-            'name'  => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'phone' => ['required', 'string', 'max:20',
                 Rule::unique('hotspot_users', 'phone')->where('owner_id', $owner->id)],
             'email' => 'nullable|email|max:255',
@@ -67,7 +66,7 @@ class HotspotUserController extends Controller
         }
 
         $message = "User {$validated['name']} added successfully";
-        if ($owner->hasFeature('hotspot') && !$owner->hasRouterConfigured()) {
+        if ($owner->hasFeature('hotspot') && ! $owner->hasRouterConfigured()) {
             $message .= ' — configure your MikroTik router in Settings to sync users.';
         }
 
@@ -82,14 +81,14 @@ class HotspotUserController extends Controller
      */
     public function quickStore(Request $request): JsonResponse
     {
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
 
         // Validated by hand rather than via $request->validate(): the app only
         // renders JSON for api/* paths (bootstrap/app.php), so a thrown
         // ValidationException would reach the picker's fetch() as a 302 + HTML
         // login/back redirect instead of a 422 carrying the field errors.
         $validator = Validator::make($request->all(), [
-            'name'  => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'phone' => ['required', 'string', 'max:20',
                 Rule::unique('hotspot_users', 'phone')->where('owner_id', $owner->id)],
         ]);
@@ -105,8 +104,8 @@ class HotspotUserController extends Controller
         }
 
         return response()->json([
-            'id'    => $user->id,
-            'name'  => $user->name,
+            'id' => $user->id,
+            'name' => $user->name,
             'phone' => $user->phone,
         ], 201);
     }
@@ -122,14 +121,14 @@ class HotspotUserController extends Controller
      */
     private function createMember(Owner $owner, array $data): HotspotUser
     {
-        $phone    = (string) $data['phone'];
+        $phone = (string) $data['phone'];
         $password = $phone;
 
-        if (!$owner->plan) {
+        if (! $owner->plan) {
             throw new \RuntimeException('No active plan assigned. Please contact your administrator.');
         }
 
-        if (!$owner->canAddMoreUsers()) {
+        if (! $owner->canAddMoreUsers()) {
             throw new \RuntimeException("You have reached your plan limit of {$owner->plan->max_members} members. Please upgrade your plan to add more users.");
         }
 
@@ -140,34 +139,38 @@ class HotspotUserController extends Controller
                 ->where('is_default', true)
                 ->first();
 
-            if (!$defaultProfile) {
+            if (! $defaultProfile) {
                 throw new \RuntimeException('Please set a default speed profile first before adding users.');
             }
 
             try {
                 $this->sync->createUser($owner, $phone, $password, $defaultProfile->name);
             } catch (\Exception $e) {
-                throw new \RuntimeException('MikroTik error: ' . $e->getMessage());
+                throw new \RuntimeException('MikroTik error: '.$e->getMessage());
             }
         }
 
-        return HotspotUser::create([
-            'owner_id'         => $owner->id,
-            'name'             => $data['name'],
-            'phone'            => $phone,
-            'password'         => $password,
-            'speed_download'   => $defaultProfile->speed_download ?? '10M',
-            'speed_upload'     => $defaultProfile->speed_upload ?? '5M',
+        $member = HotspotUser::create([
+            'owner_id' => $owner->id,
+            'name' => $data['name'],
+            'phone' => $phone,
+            'password' => $password,
+            'speed_download' => $defaultProfile->speed_download ?? '10M',
+            'speed_upload' => $defaultProfile->speed_upload ?? '5M',
             'speed_profile_id' => $defaultProfile?->id,
-            'status'           => 'active',
-            'email'            => $data['email'] ?? null,
-            'notes'            => $data['notes'] ?? null,
+            'status' => 'active',
+            'email' => $data['email'] ?? null,
+            'notes' => $data['notes'] ?? null,
         ]);
+
+        $this->activityLogger->log('member.created', $member, "Added member {$member->name}");
+
+        return $member;
     }
 
     public function show(int $id): View
     {
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
 
         $user = HotspotUser::where('id', $id)
             ->where('owner_id', $owner->id)
@@ -179,8 +182,8 @@ class HotspotUserController extends Controller
             : collect();
 
         $recentBookings = collect();
-        $openSession    = null;
-        $stats          = null;
+        $openSession = null;
+        $stats = null;
 
         if ($owner->hasFeature('booking')) {
             $recentBookings = $user->bookings()
@@ -202,10 +205,10 @@ class HotspotUserController extends Controller
             // them to lifetime spend is safe (they never inflate total_price).
             $stats = [
                 'bookings' => $user->bookings()->where('status', '!=', 'cancelled')->count(),
-                'spent'    => (float) $user->bookings()->where('status', 'completed')->sum('total_price')
+                'spent' => (float) $user->bookings()->where('status', 'completed')->sum('total_price')
                             + (float) $user->sales()->where('status', 'completed')->sum('total'),
-                'minutes'  => (float) $user->sharedSessions()->where('status', 'closed')->sum('total_minutes'),
-                'last'     => $user->bookings()
+                'minutes' => (float) $user->sharedSessions()->where('status', 'closed')->sum('total_minutes'),
+                'last' => $user->bookings()
                     ->where('status', '!=', 'cancelled')
                     ->orderByDesc('booking_date')
                     ->first()?->booking_date,
@@ -213,12 +216,12 @@ class HotspotUserController extends Controller
         }
 
         return view('users.show', [
-            'user'           => $user,
-            'speedProfiles'  => $speedProfiles,
+            'user' => $user,
+            'speedProfiles' => $speedProfiles,
             'recentBookings' => $recentBookings,
-            'openSession'    => $openSession,
-            'stats'          => $stats,
-            'activity'       => $this->activityFeed($owner, $user),
+            'openSession' => $openSession,
+            'stats' => $stats,
+            'activity' => $this->activityFeed($owner, $user),
         ]);
     }
 
@@ -249,12 +252,12 @@ class HotspotUserController extends Controller
                     ->take($limit)
                     ->get()
                     ->map(fn (Booking $b) => [
-                        'type'  => 'booking',
-                        'at'    => $b->created_at,
-                        'room'  => $b->room?->name,
+                        'type' => 'booking',
+                        'at' => $b->created_at,
+                        'room' => $b->room?->name,
                         'price' => (float) $b->total_price,
-                        'when'  => $b->booking_date,
-                        'url'   => "/bookings/{$b->id}",
+                        'when' => $b->booking_date,
+                        'url' => "/bookings/{$b->id}",
                     ])
             );
 
@@ -265,12 +268,12 @@ class HotspotUserController extends Controller
                     ->take($limit)
                     ->get()
                     ->map(fn (SharedSession $s) => [
-                        'type'    => $s->status === 'open' ? 'session_open' : 'session_closed',
-                        'at'      => $s->closed_at ?? $s->opened_at,
-                        'room'    => $s->room?->name,
-                        'price'   => (float) $s->total_price,
+                        'type' => $s->status === 'open' ? 'session_open' : 'session_closed',
+                        'at' => $s->closed_at ?? $s->opened_at,
+                        'room' => $s->room?->name,
+                        'price' => (float) $s->total_price,
                         'minutes' => (float) $s->total_minutes,
-                        'url'     => null,
+                        'url' => null,
                     ])
             );
         }
@@ -287,7 +290,7 @@ class HotspotUserController extends Controller
     public function edit(int $id): View
     {
         $user = HotspotUser::where('id', $id)
-            ->where('owner_id', auth('owner')->id())
+            ->where('owner_id', TenantContext::id())
             ->firstOrFail();
 
         return view('users.edit', [
@@ -298,22 +301,24 @@ class HotspotUserController extends Controller
     public function update(Request $request, int $id): RedirectResponse
     {
         $user = HotspotUser::where('id', $id)
-            ->where('owner_id', auth('owner')->id())
+            ->where('owner_id', TenantContext::id())
             ->firstOrFail();
 
         $validated = $request->validate([
-            'name'   => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'status' => 'required|in:active,inactive',
-            'email'  => 'nullable|email|max:255',
-            'notes'  => 'nullable|string|max:500',
+            'email' => 'nullable|email|max:255',
+            'notes' => 'nullable|string|max:500',
         ]);
 
         $user->update([
-            'name'   => $validated['name'],
+            'name' => $validated['name'],
             'status' => $validated['status'],
-            'email'  => $validated['email'] ?? $user->email,
-            'notes'  => $validated['notes'] ?? $user->notes,
+            'email' => $validated['email'] ?? $user->email,
+            'notes' => $validated['notes'] ?? $user->notes,
         ]);
+
+        $this->activityLogger->log('member.updated', $user, "Updated member {$user->name}");
 
         return redirect("/users/{$user->id}")->with('success', 'User updated successfully');
     }
@@ -321,16 +326,18 @@ class HotspotUserController extends Controller
     public function destroy(int $id): RedirectResponse
     {
         $user = HotspotUser::where('id', $id)
-            ->where('owner_id', auth('owner')->id())
+            ->where('owner_id', TenantContext::id())
             ->firstOrFail();
 
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
 
         try {
             $this->sync->deleteUser($owner, $user->phone);
         } catch (\Exception $e) {
             return back()->with('error', "Could not delete user from MikroTik: {$e->getMessage()}");
         }
+
+        $this->activityLogger->log('member.deleted', $user, "Deleted member {$user->name}");
 
         $user->delete();
 
@@ -340,12 +347,14 @@ class HotspotUserController extends Controller
     public function toggleStatus(int $id): RedirectResponse
     {
         $user = HotspotUser::where('id', $id)
-            ->where('owner_id', auth('owner')->id())
+            ->where('owner_id', TenantContext::id())
             ->firstOrFail();
 
         $user->update([
             'status' => $user->status === 'active' ? 'inactive' : 'active',
         ]);
+
+        $this->activityLogger->log('member.status_toggled', $user, "{$user->name} marked {$user->status}");
 
         return back()->with('success', 'User status updated successfully');
     }
@@ -353,7 +362,7 @@ class HotspotUserController extends Controller
     public function updateSpeed(Request $request, int $id): RedirectResponse
     {
         $user = HotspotUser::where('id', $id)
-            ->where('owner_id', auth('owner')->id())
+            ->where('owner_id', TenantContext::id())
             ->firstOrFail();
 
         $validated = $request->validate([
@@ -361,20 +370,20 @@ class HotspotUserController extends Controller
         ]);
 
         $profile = SpeedProfile::where('id', $validated['speed_profile_id'])
-            ->where('owner_id', auth('owner')->id())
+            ->where('owner_id', TenantContext::id())
             ->firstOrFail();
 
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
 
         try {
             $this->sync->setUserSpeed($owner, $user->phone, $profile->name);
         } catch (\Exception $e) {
-            return back()->with('error', 'MikroTik error: ' . $e->getMessage());
+            return back()->with('error', 'MikroTik error: '.$e->getMessage());
         }
 
         $user->update([
-            'speed_download'   => $profile->speed_download,
-            'speed_upload'     => $profile->speed_upload,
+            'speed_download' => $profile->speed_download,
+            'speed_upload' => $profile->speed_upload,
             'speed_profile_id' => $profile->id,
         ]);
 
@@ -385,11 +394,11 @@ class HotspotUserController extends Controller
     {
         $query = $request->get('q', '');
 
-        $users = HotspotUser::where('owner_id', auth('owner')->id())
+        $users = HotspotUser::where('owner_id', TenantContext::id())
             ->where('status', 'active')
             ->where(function ($q) use ($query) {
                 $q->where('name', 'like', "%{$query}%")
-                  ->orWhere('phone', 'like', "%{$query}%");
+                    ->orWhere('phone', 'like', "%{$query}%");
             })
             ->select('id', 'name', 'phone')
             ->limit(10)

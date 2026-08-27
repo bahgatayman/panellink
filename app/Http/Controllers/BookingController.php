@@ -12,10 +12,12 @@ use App\Models\Room;
 use App\Models\SaleItem;
 use App\Models\SharedSession;
 use App\Models\Workspace;
+use App\Services\ActivityLogger;
 use App\Services\AvailabilityService;
 use App\Services\BookingService;
 use App\Services\BusinessHoursService;
 use App\Services\SalesService;
+use App\Support\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -27,9 +29,11 @@ class BookingController extends Controller
 {
     use GeneratesTimeSlots;
 
+    public function __construct(private ActivityLogger $activityLogger) {}
+
     public function index(Request $request): View
     {
-        $ownerId = auth('owner')->id();
+        $ownerId = TenantContext::id();
         $status = $request->get('status');
         $date = $request->get('date');
         $roomId = $request->get('room_id');
@@ -50,7 +54,7 @@ class BookingController extends Controller
 
     public function create(Request $request): View
     {
-        $ownerId = auth('owner')->id();
+        $ownerId = TenantContext::id();
 
         $rooms = Room::where('owner_id', $ownerId)
             ->where('is_available', true)
@@ -82,7 +86,7 @@ class BookingController extends Controller
 
     public function store(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours): RedirectResponse
     {
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
         $ownerId = $owner->id;
 
         $validated = $request->validate([
@@ -170,12 +174,14 @@ class BookingController extends Controller
                 'This room is already booked for the selected time slot. Please choose a different time.');
         }
 
+        $this->activityLogger->log('booking.created', $booking, "Booked {$booking->room->name} for {$booking->booking_date->format('M d, Y')}");
+
         return redirect("/bookings/{$booking->id}")->with('success', 'Booking confirmed successfully.');
     }
 
     public function show($id): View
     {
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
 
         $booking = Booking::where('owner_id', $owner->id)
             ->with(['room.workspace', 'hotspotUser', 'sale.items'])
@@ -191,7 +197,7 @@ class BookingController extends Controller
 
     public function edit($id): View
     {
-        $ownerId = auth('owner')->id();
+        $ownerId = TenantContext::id();
 
         $booking = Booking::where('owner_id', $ownerId)
             ->with(['room.workspace', 'hotspotUser'])
@@ -217,7 +223,7 @@ class BookingController extends Controller
 
     public function update(Request $request, $id, AvailabilityService $availability, BusinessHoursService $businessHours): RedirectResponse
     {
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
         $ownerId = $owner->id;
 
         $booking = Booking::where('owner_id', $ownerId)->findOrFail($id);
@@ -296,12 +302,14 @@ class BookingController extends Controller
                 'This room is already booked for the selected time slot. Please choose a different time.');
         }
 
+        $this->activityLogger->log('booking.updated', $booking, "Updated booking #{$booking->id}");
+
         return redirect("/bookings/{$id}")->with('success', 'Booking updated successfully.');
     }
 
     public function updateStatus(Request $request, $id): RedirectResponse
     {
-        $booking = Booking::where('owner_id', auth('owner')->id())->with('room')->findOrFail($id);
+        $booking = Booking::where('owner_id', TenantContext::id())->with('room')->findOrFail($id);
 
         $validated = $request->validate([
             'status' => 'required|in:pending,confirmed,completed,cancelled',
@@ -332,7 +340,19 @@ class BookingController extends Controller
             return back()->with('error', 'Invalid status transition.');
         }
 
+        // The permission:bookings.edit,bookings.cancel route middleware lets
+        // either grant reach this shared status-machine endpoint; only the
+        // target status here tells you which capability actually applies.
+        $staff = auth('staff')->user();
+        $requiredPermission = $validated['status'] === 'cancelled' ? 'bookings.cancel' : 'bookings.edit';
+        if ($staff && ! $staff->hasPermission($requiredPermission)) {
+            return back()->with('permission_denied', __('app.msg.permission_denied'));
+        }
+
         $booking->update(['status' => $validated['status']]);
+
+        $action = $validated['status'] === 'cancelled' ? 'booking.cancelled' : 'booking.status_changed';
+        $this->activityLogger->log($action, $booking, "Booking #{$booking->id} status changed to {$booking->statusLabel()}");
 
         return back()->with('success', 'Booking status updated to '.$booking->statusLabel().'.');
     }
@@ -348,7 +368,7 @@ class BookingController extends Controller
      */
     public function checkIn(Request $request, $id, AvailabilityService $availability, BusinessHoursService $businessHours): RedirectResponse
     {
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
         $ownerId = $owner->id;
 
         $booking = Booking::where('owner_id', $ownerId)->with('room')->findOrFail($id);
@@ -435,13 +455,15 @@ class BookingController extends Controller
             return back()->with('error', 'This reservation was already checked in or is no longer available.');
         }
 
+        $this->activityLogger->log('booking.checked_in', $booking, "Checked in booking #{$booking->id}");
+
         return redirect()->route('shared-sessions.index')
             ->with('success', 'Checked in. The session is now open.');
     }
 
     public function destroy($id): RedirectResponse
     {
-        $booking = Booking::where('owner_id', auth('owner')->id())->findOrFail($id);
+        $booking = Booking::where('owner_id', TenantContext::id())->findOrFail($id);
 
         if ($booking->status !== 'cancelled') {
             return back()->with('error', 'Only cancelled bookings can be deleted.');
@@ -461,7 +483,7 @@ class BookingController extends Controller
      */
     public function calendar(Request $request, AvailabilityService $availability): View
     {
-        $ownerId = auth('owner')->id();
+        $ownerId = TenantContext::id();
 
         $view = $request->get('view', 'day');
         if (! in_array($view, ['day', 'week', 'month'], true)) {
@@ -550,7 +572,7 @@ class BookingController extends Controller
      */
     public function availabilityLookup(Request $request): View
     {
-        $ownerId = auth('owner')->id();
+        $ownerId = TenantContext::id();
 
         $rooms = Room::where('owner_id', $ownerId)
             ->where('is_available', true)
@@ -565,7 +587,7 @@ class BookingController extends Controller
 
     public function checkAvailability(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours): JsonResponse
     {
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
 
         $validated = $request->validate([
             'room_id' => 'required|exists:rooms,id',
@@ -634,7 +656,7 @@ class BookingController extends Controller
      */
     public function addItem(Request $request, $id, SalesService $sales): RedirectResponse
     {
-        $ownerId = auth('owner')->id();
+        $ownerId = TenantContext::id();
 
         $booking = Booking::where('owner_id', $ownerId)->with('room')->findOrFail($id);
 
@@ -662,13 +684,15 @@ class BookingController extends Controller
         $sale = $sales->saleForBooking($booking);
         $sales->addItem($sale, $product, (int) $validated['quantity']);
 
+        $this->activityLogger->log('booking.item_added', $booking, "Added {$validated['quantity']}x {$product->name} to booking #{$booking->id}");
+
         return back()->with('success', __('app.sales.item_added'));
     }
 
     /** Remove a line item from this booking's sale. */
     public function removeItem($id, $itemId, SalesService $sales): RedirectResponse
     {
-        $ownerId = auth('owner')->id();
+        $ownerId = TenantContext::id();
 
         $booking = Booking::where('owner_id', $ownerId)->with(['sale', 'room'])->findOrFail($id);
 
@@ -682,6 +706,8 @@ class BookingController extends Controller
                 ->firstOrFail();
 
             $sales->removeItem($item);
+
+            $this->activityLogger->log('booking.item_removed', $booking, "Removed a line item from booking #{$booking->id}");
         }
 
         return back()->with('success', __('app.sales.item_removed'));

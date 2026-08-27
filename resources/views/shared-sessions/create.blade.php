@@ -15,18 +15,38 @@
                 @csrf
 
                 <div class="mb-5">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('app.session.room') }}</label>
-                    <select name="room_id" required
-                            class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                        <option value="">{{ __('app.placeholder.select_room') }}</option>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">{{ __('app.session.room') }}</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         @foreach($sharedRooms as $room)
-                        <option value="{{ $room->id }}" {{ old('room_id') == $room->id ? 'selected' : '' }}
-                                data-capacity="{{ $room->capacity }}" data-available="{{ max(0, $room->capacity - ($room->occupied_seats ?? 0)) }}">
-                            {{ $room->workspace->name }} &rarr; {{ $room->name }}
-                            ({{ $room->occupied_seats ?? 0 }}/{{ $room->capacity }} {{ __('app.session.occupied') }})
-                        </option>
+                            @php
+                                $available = max(0, $room->capacity - ($room->occupied_seats ?? 0));
+                                $isFull = $available <= 0;
+                                $used = $room->capacity - $available;
+                            @endphp
+                            <label class="room-card relative flex flex-col gap-3 rounded-xl border-2 border-gray-200 bg-white p-4 cursor-pointer transition hover:border-blue-300 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 has-[:checked]:ring-2 has-[:checked]:ring-blue-500/20">
+                                <input type="radio" name="room_id" value="{{ $room->id }}"
+                                       data-capacity="{{ $room->capacity }}" data-available="{{ $available }}"
+                                       {{ old('room_id') == $room->id ? 'checked' : '' }}
+                                       required class="peer sr-only room-radio">
+
+                                <span class="pointer-events-none absolute top-3 end-3 hidden h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white peer-checked:flex">
+                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                                </span>
+
+                                <div class="pe-6">
+                                    <p class="text-sm font-semibold text-gray-900 truncate">{{ $room->workspace->name }} &rarr; {{ $room->name }}</p>
+                                    <span class="inline-flex mt-1.5 text-xs px-2 py-0.5 rounded-full {{ $isFull ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600' }}">
+                                        {{ $isFull ? __('app.workspace.seats_full') : __('app.workspace.seats_free', ['count' => $available, 'total' => $room->capacity]) }}
+                                    </span>
+                                </div>
+
+                                <div class="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                                    <div class="h-1.5 rounded-full {{ $isFull ? 'bg-red-500' : 'bg-green-500' }}"
+                                         style="width: {{ $room->capacity > 0 ? min(100, ($used / $room->capacity) * 100) : 0 }}%"></div>
+                                </div>
+                            </label>
                         @endforeach
-                    </select>
+                    </div>
                     @error('room_id') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                 </div>
 
@@ -95,12 +115,12 @@
 
     <script>
     (function () {
-        const roomSelect = document.querySelector('select[name="room_id"]');
+        const roomRadios = document.querySelectorAll('.room-radio');
         const partyInput = document.getElementById('party-size-input');
 
         function syncMax() {
-            const opt = roomSelect.options[roomSelect.selectedIndex];
-            const available = opt ? parseInt(opt.dataset.available || '0', 10) : null;
+            const checked = document.querySelector('.room-radio:checked');
+            const available = checked ? parseInt(checked.dataset.available || '0', 10) : null;
             if (available) {
                 partyInput.max = available;
                 if (parseInt(partyInput.value, 10) > available) partyInput.value = available;
@@ -109,7 +129,7 @@
             }
         }
 
-        roomSelect.addEventListener('change', syncMax);
+        roomRadios.forEach(radio => radio.addEventListener('change', syncMax));
         syncMax();
     })();
     </script>

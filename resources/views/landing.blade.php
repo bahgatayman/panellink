@@ -208,7 +208,7 @@
                     <a href="#how-it-works" class="text-sm font-medium text-surface-500 hover:text-surface-900 transition">{{ __('app.landing.how_it_works') }}</a>
                     <a href="#pricing" class="text-sm font-medium text-surface-500 hover:text-surface-900 transition">{{ __('app.landing.pricing') }}</a>
                     <a href="/login" class="text-sm font-medium text-surface-500 hover:text-surface-900 transition">{{ __('app.landing.sign_in') }}</a>
-                    <button onclick="openDemoModal()" class="cta-primary !py-2.5 !px-5 text-sm">{{ __('app.landing.get_started') }}</button>
+                    <a href="/register" class="cta-primary !py-2.5 !px-5 text-sm">{{ __('app.landing.get_started') }}</a>
                     <form method="POST" action="{{ route('language.switch', $isRtl ? 'en' : 'ar') }}" class="flex items-center gap-1.5 ml-2">
                         @csrf
                         <button type="submit" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none {{ $isRtl ? 'bg-brand-600' : 'bg-gray-300' }}" role="switch" aria-checked="{{ $isRtl ? 'true' : 'false' }}">
@@ -229,7 +229,14 @@
                 <a href="#how-it-works" class="block text-sm font-medium text-surface-600 py-2">{{ __('app.landing.how_it_works') }}</a>
                 <a href="#pricing" class="block text-sm font-medium text-surface-600 py-2">{{ __('app.landing.pricing') }}</a>
                 <a href="/login" class="block text-sm font-medium text-brand-600 py-2">{{ __('app.landing.sign_in') }}</a>
-                <button onclick="openDemoModal(); toggleMobile();" class="w-full cta-primary justify-center text-sm">{{ __('app.landing.get_started') }}</button>
+                <a href="/register" class="block w-full cta-primary justify-center text-sm">{{ __('app.landing.get_started') }}</a>
+                <form method="POST" action="{{ route('language.switch', $isRtl ? 'en' : 'ar') }}" class="flex items-center gap-1.5 pt-2">
+                    @csrf
+                    <button type="submit" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none {{ $isRtl ? 'bg-brand-600' : 'bg-gray-300' }}" role="switch" aria-checked="{{ $isRtl ? 'true' : 'false' }}">
+                        <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out {{ $isRtl ? 'translate-x-[18px]' : 'translate-x-[3px]' }}"></span>
+                    </button>
+                    <span class="text-xs font-medium {{ $isRtl ? 'text-brand-600' : 'text-surface-500' }}">{{ $isRtl ? 'العربية' : 'English' }}</span>
+                </form>
             </div>
         </div>
     </nav>
@@ -262,10 +269,10 @@
             </p>
 
             <div class="flex flex-col sm:flex-row gap-3 justify-center mb-14 fade-in" style="transition-delay:0.15s">
-                <button onclick="openDemoModal()" class="cta-primary justify-center">
+                <a href="/register" class="cta-primary justify-center">
                     {{ __('app.landing.get_started') }}
                     <svg class="w-4 h-4 {{ $isRtl ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-                </button>
+                </a>
                 <button onclick="document.getElementById('product').scrollIntoView({behavior:'smooth'})" class="cta-secondary justify-center bg-white/85 backdrop-blur">
                     {{ __('app.landing.see_how_it_works') }}
                 </button>
@@ -746,6 +753,7 @@
                         'price_class' => 'text-green-600',
                         'featured'    => false,
                         'cta'         => __('app.landing.get_started'),
+                        'href'        => '/register',
                         'features'    => [__('app.landing.plan_starter_f1'), __('app.landing.plan_starter_f2'), __('app.landing.plan_starter_f3')],
                     ],
                     [
@@ -799,7 +807,11 @@
                                 </li>
                             @endforeach
                         </ul>
-                        <button onclick="openDemoModal()" class="w-full justify-center font-semibold {{ $feat ? 'inline-flex items-center bg-white text-brand-900 hover:bg-brand-50 rounded-xl px-4 py-3 transition' : 'cta-secondary' }}">{{ $plan['cta'] }}</button>
+                        @if(!empty($plan['href']))
+                            <a href="{{ $plan['href'] }}" class="w-full justify-center font-semibold {{ $feat ? 'inline-flex items-center bg-white text-brand-900 hover:bg-brand-50 rounded-xl px-4 py-3 transition' : 'cta-secondary' }}">{{ $plan['cta'] }}</a>
+                        @else
+                            <button onclick="openDemoModal()" class="w-full justify-center font-semibold {{ $feat ? 'inline-flex items-center bg-white text-brand-900 hover:bg-brand-50 rounded-xl px-4 py-3 transition' : 'cta-secondary' }}">{{ $plan['cta'] }}</button>
+                        @endif
                     </div>
                 @endforeach
             </div>
@@ -821,10 +833,10 @@
                     <h2 class="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white mb-4 max-w-2xl mx-auto" style="text-wrap:balance">{{ __('app.landing.ready_to_transform') }}</h2>
                     <p class="text-brand-100 text-base sm:text-lg mb-9 max-w-xl mx-auto leading-relaxed">{{ __('app.landing.cta_subtitle') }}</p>
                     <div class="flex flex-col sm:flex-row gap-3 justify-center">
-                        <button onclick="openDemoModal()" class="group inline-flex items-center justify-center gap-2 bg-white text-brand-700 font-semibold text-sm px-7 py-3.5 rounded-xl hover:bg-brand-50 transition shadow-lg shadow-brand-900/30">
+                        <a href="/register" class="group inline-flex items-center justify-center gap-2 bg-white text-brand-700 font-semibold text-sm px-7 py-3.5 rounded-xl hover:bg-brand-50 transition shadow-lg shadow-brand-900/30">
                             {{ __('app.landing.start_free_trial') }}
                             <svg class="w-4 h-4 transition group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-                        </button>
+                        </a>
                         <button onclick="openDemoModal()" class="inline-flex items-center justify-center gap-2 border border-white/40 text-white font-semibold text-sm px-7 py-3.5 rounded-xl hover:bg-white/10 transition">
                             {{ __('app.landing.request_demo') }}
                         </button>
@@ -849,7 +861,7 @@
                 <p class="text-sm text-surface-400 text-center">{{ __('app.landing.footer_text') }}</p>
                 <div class="flex items-center gap-5 text-sm text-surface-400">
                     <a href="/login" class="hover:text-surface-900 transition font-medium">{{ __('app.landing.sign_in') }}</a>
-                    <a href="/register" class="hover:text-surface-900 transition font-medium">Register</a>
+                    <a href="/register" class="hover:text-surface-900 transition font-medium">{{ __('app.auth.register') }}</a>
                     <a href="mailto:bahgatayman10@gmail.com" class="hover:text-surface-900 transition font-medium">Contact</a>
                 </div>
             </div>
@@ -878,10 +890,10 @@
     <!-- ═══════════════════════════════════════════
          Demo Modal
          ═══════════════════════════════════════════ -->
-    <div id="demo-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div id="demo-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="demo-modal-title">
         <div onclick="closeDemoModal()" class="absolute inset-0 modal-overlay"></div>
         <div class="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
-            <button onclick="closeDemoModal()" class="absolute top-4 right-4 text-surface-400 hover:text-surface-600 transition">
+            <button type="button" onclick="closeDemoModal()" class="absolute top-4 right-4 text-surface-400 hover:text-surface-600 transition" aria-label="{{ __('app.common.close') }}">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
 
@@ -889,11 +901,11 @@
                 <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-500/20">
                     <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                 </div>
-                <h3 class="text-xl font-bold text-surface-900">{{ __('app.landing.demo_modal_title') }}</h3>
+                <h3 id="demo-modal-title" class="text-xl font-bold text-surface-900">{{ __('app.landing.demo_modal_title') }}</h3>
                 <p class="text-sm text-surface-500 mt-1">{{ __('app.landing.demo_modal_subtitle') }}</p>
             </div>
 
-            <form method="POST" action="/demo-request" class="space-y-4">
+            <form method="POST" action="/demo-request" class="space-y-4" onsubmit="return handleDemoSubmit(this)">
                 @csrf
                 <div>
                     <label class="block text-sm font-medium text-surface-700 mb-1.5">{{ __('app.landing.your_full_name') }} *</label>
@@ -944,14 +956,25 @@
 
         // Modal
         function openDemoModal() {
-            document.getElementById('demo-modal').classList.remove('hidden');
-            document.getElementById('demo-modal').classList.add('flex');
+            const modal = document.getElementById('demo-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
             document.body.style.overflow = 'hidden';
+            const firstField = modal.querySelector('input[name="name"]');
+            if (firstField) setTimeout(() => firstField.focus(), 50);
         }
         function closeDemoModal() {
             document.getElementById('demo-modal').classList.add('hidden');
             document.getElementById('demo-modal').classList.remove('flex');
             document.body.style.overflow = '';
+        }
+        function handleDemoSubmit(form) {
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.7';
+            }
+            return true;
         }
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDemoModal(); });
         document.addEventListener('click', e => { if (e.target.id === 'demo-modal') closeDemoModal(); });

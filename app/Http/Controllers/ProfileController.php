@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -11,7 +12,7 @@ class ProfileController extends Controller
 {
     public function index(): View
     {
-        $owner = auth('owner')->user()->load('plan');
+        $owner = TenantContext::user()->load('plan');
         $usageCount = $owner->hotspotUsers()->count();
 
         return view('profile.index', compact('owner', 'usageCount'));
@@ -30,7 +31,7 @@ class ProfileController extends Controller
             'logo' => ['required', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
         ]);
 
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
         $previous = $owner->logo_path;
 
         $path = $request->file('logo')->store('owner-logos', 'public');
@@ -46,7 +47,7 @@ class ProfileController extends Controller
 
     public function destroyLogo(): RedirectResponse
     {
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
 
         if ($owner->logo_path) {
             Storage::disk('public')->delete($owner->logo_path);

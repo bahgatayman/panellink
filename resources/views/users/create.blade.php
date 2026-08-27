@@ -20,8 +20,7 @@
     @endif
 
     @php
-        $owner = auth('owner')->user();
-        $plan  = $owner->plan;
+        $plan = $owner->plan;
     @endphp
 
     @if($plan)

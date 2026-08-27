@@ -4,17 +4,21 @@ namespace App\Http\Controllers;
 
 use App\Models\Room;
 use App\Models\Workspace;
+use App\Services\ActivityLogger;
 use App\Services\AvailabilityService;
+use App\Support\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class RoomController extends Controller
 {
+    public function __construct(private ActivityLogger $activityLogger) {}
+
     private function getWorkspace(int $workspaceId): Workspace
     {
         return Workspace::where('id', $workspaceId)
-            ->where('owner_id', auth('owner')->id())
+            ->where('owner_id', TenantContext::id())
             ->firstOrFail();
     }
 
@@ -43,7 +47,7 @@ class RoomController extends Controller
     {
         $workspace = $this->getWorkspace($workspaceId);
 
-        if (! auth('owner')->user()->canAddMoreRooms()) {
+        if (! TenantContext::user()->canAddMoreRooms()) {
             return back()->withInput()->with('error', __('app.plan_limit.rooms'));
         }
 
@@ -55,10 +59,12 @@ class RoomController extends Controller
             'description' => 'nullable|string|max:1000',
         ]);
 
-        Room::create(array_merge($data, [
+        $room = Room::create(array_merge($data, [
             'workspace_id' => $workspace->id,
-            'owner_id' => auth('owner')->id(),
+            'owner_id' => TenantContext::id(),
         ]));
+
+        $this->activityLogger->log('room.created', $room, "Added room {$room->name} to {$workspace->name}");
 
         return redirect()->route('workspaces.show', $workspace)
             ->with('success', 'Room added successfully.');
@@ -117,6 +123,8 @@ class RoomController extends Controller
 
         $room->update($data);
 
+        $this->activityLogger->log('room.updated', $room, "Updated room {$room->name}");
+
         return redirect()->route('workspaces.show', $workspace)
             ->with('success', 'Room updated successfully.');
     }
@@ -125,6 +133,8 @@ class RoomController extends Controller
     {
         $workspace = $this->getWorkspace($workspaceId);
         $room = $this->getRoom($workspace, $roomId);
+
+        $this->activityLogger->log('room.deleted', $room, "Deleted room {$room->name}");
 
         $room->delete();
 
@@ -138,6 +148,8 @@ class RoomController extends Controller
         $room = $this->getRoom($workspace, $roomId);
 
         $room->update(['is_available' => ! $room->is_available]);
+
+        $this->activityLogger->log('room.availability_toggled', $room, "Room '{$room->name}' marked as ".($room->is_available ? 'available' : 'unavailable'));
 
         return back()->with(
             'success',

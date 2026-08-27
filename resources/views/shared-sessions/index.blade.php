@@ -3,7 +3,7 @@
 @section('page-title', __('app.session.shared_sessions'))
 
 @section('content')
-    @php $canSell = auth('owner')->user()->hasFeature('sales'); @endphp
+    @php $canSell = $owner->hasFeature('sales'); @endphp
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 class="text-2xl font-bold text-gray-900">{{ __('app.session.shared_sessions') }}</h1>
         <a href="{{ route('shared-sessions.create') }}" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm font-medium shadow-sm">

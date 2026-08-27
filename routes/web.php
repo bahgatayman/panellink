@@ -18,6 +18,7 @@ use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DemoRequestController;
+use App\Http\Controllers\FinancialController as OwnerFinancialController;
 use App\Http\Controllers\HotspotUserController;
 use App\Http\Controllers\LanguageController;
 use App\Http\Controllers\NotificationController;
@@ -29,6 +30,8 @@ use App\Http\Controllers\SessionController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SharedSessionController;
 use App\Http\Controllers\SpeedProfileController;
+use App\Http\Controllers\StaffActivityController;
+use App\Http\Controllers\StaffController;
 use App\Http\Controllers\SubscriptionController as OwnerSubscriptionController;
 use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
@@ -67,88 +70,121 @@ Route::middleware('auth:owner')->group(function () {
 });
 
 // ===================== Owner Routes (authenticated + subscription check) =====================
-Route::middleware(['auth:owner', 'subscription.active'])->group(function () {
+// auth:owner,staff — a staff session is an alternate identity for the same
+// tenant. subscription.active only recognizes the owner guard, so
+// staff.active re-verifies staff/owner active-state + subscription on every
+// request for staff sessions specifically (see CheckStaffActive).
+Route::middleware(['auth:owner,staff', 'subscription.active', 'staff.active'])->group(function () {
+    // Never permission-gated: this is the mandatory post-login landing page
+    // and CheckPermission's own denial fallback target, so gating it risks
+    // an infinite redirect loop for any staff member who lacks the permission.
     Route::get('/dashboard', [DashboardController::class, 'index']);
-    Route::get('/users/search', [HotspotUserController::class, 'search']);
+    Route::get('/users/search', [HotspotUserController::class, 'search'])->middleware('permission:members.view');
 
     // Member/customer registry — HotspotUser is the shared customer entity that
     // BOOKING owners also need. Available with either feature; router sync is
     // applied inside the controller only for hotspot owners.
     Route::middleware('feature:hotspot,booking')->group(function () {
-        Route::get('/users', [HotspotUserController::class, 'index']);
-        Route::get('/users/create', [HotspotUserController::class, 'create']);
-        Route::post('/users', [HotspotUserController::class, 'store']);
+        Route::get('/users', [HotspotUserController::class, 'index'])->middleware('permission:members.view');
+        Route::get('/users/create', [HotspotUserController::class, 'create'])->middleware('permission:members.create');
+        Route::post('/users', [HotspotUserController::class, 'store'])->middleware('permission:members.create');
         // Inline "add member" used by the booking + shared-session pickers.
-        Route::post('/users/quick', [HotspotUserController::class, 'quickStore']);
-        Route::get('/users/{id}', [HotspotUserController::class, 'show']);
-        Route::get('/users/{id}/edit', [HotspotUserController::class, 'edit']);
-        Route::put('/users/{id}', [HotspotUserController::class, 'update']);
-        Route::delete('/users/{id}', [HotspotUserController::class, 'destroy']);
-        Route::post('/users/{id}/toggle-status', [HotspotUserController::class, 'toggleStatus']);
+        Route::post('/users/quick', [HotspotUserController::class, 'quickStore'])->middleware('permission:members.create');
+        Route::get('/users/{id}', [HotspotUserController::class, 'show'])->middleware('permission:members.view');
+        Route::get('/users/{id}/edit', [HotspotUserController::class, 'edit'])->middleware('permission:members.edit');
+        Route::put('/users/{id}', [HotspotUserController::class, 'update'])->middleware('permission:members.edit');
+        Route::delete('/users/{id}', [HotspotUserController::class, 'destroy'])->middleware('permission:members.delete');
+        Route::post('/users/{id}/toggle-status', [HotspotUserController::class, 'toggleStatus'])->middleware('permission:members.manage_status');
     });
 
     // Hotspot-only: router-backed actions.
     Route::middleware('feature:hotspot')->group(function () {
-        Route::post('/users/{id}/speed', [HotspotUserController::class, 'updateSpeed']);
-        Route::get('/speed-profiles', [SpeedProfileController::class, 'index']);
-        Route::get('/speed-profiles/create', [SpeedProfileController::class, 'create']);
-        Route::post('/speed-profiles', [SpeedProfileController::class, 'store']);
-        Route::get('/speed-profiles/{id}/edit', [SpeedProfileController::class, 'edit']);
-        Route::put('/speed-profiles/{id}', [SpeedProfileController::class, 'update']);
-        Route::delete('/speed-profiles/{id}', [SpeedProfileController::class, 'destroy']);
-        Route::post('/speed-profiles/{id}/set-default', [SpeedProfileController::class, 'setDefault']);
-        Route::get('/sessions', [SessionController::class, 'index']);
+        Route::post('/users/{id}/speed', [HotspotUserController::class, 'updateSpeed'])->middleware('permission:hotspot.manage_speed');
+        Route::middleware('permission:hotspot.manage_speed')->group(function () {
+            Route::get('/speed-profiles', [SpeedProfileController::class, 'index']);
+            Route::get('/speed-profiles/create', [SpeedProfileController::class, 'create']);
+            Route::post('/speed-profiles', [SpeedProfileController::class, 'store']);
+            Route::get('/speed-profiles/{id}/edit', [SpeedProfileController::class, 'edit']);
+            Route::put('/speed-profiles/{id}', [SpeedProfileController::class, 'update']);
+            Route::delete('/speed-profiles/{id}', [SpeedProfileController::class, 'destroy']);
+            Route::post('/speed-profiles/{id}/set-default', [SpeedProfileController::class, 'setDefault']);
+        });
+        Route::get('/sessions', [SessionController::class, 'index'])->middleware('permission:hotspot.view_sessions');
     });
 
     // Workspace feature routes
     Route::middleware('feature:workspace')->group(function () {
-        Route::get('/workspaces', [WorkspaceController::class, 'index'])->name('workspaces.index');
-        Route::get('/workspaces/create', [WorkspaceController::class, 'create'])->name('workspaces.create');
-        Route::post('/workspaces', [WorkspaceController::class, 'store'])->name('workspaces.store');
-        Route::get('/workspaces/{workspace}', [WorkspaceController::class, 'show'])->name('workspaces.show');
-        Route::get('/workspaces/{workspace}/edit', [WorkspaceController::class, 'edit'])->name('workspaces.edit');
-        Route::put('/workspaces/{workspace}', [WorkspaceController::class, 'update'])->name('workspaces.update');
-        Route::delete('/workspaces/{workspace}', [WorkspaceController::class, 'destroy'])->name('workspaces.destroy');
-        Route::post('/workspaces/{workspace}/toggle', [WorkspaceController::class, 'toggleActive'])->name('workspaces.toggle');
+        Route::get('/workspaces', [WorkspaceController::class, 'index'])->name('workspaces.index')->middleware('permission:workspaces.view');
 
-        // Nested room routes
-        Route::get('/workspaces/{workspace}/rooms/create', [RoomController::class, 'create'])->name('rooms.create');
-        Route::post('/workspaces/{workspace}/rooms', [RoomController::class, 'store'])->name('rooms.store');
-        Route::get('/workspaces/{workspace}/rooms/{room}/edit', [RoomController::class, 'edit'])->name('rooms.edit');
-        Route::put('/workspaces/{workspace}/rooms/{room}', [RoomController::class, 'update'])->name('rooms.update');
-        Route::delete('/workspaces/{workspace}/rooms/{room}', [RoomController::class, 'destroy'])->name('rooms.destroy');
-        Route::post('/workspaces/{workspace}/rooms/{room}/toggle', [RoomController::class, 'toggleAvailable'])->name('rooms.toggle');
+        // /workspaces/create must be registered before the /workspaces/{workspace}
+        // wildcard below, or "create" gets swallowed as a workspace ID.
+        Route::middleware('permission:workspaces.manage')->group(function () {
+            Route::get('/workspaces/create', [WorkspaceController::class, 'create'])->name('workspaces.create');
+            Route::post('/workspaces', [WorkspaceController::class, 'store'])->name('workspaces.store');
+        });
+
+        Route::get('/workspaces/{workspace}', [WorkspaceController::class, 'show'])->name('workspaces.show')->middleware('permission:workspaces.view');
+
+        Route::middleware('permission:workspaces.manage')->group(function () {
+            Route::get('/workspaces/{workspace}/edit', [WorkspaceController::class, 'edit'])->name('workspaces.edit');
+            Route::put('/workspaces/{workspace}', [WorkspaceController::class, 'update'])->name('workspaces.update');
+            Route::delete('/workspaces/{workspace}', [WorkspaceController::class, 'destroy'])->name('workspaces.destroy');
+            Route::post('/workspaces/{workspace}/toggle', [WorkspaceController::class, 'toggleActive'])->name('workspaces.toggle');
+
+            // Nested room routes
+            Route::get('/workspaces/{workspace}/rooms/create', [RoomController::class, 'create'])->name('rooms.create');
+            Route::post('/workspaces/{workspace}/rooms', [RoomController::class, 'store'])->name('rooms.store');
+            Route::get('/workspaces/{workspace}/rooms/{room}/edit', [RoomController::class, 'edit'])->name('rooms.edit');
+            Route::put('/workspaces/{workspace}/rooms/{room}', [RoomController::class, 'update'])->name('rooms.update');
+            Route::delete('/workspaces/{workspace}/rooms/{room}', [RoomController::class, 'destroy'])->name('rooms.destroy');
+            Route::post('/workspaces/{workspace}/rooms/{room}/toggle', [RoomController::class, 'toggleAvailable'])->name('rooms.toggle');
+        });
     });
 
     // Booking feature routes
     Route::middleware('feature:booking')->group(function () {
-        Route::get('/shared-sessions', [SharedSessionController::class, 'index'])->name('shared-sessions.index');
-        Route::get('/shared-sessions/create', [SharedSessionController::class, 'create'])->name('shared-sessions.create');
-        Route::post('/shared-sessions', [SharedSessionController::class, 'store'])->name('shared-sessions.store');
-        Route::get('/shared-sessions/{session}/close-preview', [SharedSessionController::class, 'closePreview'])->name('shared-sessions.close-preview');
-        Route::post('/shared-sessions/{session}/close', [SharedSessionController::class, 'close'])->name('shared-sessions.close');
+        Route::get('/shared-sessions', [SharedSessionController::class, 'index'])->name('shared-sessions.index')->middleware('permission:shared_sessions.view');
+
+        Route::middleware('permission:shared_sessions.manage')->group(function () {
+            Route::get('/shared-sessions/create', [SharedSessionController::class, 'create'])->name('shared-sessions.create');
+            Route::post('/shared-sessions', [SharedSessionController::class, 'store'])->name('shared-sessions.store');
+            Route::get('/shared-sessions/{session}/close-preview', [SharedSessionController::class, 'closePreview'])->name('shared-sessions.close-preview');
+            Route::post('/shared-sessions/{session}/close', [SharedSessionController::class, 'close'])->name('shared-sessions.close');
+        });
 
         // Running-tab items on an open session need BOTH booking and sales features.
-        Route::middleware('feature:sales')->group(function () {
+        Route::middleware(['feature:sales', 'permission:shared_sessions.manage'])->group(function () {
             Route::post('/shared-sessions/{session}/items', [SharedSessionController::class, 'addItem'])->name('shared-sessions.items.add');
             Route::delete('/shared-sessions/{session}/items/{item}', [SharedSessionController::class, 'removeItem'])->name('shared-sessions.items.remove');
         });
 
-        Route::get('/bookings/calendar', [BookingController::class, 'calendar']);
-        Route::get('/bookings/availability', [BookingController::class, 'availabilityLookup']);
-        Route::get('/bookings/check-availability', [BookingController::class, 'checkAvailability']);
-        Route::get('/bookings', [BookingController::class, 'index']);
-        Route::get('/bookings/create', [BookingController::class, 'create']);
-        Route::post('/bookings', [BookingController::class, 'store']);
-        Route::get('/bookings/{booking}', [BookingController::class, 'show']);
-        Route::get('/bookings/{booking}/edit', [BookingController::class, 'edit']);
-        Route::put('/bookings/{booking}', [BookingController::class, 'update']);
-        Route::delete('/bookings/{booking}', [BookingController::class, 'destroy']);
-        Route::post('/bookings/{booking}/status', [BookingController::class, 'updateStatus']);
-        Route::post('/bookings/{booking}/check-in', [BookingController::class, 'checkIn']);
+        Route::middleware('permission:bookings.view')->group(function () {
+            Route::get('/bookings/calendar', [BookingController::class, 'calendar']);
+            Route::get('/bookings/availability', [BookingController::class, 'availabilityLookup']);
+            Route::get('/bookings/check-availability', [BookingController::class, 'checkAvailability']);
+            Route::get('/bookings', [BookingController::class, 'index']);
+        });
+        // /bookings/create must be registered before the /bookings/{booking}
+        // wildcard below, or "create" gets swallowed as a booking ID.
+        Route::middleware('permission:bookings.create')->group(function () {
+            Route::get('/bookings/create', [BookingController::class, 'create']);
+            Route::post('/bookings', [BookingController::class, 'store']);
+        });
+        Route::get('/bookings/{booking}', [BookingController::class, 'show'])->middleware('permission:bookings.view');
+        Route::middleware('permission:bookings.edit')->group(function () {
+            Route::get('/bookings/{booking}/edit', [BookingController::class, 'edit']);
+            Route::put('/bookings/{booking}', [BookingController::class, 'update']);
+            Route::post('/bookings/{booking}/check-in', [BookingController::class, 'checkIn']);
+        });
+        // Both routes carry the full booking status-machine; the controller
+        // enforces the finer edit-vs-cancel distinction per the target status.
+        Route::middleware('permission:bookings.edit,bookings.cancel')->group(function () {
+            Route::post('/bookings/{booking}/status', [BookingController::class, 'updateStatus']);
+        });
+        Route::delete('/bookings/{booking}', [BookingController::class, 'destroy'])->middleware('permission:bookings.cancel');
 
         // Attaching products to a booking needs BOTH booking and sales features.
-        Route::middleware('feature:sales')->group(function () {
+        Route::middleware(['feature:sales', 'permission:bookings.edit'])->group(function () {
             Route::post('/bookings/{booking}/items', [BookingController::class, 'addItem'])->name('bookings.items.add');
             Route::delete('/bookings/{booking}/items/{item}', [BookingController::class, 'removeItem'])->name('bookings.items.remove');
         });
@@ -156,26 +192,46 @@ Route::middleware(['auth:owner', 'subscription.active'])->group(function () {
 
     // Sales feature routes (product catalog + sales history)
     Route::middleware('feature:sales')->group(function () {
-        Route::get('/products', [ProductController::class, 'index'])->name('products.index');
-        Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
-        Route::post('/products', [ProductController::class, 'store'])->name('products.store');
-        Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
-        Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
-        Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
-        Route::post('/products/{product}/toggle', [ProductController::class, 'toggleActive'])->name('products.toggle');
+        Route::get('/products', [ProductController::class, 'index'])->name('products.index')->middleware('permission:products.view');
 
-        Route::get('/sales', [SaleController::class, 'index'])->name('sales.index');
-        Route::get('/sales/{sale}', [SaleController::class, 'show'])->name('sales.show');
+        Route::middleware('permission:products.manage')->group(function () {
+            Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
+            Route::post('/products', [ProductController::class, 'store'])->name('products.store');
+            Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
+            Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
+            Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+            Route::post('/products/{product}/toggle', [ProductController::class, 'toggleActive'])->name('products.toggle');
+        });
     });
 
-    Route::get('/settings', [SettingsController::class, 'index']);
+    // Financials — replaces the old Sales section with a unified view of
+    // booking + shared-session + product revenue. Feature gate is an OR:
+    // a room-only tenant still needs it for booking revenue, a
+    // product-only tenant still needs it for product revenue.
+    Route::middleware('feature:booking,sales')->group(function () {
+        Route::get('/financials', [OwnerFinancialController::class, 'index'])->name('financials.index')->middleware('permission:financials.view');
+        Route::get('/financials/transactions', [OwnerFinancialController::class, 'transactions'])->name('financials.transactions')->middleware('permission:financials.view');
+        Route::get('/financials/transactions/{booking}', [OwnerFinancialController::class, 'show'])->name('financials.transactions.show')->middleware('permission:financials.view');
+        Route::get('/financials/export', [OwnerFinancialController::class, 'export'])->name('financials.export')->middleware('permission:financials.export');
+    });
+
+    // Retired — permanent redirects into Financials so old /sales links
+    // (e.g. past notification action_url values) never 404. OR'd with
+    // sales.view so staff who already held that permission aren't locked
+    // out of the redirect itself during the transition.
+    Route::middleware('feature:sales')->group(function () {
+        Route::get('/sales', [SaleController::class, 'index'])->name('sales.index')->middleware('permission:sales.view,financials.view');
+        Route::get('/sales/{sale}', [SaleController::class, 'show'])->name('sales.show')->middleware('permission:sales.view,financials.view');
+    });
+
+    Route::get('/settings', [SettingsController::class, 'index'])->middleware('permission:settings.view');
     // Router configuration is only writable/testable when the hotspot feature is on.
-    Route::middleware('feature:hotspot')->group(function () {
+    Route::middleware(['feature:hotspot', 'permission:settings.manage'])->group(function () {
         Route::post('/settings', [SettingsController::class, 'update']);
         Route::post('/settings/test-connection', [SettingsController::class, 'testConnection']);
     });
     // Working hours are relevant to workspace/booking owners, not hotspot-only ones.
-    Route::middleware('feature:workspace,booking')->group(function () {
+    Route::middleware(['feature:workspace,booking', 'permission:settings.manage'])->group(function () {
         Route::post('/settings/working-hours', [SettingsController::class, 'updateWorkingHours'])->name('settings.working-hours.update');
     });
 
@@ -189,6 +245,26 @@ Route::middleware(['auth:owner', 'subscription.active'])->group(function () {
     Route::get('/notifications/{id}/open', [NotificationController::class, 'open'])->name('notifications.open');
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+
+    // Staff Management — owner-only, never reachable via the staff guard at
+    // all (see CheckPermission's owner-bypass: this is enforced by the
+    // guard restriction below, not by a permission flag, so staff can never
+    // reach this surface regardless of what staff_permissions might say).
+});
+
+Route::middleware(['auth:owner', 'subscription.active', 'permission:staff.view'])->group(function () {
+    Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
+    Route::get('/staff/{staff}/activity', [StaffActivityController::class, 'show'])->name('staff.activity');
+});
+
+Route::middleware(['auth:owner', 'subscription.active', 'permission:staff.manage'])->group(function () {
+    Route::get('/staff/create', [StaffController::class, 'create'])->name('staff.create');
+    Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
+    Route::get('/staff/{staff}/edit', [StaffController::class, 'edit'])->name('staff.edit');
+    Route::put('/staff/{staff}', [StaffController::class, 'update'])->name('staff.update');
+    Route::post('/staff/{staff}/toggle-status', [StaffController::class, 'toggleStatus'])->name('staff.toggle-status');
+    Route::post('/staff/{staff}/reset-permissions', [StaffController::class, 'resetPermissions'])->name('staff.reset-permissions');
+    Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy');
 });
 
 // ===================== Admin Auth =====================

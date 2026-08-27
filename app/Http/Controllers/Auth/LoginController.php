@@ -39,6 +39,23 @@ class LoginController extends Controller
             return redirect()->intended('/dashboard');
         }
 
+        if (Auth::guard('staff')->attempt($credentials, $remember)) {
+            $staff = Auth::guard('staff')->user();
+
+            if (! $staff->is_active || ! $staff->owner->is_active) {
+                Auth::guard('staff')->logout();
+
+                return back()->withErrors([
+                    'email' => 'Your account has been disabled. Contact your manager.',
+                ])->onlyInput('email');
+            }
+
+            $request->session()->regenerate();
+            $staff->forceFill(['last_login_at' => now()])->save();
+
+            return redirect()->intended('/dashboard');
+        }
+
         return back()->withErrors([
             'email' => 'The provided credentials do not match our records.',
         ])->onlyInput('email');
@@ -49,6 +66,7 @@ class LoginController extends Controller
         // Log out whichever guard this session belongs to.
         Auth::guard('owner')->logout();
         Auth::guard('admin')->logout();
+        Auth::guard('staff')->logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

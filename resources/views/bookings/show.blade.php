@@ -82,7 +82,7 @@
                 @endif
             </div>
 
-            @php $canSell = auth('owner')->user()->hasFeature('sales'); @endphp
+            @php $canSell = $owner->hasFeature('sales'); @endphp
             @if ($canSell)
                 @php $sale = $booking->sale; @endphp
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">

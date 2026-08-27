@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\TenantContext;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -9,15 +10,17 @@ use Symfony\Component\HttpFoundation\Response;
 class CheckFeature
 {
     /**
-     * Grant access when the owner has ANY of the given feature keys.
-     * Single-key usage (`feature:hotspot`) is unchanged; multi-key
-     * (`feature:hotspot,booking`) means "any of these".
+     * Grant access when the tenant (owner or, via TenantContext, an acting
+     * staff member) has ANY of the given feature keys. Single-key usage
+     * (`feature:hotspot`) is unchanged; multi-key (`feature:hotspot,booking`)
+     * means "any of these". Feature entitlement is tenant-level, so staff
+     * inherit it from their owner rather than having their own.
      */
     public function handle(Request $request, Closure $next, string ...$featureKeys): Response
     {
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
 
-        if (!$owner) {
+        if (! $owner) {
             return redirect()->route('login');
         }
 

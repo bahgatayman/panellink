@@ -49,14 +49,20 @@
             </div>
             {{-- Long menus scroll inside the sidebar so the profile/logout block stays pinned. --}}
             <nav class="nav-scroll flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-1">
-                @php $currentOwner = auth('owner')->user(); @endphp
+                @php
+                    $currentOwner = $owner;
+                    // Owner sessions have no permission grid — every nav item they can
+                    // reach via feature entitlement is visible. A staff session only
+                    // sees items it's also been granted the matching permission for.
+                    $can = fn (string $key) => ! $actingStaff || $actingStaff->hasPermission($key);
+                @endphp
                 <a href="/dashboard" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('dashboard') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
                     </svg>
                     <span>{{ __('app.nav.dashboard') }}</span>
                 </a>
-                @if($currentOwner->hasFeature('hotspot') || $currentOwner->hasFeature('booking'))
+                @if(($currentOwner->hasFeature('hotspot') || $currentOwner->hasFeature('booking')) && $can('members.view'))
                     <a href="/users" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('users*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -65,20 +71,24 @@
                     </a>
                 @endif
                 @if($currentOwner->hasFeature('hotspot'))
+                    @if($can('hotspot.view_sessions'))
                     <a href="/sessions" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('sessions*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
                         </svg>
                         <span>{{ __('app.nav.active_sessions') }}</span>
                     </a>
+                    @endif
+                    @if($can('hotspot.manage_speed'))
                     <a href="/speed-profiles" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('speed-profiles*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                         </svg>
                         <span>{{ __('app.nav.speed_profiles') }}</span>
                     </a>
+                    @endif
                 @endif
-                @if($currentOwner->hasFeature('workspace'))
+                @if($currentOwner->hasFeature('workspace') && $can('workspaces.view'))
                     <a href="/workspaces" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('workspaces*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
@@ -87,39 +97,59 @@
                     </a>
                 @endif
                 @if($currentOwner->hasFeature('booking'))
+                    @if($can('bookings.view'))
                     <a href="/bookings/calendar" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('bookings*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                         </svg>
                         <span>{{ __('app.nav.bookings') }}</span>
                     </a>
+                    @endif
+                    @if($can('shared_sessions.view'))
                     <a href="/shared-sessions" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('shared-sessions*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
                         </svg>
                         <span>{{ __('app.nav.shared_sessions') }}</span>
                     </a>
+                    @endif
                 @endif
                 @if($currentOwner->hasFeature('sales'))
+                    @if($can('products.view'))
                     <a href="/products" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('products*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                         </svg>
                         <span>{{ __('app.nav.products') }}</span>
                     </a>
-                    <a href="/sales" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('sales*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
+                    @endif
+                @endif
+                @if($currentOwner->hasFeature('booking') || $currentOwner->hasFeature('sales'))
+                    @if($can('financials.view'))
+                    <a href="/financials" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('financials*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
                         </svg>
-                        <span>{{ __('app.nav.sales') }}</span>
+                        <span>{{ __('app.nav.financials') }}</span>
                     </a>
+                    @endif
                 @endif
+                @if(! $actingStaff)
+                <a href="/staff" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('staff*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zM3 7a2 2 0 114 0 2 2 0 01-4 0z"/>
+                    </svg>
+                    <span>{{ __('app.nav.staff') }}</span>
+                </a>
+                @endif
+                @if($can('settings.view'))
                 <a href="/settings" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('settings*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                     </svg>
                     <span>{{ __('app.nav.settings') }}</span>
                 </a>
+                @endif
             </nav>
             <div class="shrink-0 px-4 py-4 border-t border-white/10">
                 <a href="/profile" class="flex items-center gap-2 text-sm text-gray-300 hover:text-white transition mb-2 {{ request()->is('profile') ? 'text-blue-400' : '' }}">
@@ -218,13 +248,13 @@
             </header>
 
             <main class="flex-1 min-h-0 overflow-y-auto p-4 lg:p-6">
-                @if(auth('owner')->user()->subscriptionStatus() === 'expiring_soon')
+                @if($currentOwner->subscriptionStatus() === 'expiring_soon')
                     <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 flex items-center gap-3">
                         <svg class="w-5 h-5 text-yellow-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
                         </svg>
                         <p class="text-yellow-800 text-sm font-medium">
-                            {{ __('app.msg.subscription_expires_in', ['days' => auth('owner')->user()->daysUntilExpiry()]) }}
+                            {{ __('app.msg.subscription_expires_in', ['days' => $currentOwner->daysUntilExpiry()]) }}
                         </p>
                     </div>
                 @endif
@@ -232,6 +262,31 @@
             </main>
         </div>
     </div>
+
+    @if (session('permission_denied'))
+        <div id="permission-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-gray-900/50" onclick="closePermissionModal()"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+                <div class="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-7 h-7 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800">{{ __('app.error.403_heading') }}</h3>
+                <p class="text-sm text-gray-500 mt-2">{{ session('permission_denied') }}</p>
+                <button type="button" onclick="closePermissionModal()" class="mt-6 w-full bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-lg px-4 py-2.5 transition">
+                    {{ __('app.common.close') }}
+                </button>
+            </div>
+        </div>
+        <script>
+            function closePermissionModal() {
+                const modal = document.getElementById('permission-modal');
+                if (modal) modal.remove();
+            }
+            document.addEventListener('keydown', e => { if (e.key === 'Escape') closePermissionModal(); });
+        </script>
+    @endif
 
     <script>
     function toggleNotif() {

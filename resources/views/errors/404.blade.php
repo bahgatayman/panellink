@@ -4,8 +4,8 @@
 
 @section('content')
     @php
-        $isAuthed = auth('admin')->check() || auth('owner')->check();
-        $homeUrl = auth('admin')->check() ? '/admin/dashboard' : (auth('owner')->check() ? '/dashboard' : '/login');
+        $isAuthed = auth('admin')->check() || auth('owner')->check() || auth('staff')->check();
+        $homeUrl = auth('admin')->check() ? '/admin/dashboard' : ((auth('owner')->check() || auth('staff')->check()) ? '/dashboard' : '/login');
         $homeLabel = $isAuthed ? __('app.error.go_to_dashboard') : __('app.error.go_to_login');
     @endphp
     <div class="text-center">

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Notification;
 use App\Services\NotificationService;
+use App\Support\TenantContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\View;
@@ -26,8 +27,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         View::composer('*', function ($view) {
-            if (Auth::guard('owner')->check()) {
-                $view->with('owner', Auth::guard('owner')->user());
+            $owner = TenantContext::user();
+            if ($owner) {
+                $view->with('owner', $owner);
             }
         });
 
@@ -35,7 +37,8 @@ class AppServiceProvider extends ServiceProvider
         // Alerts are (re)generated at most once every 10 minutes per owner so page
         // loads stay cheap even without the scheduler running.
         View::composer('layouts.app', function ($view) {
-            $owner = Auth::guard('owner')->user();
+            $owner = TenantContext::user();
+            $view->with('actingStaff', Auth::guard('staff')->user());
             if (! $owner) {
                 return;
             }

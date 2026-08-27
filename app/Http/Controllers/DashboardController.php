@@ -2,26 +2,34 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Booking;
 use App\Models\HotspotUser;
-use App\Models\Room;
-use App\Models\Sale;
-use App\Models\SharedSession;
+use App\Models\Notification;
 use App\Models\SpeedProfile;
-use App\Models\Workspace;
+use App\Services\AnalyticsPeriod;
+use App\Services\BookingAnalyticsService;
 use App\Services\BusinessHoursService;
+use App\Services\CustomerAnalyticsService;
 use App\Services\HotspotSyncService;
+use App\Services\OccupancyAnalyticsService;
+use App\Services\RevenueAnalyticsService;
+use App\Support\TenantContext;
 use Exception;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function __construct(private HotspotSyncService $sync, private BusinessHoursService $businessHours) {}
+    public function __construct(
+        private HotspotSyncService $sync,
+        private BusinessHoursService $businessHours,
+        private RevenueAnalyticsService $revenueAnalytics,
+        private OccupancyAnalyticsService $occupancyAnalytics,
+        private BookingAnalyticsService $bookingAnalytics,
+        private CustomerAnalyticsService $customerAnalytics,
+    ) {}
 
     public function index(): View
     {
-        $owner = Auth::guard('owner')->user();
+        $owner = TenantContext::user();
         $ownerId = $owner->id;
 
         $totalUsers = HotspotUser::where('owner_id', $ownerId)->count();
@@ -37,6 +45,20 @@ class DashboardController extends Controller
             $mikrotikError = $e->getMessage();
         }
 
+        // Dashboard route is never permission-gated (it's the mandatory
+        // post-login landing page), but individual sections on it still
+        // respect the same permissions their full pages would.
+        $staff = auth('staff')->user();
+        $canViewRevenue = ! $staff || $staff->hasPermission('reports.view');
+        $canViewWorkspaces = ! $staff || $staff->hasPermission('workspaces.view');
+
+        $periodKey = in_array(request('period'), ['today', 'week', 'month'], true) ? request('period') : 'today';
+        $period = match ($periodKey) {
+            'week' => AnalyticsPeriod::thisWeek(),
+            'month' => AnalyticsPeriod::thisMonth(),
+            default => AnalyticsPeriod::today(),
+        };
+
         $viewData = [
             'owner' => $owner,
             'totalUsers' => $totalUsers,
@@ -44,10 +66,12 @@ class DashboardController extends Controller
             'totalProfiles' => $totalProfiles,
             'activeSessions' => $activeSessions,
             'mikrotikError' => $mikrotikError,
-            'todayBookings' => 0,
-            'pendingBookings' => 0,
-            'monthRevenue' => 0,
-            'productRevenue' => 0,
+            'canViewRevenue' => $canViewRevenue,
+            'canViewWorkspaces' => $canViewWorkspaces,
+            // The plan/feature list is billing-facing tenant info, not an
+            // operational concern for staff — Owner-only, no permission to grant.
+            'isStaff' => (bool) $staff,
+            'periodKey' => $periodKey,
         ];
 
         // Working-hours "open now" badge — only meaningful once an owner has
@@ -58,39 +82,53 @@ class DashboardController extends Controller
             $viewData['isOpenNow'] = $this->businessHours->isOpenNow($owner);
         }
 
-        if ($owner->hasFeature('workspace')) {
-            $viewData['totalWorkspaces'] = Workspace::where('owner_id', $ownerId)->count();
-            $viewData['totalRooms'] = Room::where('owner_id', $ownerId)->count();
-            $viewData['availableRooms'] = Room::where('owner_id', $ownerId)->where('is_available', true)->count();
+        // Revenue combines booking + product/service sales (see
+        // RevenueAnalyticsService); meaningless for an owner with neither
+        // feature enabled, so the whole block is skipped rather than showing
+        // an always-zero card.
+        $viewData['showRevenue'] = $canViewRevenue && ($owner->hasFeature('booking') || $owner->hasFeature('sales'));
+        if ($viewData['showRevenue']) {
+            $viewData['revenueToday'] = $this->revenueAnalytics->totalRevenue($owner, AnalyticsPeriod::today());
+            $viewData['revenueThisMonth'] = $this->revenueAnalytics->totalRevenue($owner, AnalyticsPeriod::thisMonth());
+            $viewData['revenueComparison'] = $this->revenueAnalytics->revenueWithComparison($owner, $period);
+            $viewData['revenueTrend'] = $this->revenueAnalytics->dailyRevenueTrend($owner, $period);
         }
 
         if ($owner->hasFeature('booking')) {
-            $viewData['todayBookings'] = Booking::where('owner_id', $ownerId)
-                ->where('booking_date', today())
-                ->where('status', '!=', 'cancelled')
-                ->count();
-            $viewData['pendingBookings'] = Booking::where('owner_id', $ownerId)
-                ->where('status', 'pending')
-                ->count();
-            $viewData['monthRevenue'] = Booking::where('owner_id', $ownerId)
-                ->where('status', 'completed')
-                ->whereMonth('booking_date', now()->month)
-                ->whereYear('booking_date', now()->year)
-                ->sum('total_price');
-            $viewData['openSharedSessions'] = SharedSession::where('owner_id', $ownerId)
-                ->where('status', 'open')
-                ->count();
+            $viewData['todayBookings'] = $this->bookingAnalytics->bookingsCount($owner, AnalyticsPeriod::today(), excludeCancelled: true);
+            $viewData['statusBreakdown'] = $this->bookingAnalytics->statusBreakdown($owner, $period);
+            $viewData['peakHours'] = $this->bookingAnalytics->peakHours($owner, $period);
+            $viewData['todaysSchedule'] = $this->bookingAnalytics->todaysSchedule($owner);
         }
 
-        // Product sales are a separate additive revenue stream (never folded into
-        // bookings.total_price, so summing both here does not double-count).
-        if ($owner->hasFeature('sales')) {
-            $viewData['productRevenue'] = Sale::where('owner_id', $ownerId)
-                ->where('status', 'completed')
-                ->whereMonth('sold_at', now()->month)
-                ->whereYear('sold_at', now()->year)
-                ->sum('total');
+        $viewData['showWorkspace'] = $owner->hasFeature('workspace') && $canViewWorkspaces;
+        if ($viewData['showWorkspace']) {
+            $viewData['occupancy'] = $this->occupancyAnalytics->currentOccupancy($owner);
+            $viewData['availableRoomsNow'] = $this->occupancyAnalytics->availableRoomsNow($owner);
+
+            if ($owner->hasFeature('booking')) {
+                // Ranked highest-utilization-first, the same ordering rule
+                // BookingAnalyticsService uses internally for most/least
+                // utilized room, so the view never re-derives a sort key.
+                $viewData['roomUtilization'] = $this->bookingAnalytics
+                    ->roomUtilization($owner, $period, $this->businessHours)
+                    ->sortByDesc(fn (array $r) => $r['utilization_percent'] ?? $r['hours_booked'])
+                    ->values();
+            }
         }
+
+        // "Customers" here is HotspotUser (the merged member entity) — shown
+        // wherever that entity is otherwise reachable (hotspot or booking),
+        // matching the existing /users nav visibility rule.
+        if ($owner->hasFeature('hotspot') || $owner->hasFeature('booking')) {
+            $viewData['newCustomers'] = $this->customerAnalytics->newCustomers($owner, $period);
+        }
+
+        // Reuses the existing Notification feed (generated by
+        // NotificationService, refreshed by the layout's own view composer)
+        // rather than recomputing alert logic here.
+        $viewData['needsAttentionCount'] = Notification::forOwner($ownerId)->unread()->count();
+        $viewData['needsAttentionItems'] = Notification::forOwner($ownerId)->unread()->latest()->take(10)->get();
 
         return view('dashboard.index', $viewData);
     }

@@ -16,7 +16,9 @@ return [
         'shared_sessions' => 'Shared Sessions',
         'products' => 'Products',
         'sales' => 'Sales',
+        'financials' => 'Financials',
         'settings' => 'Settings',
+        'staff' => 'Staff',
         'my_profile' => 'My Profile',
         'logout' => 'Logout',
         'plans' => 'Plans',
@@ -154,6 +156,7 @@ return [
         'update' => 'Update',
         'select' => 'Select',
         'actions' => 'Actions',
+        'action' => 'Action',
         'status' => 'Status',
         'date' => 'Date',
         'time' => 'Time',
@@ -379,6 +382,7 @@ return [
         'subscription_expires_in' => 'Your subscription expires in :days days. Please contact your administrator to renew.',
         'mikrotik_connection_error' => 'MikroTik connection error: :message',
         'check_mikrotik_settings' => 'Check your MikroTik connection in Settings',
+        'permission_denied' => 'You do not have permission to do that. Ask an owner or admin to grant you access.',
     ],
 
     /*
@@ -418,22 +422,45 @@ return [
         'active_users' => 'Active Users',
         'online_now' => 'Online Now',
         'today_bookings' => 'Today\'s Bookings',
-        'pending_confirmations' => 'Pending Confirmations',
-        'open_sessions' => 'Open Sessions',
-        'this_month_revenue' => 'This Month Revenue',
-        'product_sales' => 'Product Sales (This Month)',
-        'workspace_overview' => 'Workspace Overview',
-        'total_workspaces' => 'Total Workspaces',
-        'total_rooms' => 'Total Rooms',
         'available_rooms' => 'Available Rooms',
         'your_features' => 'Your Features',
         'quick_links' => 'Quick Links',
         'add_new_user' => 'Add New User',
         'view_active_sessions' => 'View Active Sessions',
         'manage_speed_profiles' => 'Manage Speed Profiles',
-        'booking_overview' => 'Booking Overview',
         'open_now' => 'Open now',
         'closed_now' => 'Closed now',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Owner dashboard — business analytics
+    |--------------------------------------------------------------------------
+    */
+    'dashboard' => [
+        'revenue_today' => 'Revenue Today',
+        'revenue_this_month' => 'Revenue This Month',
+        'vs_previous_period' => 'vs previous period',
+        'current_occupancy' => 'Current Occupancy',
+        'needs_attention' => 'Needs Attention',
+        'revenue_trend' => 'Revenue Trend',
+        'room_utilization' => 'Room Utilization',
+        'room_utilization_details' => 'Room Utilization Details',
+        'peak_hours' => 'Peak Hours',
+        'booking_status' => 'Booking Status',
+        'todays_schedule' => 'Today\'s Schedule',
+        'new_customers' => 'New Customers',
+        'period_today' => 'Today',
+        'period_week' => 'This Week',
+        'period_month' => 'This Month',
+        'no_bookings_today' => 'No bookings scheduled for today.',
+        'no_room_data' => 'No room data yet.',
+        'working_hours_not_configured' => 'Configure working hours to see utilization %.',
+        'seats_occupied' => ':occupied of :capacity seats occupied',
+        'all_caught_up' => 'All caught up — nothing needs your attention.',
+        'hours_booked' => 'Hours Booked',
+        'bookings' => 'Bookings',
+        'no_data_for_period' => 'No data for this period.',
     ],
 
     /*
@@ -663,6 +690,66 @@ return [
         'walk_in' => 'Walk-in',
         'booking' => 'Booking',
         'from_booking' => 'From booking #:id',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Financials — unified booking + shared-session + product revenue module
+    |--------------------------------------------------------------------------
+    */
+    'financials' => [
+        'title' => 'Financials',
+        'overview' => 'Overview',
+        'transactions' => 'Transactions',
+        'revenue_today' => 'Today',
+        'revenue_this_week' => 'This Week',
+        'revenue_this_month' => 'This Month',
+        'total_revenue' => 'Total Revenue',
+        'booking_revenue' => 'Room Revenue',
+        'product_revenue' => 'Product Revenue',
+        'average_booking_value' => 'Average Booking Value',
+        'vs_previous_period' => 'vs previous period',
+        'revenue_trend' => 'Revenue Trend',
+        'revenue_by_room' => 'Revenue by Room',
+        'revenue_by_room_type' => 'Revenue by Room Type',
+        'revenue_by_product' => 'Revenue by Product',
+        'no_data' => 'No revenue recorded for this period.',
+        'view_transactions' => 'View Transactions',
+        'export' => 'Export to Excel',
+        'filters' => 'Filters',
+        'period' => 'Period',
+        'period_today' => 'Today',
+        'period_week' => 'This Week',
+        'period_month' => 'This Month',
+        'period_custom' => 'Custom',
+        'start_date' => 'Start Date',
+        'end_date' => 'End Date',
+        'apply' => 'Apply',
+        'status' => 'Status',
+        'status_completed' => 'Completed only',
+        'status_all' => 'All statuses',
+        'source' => 'Source',
+        'source_all' => 'All',
+        'source_direct_booking' => 'Direct Booking',
+        'source_shared_session' => 'Shared Session',
+        'source_with_products' => 'With Products',
+        'no_transactions' => 'No transactions found for these filters.',
+        'transaction' => 'Transaction',
+        'date' => 'Date',
+        'booking_number' => 'Booking',
+        'customer' => 'Customer',
+        'room' => 'Room',
+        'hours' => 'Hours',
+        'grand_total' => 'Grand Total',
+        'not_counted' => 'Not counted',
+        'back_to_transactions' => 'Back to Transactions',
+        'room_charge' => 'Room Charge',
+        'products' => 'Products',
+        'origin' => 'Origin',
+        'origin_direct' => 'Direct Booking',
+        'origin_shared_session' => 'Auto-opened via Shared Session #:id',
+        'created_by' => 'Created By',
+        'created_by_unknown' => 'Unknown',
     ],
 
     /*
@@ -1038,6 +1125,7 @@ return [
         'plans' => 'Plans',
         'financial' => 'Financial',
         'owners' => 'Owners',
+        'staff' => 'Staff',
     ],
 
     /*
@@ -1053,6 +1141,168 @@ return [
         'thursday' => 'Thursday',
         'friday' => 'Friday',
         'saturday' => 'Saturday',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Staff accounts & permissions
+    |--------------------------------------------------------------------------
+    */
+    'staff' => [
+        'add_staff' => 'Add Staff Member',
+        'edit_staff' => 'Edit Staff Member',
+        'name' => 'Name',
+        'email' => 'Email',
+        'password' => 'Password',
+        'password_hint' => 'Leave blank to keep the current password.',
+        'role' => 'Role',
+        'no_role' => 'No role — assign permissions directly',
+        'permissions' => 'Permissions',
+        'reset_to_role_defaults' => 'Reset to Role Defaults',
+        'enable' => 'Enable',
+        'disable' => 'Disable',
+        'last_login' => 'Last Login',
+        'never_logged_in' => 'Never logged in',
+        'view_activity' => 'View Activity',
+        'no_staff' => 'No staff members yet.',
+        'confirm_delete' => 'Remove this staff member? Their past activity and records will be kept.',
+        'confirm_disable' => 'Disable this staff member? They will be signed out immediately.',
+        'save' => 'Save',
+        'activity_for' => 'Activity — :name',
+        'range_week' => 'This Week',
+        'range_month' => 'This Month',
+        'range_all' => 'All Time',
+        'no_activity' => 'No activity recorded yet.',
+        // Nested to match StaffActivityLog.action's "domain.action" shape —
+        // same reason as app.permission below: a flat key containing a
+        // literal dot never resolves via Laravel's dot-notation lookup.
+        'events' => [
+            'staff' => [
+                'created' => 'Staff account created',
+                'updated' => 'Staff account updated',
+                'status_toggled' => 'Status changed',
+                'permissions_changed' => 'Permissions changed',
+                'deleted' => 'Staff account removed',
+            ],
+            'booking' => [
+                'created' => 'Booking created',
+                'updated' => 'Booking updated',
+                'status_changed' => 'Booking status changed',
+                'cancelled' => 'Booking cancelled',
+                'checked_in' => 'Booking checked in',
+                'item_added' => 'Product added to booking',
+                'item_removed' => 'Product removed from booking',
+            ],
+            'shared_session' => [
+                'opened' => 'Shared session opened',
+                'closed' => 'Shared session closed',
+                'item_added' => 'Product added to session',
+                'item_removed' => 'Product removed from session',
+            ],
+            'product' => [
+                'created' => 'Product added',
+                'updated' => 'Product updated',
+                'deleted' => 'Product deleted',
+                'toggled' => 'Product status changed',
+            ],
+            'member' => [
+                'created' => 'Member added',
+                'updated' => 'Member updated',
+                'deleted' => 'Member deleted',
+                'status_toggled' => 'Member status changed',
+            ],
+            'room' => [
+                'created' => 'Room added',
+                'updated' => 'Room updated',
+                'deleted' => 'Room deleted',
+                'availability_toggled' => 'Room availability changed',
+            ],
+            'workspace' => [
+                'created' => 'Workspace added',
+                'updated' => 'Workspace updated',
+                'deleted' => 'Workspace deleted',
+                'toggled' => 'Workspace status changed',
+            ],
+            'settings' => [
+                'updated' => 'Settings updated',
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Permission catalog & system roles (staff accounts)
+    |--------------------------------------------------------------------------
+    */
+    'permission_group' => [
+        'members' => 'Members',
+        'hotspot' => 'Hotspot',
+        'workspaces' => 'Workspaces & Rooms',
+        'shared_sessions' => 'Shared Sessions',
+        'bookings' => 'Bookings',
+        'products_sales' => 'Products & Sales',
+        'reports' => 'Reports',
+        'financials' => 'Financials',
+        'settings' => 'Settings',
+        'staff' => 'Staff Management',
+    ],
+    // Nested to match Permission.key's "domain.action" shape — Laravel's
+    // translator splits every dot in the lookup string as a nesting level,
+    // so a flat key containing a literal dot (e.g. 'bookings.cancel' => ...)
+    // silently never resolves via __('app.permission.bookings.cancel').
+    'permission' => [
+        'members' => [
+            'view' => 'View Members',
+            'create' => 'Add Members',
+            'edit' => 'Edit Members',
+            'delete' => 'Delete Members',
+            'manage_status' => 'Enable/Disable Members',
+        ],
+        'hotspot' => [
+            'manage_speed' => 'Manage Hotspot Speed Profiles',
+            'view_sessions' => 'View Live Hotspot Sessions',
+        ],
+        'workspaces' => [
+            'view' => 'View Workspaces & Rooms',
+            'manage' => 'Manage Workspaces & Rooms',
+        ],
+        'shared_sessions' => [
+            'view' => 'View Shared Sessions',
+            'manage' => 'Open/Close Shared Sessions',
+        ],
+        'bookings' => [
+            'view' => 'View Bookings',
+            'create' => 'Create Bookings',
+            'edit' => 'Edit Bookings',
+            'cancel' => 'Cancel Bookings',
+        ],
+        'products' => [
+            'view' => 'View Products',
+            'manage' => 'Manage Products',
+        ],
+        'sales' => [
+            'view' => 'View Sales',
+        ],
+        'reports' => [
+            'view' => 'View Reports & Revenue',
+        ],
+        'financials' => [
+            'view' => 'View Financials',
+            'export' => 'Export Financial Reports',
+        ],
+        'settings' => [
+            'view' => 'View Settings',
+            'manage' => 'Manage Settings',
+        ],
+        'staff' => [
+            'view' => 'View Staff',
+            'manage' => 'Manage Staff',
+        ],
+    ],
+    'role' => [
+        'receptionist' => 'Receptionist',
+        'staff' => 'Staff',
+        'manager' => 'Manager',
     ],
 
     /*

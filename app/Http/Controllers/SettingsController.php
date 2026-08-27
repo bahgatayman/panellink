@@ -4,11 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\GeneratesTimeSlots;
 use App\Models\WorkingHour;
+use App\Services\ActivityLogger;
 use App\Services\HotspotSyncService;
+use App\Support\TenantContext;
 use Exception;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -25,11 +26,11 @@ class SettingsController extends Controller
         4 => 'thursday', 5 => 'friday', 6 => 'saturday',
     ];
 
-    public function __construct(private HotspotSyncService $sync) {}
+    public function __construct(private HotspotSyncService $sync, private ActivityLogger $activityLogger) {}
 
     public function index(): View
     {
-        $owner = Auth::guard('owner')->user();
+        $owner = TenantContext::user();
 
         $existingHours = $owner->workingHours()->get()->keyBy('day_of_week');
 
@@ -60,7 +61,7 @@ class SettingsController extends Controller
      */
     public function update(Request $request): RedirectResponse
     {
-        $owner = Auth::guard('owner')->user();
+        $owner = TenantContext::user();
 
         $validated = $request->validate([
             'mikrotik_host' => 'required|string',
@@ -78,12 +79,14 @@ class SettingsController extends Controller
                 : $owner->mikrotik_password,
         ]);
 
+        $this->activityLogger->log('settings.updated', $owner, 'Updated router settings');
+
         return back()->with('success', 'Router settings saved successfully.');
     }
 
     public function testConnection(Request $request): RedirectResponse
     {
-        $owner = Auth::guard('owner')->user();
+        $owner = TenantContext::user();
 
         try {
             $this->sync->testConnection($owner);
@@ -103,7 +106,7 @@ class SettingsController extends Controller
      */
     public function updateWorkingHours(Request $request): RedirectResponse
     {
-        $owner = Auth::guard('owner')->user();
+        $owner = TenantContext::user();
 
         $validated = $request->validate([
             'hours' => 'required|array',
@@ -148,6 +151,8 @@ class SettingsController extends Controller
                 ]);
             }
         });
+
+        $this->activityLogger->log('settings.updated', $owner, 'Updated working hours');
 
         return back()->with('success', __('app.settings.working_hours.saved'));
     }

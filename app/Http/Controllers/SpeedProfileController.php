@@ -5,19 +5,18 @@ namespace App\Http\Controllers;
 use App\Models\HotspotUser;
 use App\Models\SpeedProfile;
 use App\Services\HotspotSyncService;
+use App\Support\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class SpeedProfileController extends Controller
 {
-    public function __construct(private HotspotSyncService $sync)
-    {
-    }
+    public function __construct(private HotspotSyncService $sync) {}
 
     public function index(): View
     {
-        $profiles = SpeedProfile::where('owner_id', auth('owner')->id())
+        $profiles = SpeedProfile::where('owner_id', TenantContext::id())
             ->withCount('hotspotUsers')
             ->orderBy('name')
             ->get();
@@ -39,34 +38,35 @@ class SpeedProfileController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'name'           => 'required|string|max:100|unique:speed_profiles,name,NULL,id,owner_id,' . auth('owner')->id(),
+            'name' => 'required|string|max:100|unique:speed_profiles,name,NULL,id,owner_id,'.TenantContext::id(),
             'speed_download' => 'required|string',
-            'speed_upload'   => 'required|string',
-            'is_default'     => 'boolean',
+            'speed_upload' => 'required|string',
+            'is_default' => 'boolean',
         ]);
 
         $isDefault = $validated['is_default'] ?? false;
 
         if ($isDefault) {
-            SpeedProfile::where('owner_id', auth('owner')->id())
+            SpeedProfile::where('owner_id', TenantContext::id())
                 ->where('is_default', true)
                 ->update(['is_default' => false]);
         }
 
         $profile = SpeedProfile::create([
-            'owner_id'       => auth('owner')->id(),
-            'name'           => $validated['name'],
+            'owner_id' => TenantContext::id(),
+            'name' => $validated['name'],
             'speed_download' => $validated['speed_download'],
-            'speed_upload'   => $validated['speed_upload'],
-            'is_default'     => $isDefault,
+            'speed_upload' => $validated['speed_upload'],
+            'is_default' => $isDefault,
         ]);
 
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
 
         try {
             $this->sync->createProfile($owner, $profile->name, $profile->speed_download, $profile->speed_upload);
         } catch (\Exception $e) {
             $profile->delete();
+
             return back()->withInput()->with('error', "Profile saved but MikroTik sync failed: {$e->getMessage()}. Profile was not created.");
         }
 
@@ -76,7 +76,7 @@ class SpeedProfileController extends Controller
     public function edit(int $id): View
     {
         $profile = SpeedProfile::where('id', $id)
-            ->where('owner_id', auth('owner')->id())
+            ->where('owner_id', TenantContext::id())
             ->firstOrFail();
 
         $speedOptions = ['1M', '2M', '5M', '10M', '20M', '50M', '100M'];
@@ -90,49 +90,49 @@ class SpeedProfileController extends Controller
     public function update(Request $request, int $id): RedirectResponse
     {
         $profile = SpeedProfile::where('id', $id)
-            ->where('owner_id', auth('owner')->id())
+            ->where('owner_id', TenantContext::id())
             ->firstOrFail();
 
         $validated = $request->validate([
-            'name'           => 'required|string|max:100|unique:speed_profiles,name,' . $id . ',id,owner_id,' . auth('owner')->id(),
+            'name' => 'required|string|max:100|unique:speed_profiles,name,'.$id.',id,owner_id,'.TenantContext::id(),
             'speed_download' => 'required|string',
-            'speed_upload'   => 'required|string',
-            'is_default'     => 'boolean',
+            'speed_upload' => 'required|string',
+            'is_default' => 'boolean',
         ]);
 
         if ($request->boolean('is_default')) {
-            SpeedProfile::where('owner_id', auth('owner')->id())
+            SpeedProfile::where('owner_id', TenantContext::id())
                 ->where('id', '!=', $profile->id)
                 ->update(['is_default' => false]);
         }
 
         $profile->update($validated);
 
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
 
-        $assignedUsers = HotspotUser::where('owner_id', auth('owner')->id())
+        $assignedUsers = HotspotUser::where('owner_id', TenantContext::id())
             ->where('speed_profile_id', $profile->id)
             ->get();
 
         try {
             $syncErrors = $this->sync->syncProfileToUsers($owner, $profile, $assignedUsers);
         } catch (\Exception $e) {
-            return back()->with('error', 'Profile updated in DB but MikroTik sync failed: ' . $e->getMessage());
+            return back()->with('error', 'Profile updated in DB but MikroTik sync failed: '.$e->getMessage());
         }
 
-        if (!empty($syncErrors)) {
+        if (! empty($syncErrors)) {
             return redirect('/speed-profiles')
-                ->with('warning', 'Profile updated but some users failed to sync: ' . implode(', ', $syncErrors));
+                ->with('warning', 'Profile updated but some users failed to sync: '.implode(', ', $syncErrors));
         }
 
         return redirect('/speed-profiles')
-            ->with('success', 'Speed profile updated and synced to ' . ($assignedUsers->count() ?? 0) . ' users on MikroTik.');
+            ->with('success', 'Speed profile updated and synced to '.($assignedUsers->count() ?? 0).' users on MikroTik.');
     }
 
     public function destroy(int $id): RedirectResponse
     {
         $profile = SpeedProfile::where('id', $id)
-            ->where('owner_id', auth('owner')->id())
+            ->where('owner_id', TenantContext::id())
             ->firstOrFail();
 
         $usersUsing = HotspotUser::where('speed_profile_id', $profile->id)->count();
@@ -141,7 +141,7 @@ class SpeedProfileController extends Controller
             return back()->with('error', "Cannot delete — {$usersUsing} user(s) are using this profile");
         }
 
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
 
         try {
             $this->sync->deleteProfile($owner, $profile->name);
@@ -157,10 +157,10 @@ class SpeedProfileController extends Controller
     public function setDefault(int $id): RedirectResponse
     {
         $profile = SpeedProfile::where('id', $id)
-            ->where('owner_id', auth('owner')->id())
+            ->where('owner_id', TenantContext::id())
             ->firstOrFail();
 
-        SpeedProfile::where('owner_id', auth('owner')->id())
+        SpeedProfile::where('owner_id', TenantContext::id())
             ->where('is_default', true)
             ->update(['is_default' => false]);
 

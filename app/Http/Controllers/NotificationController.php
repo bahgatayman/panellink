@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Notification;
+use App\Support\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -10,11 +11,11 @@ class NotificationController extends Controller
 {
     public function index(): View
     {
-        $notifications = Notification::forOwner(auth('owner')->id())
+        $notifications = Notification::forOwner(TenantContext::id())
             ->latest()
             ->paginate(20);
 
-        $unreadCount = Notification::forOwner(auth('owner')->id())->unread()->count();
+        $unreadCount = Notification::forOwner(TenantContext::id())->unread()->count();
 
         return view('notifications.index', compact('notifications', 'unreadCount'));
     }
@@ -37,7 +38,7 @@ class NotificationController extends Controller
 
     public function markAllRead(): RedirectResponse
     {
-        Notification::forOwner(auth('owner')->id())
+        Notification::forOwner(TenantContext::id())
             ->unread()
             ->update(['read_at' => now()]);
 
@@ -53,6 +54,6 @@ class NotificationController extends Controller
 
     private function findOwned(int $id): Notification
     {
-        return Notification::forOwner(auth('owner')->id())->findOrFail($id);
+        return Notification::forOwner(TenantContext::id())->findOrFail($id);
     }
 }

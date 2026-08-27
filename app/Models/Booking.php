@@ -70,6 +70,17 @@ class Booking extends Model
         return $this->hasOne(Sale::class);
     }
 
+    /**
+     * Set only when this booking was auto-created by SharedSession::close()
+     * (the inverse of SharedSession::booking()). Used by the Financials
+     * module to detect a session-derived booking via the FK rather than by
+     * matching the free-text 'Auto-created from shared session.' notes.
+     */
+    public function sharedSession(): HasOne
+    {
+        return $this->hasOne(SharedSession::class);
+    }
+
     /** Room charge plus any attached product sales. */
     public function grandTotal(): float
     {

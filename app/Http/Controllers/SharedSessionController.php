@@ -9,9 +9,11 @@ use App\Models\Product;
 use App\Models\Room;
 use App\Models\SaleItem;
 use App\Models\SharedSession;
+use App\Services\ActivityLogger;
 use App\Services\AvailabilityService;
 use App\Services\BusinessHoursService;
 use App\Services\SalesService;
+use App\Support\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -21,9 +23,11 @@ use Illuminate\View\View;
 
 class SharedSessionController extends Controller
 {
+    public function __construct(private ActivityLogger $activityLogger) {}
+
     public function index(): View
     {
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
 
         $openSessions = SharedSession::where('owner_id', $owner->id)
             ->where('status', 'open')
@@ -51,7 +55,7 @@ class SharedSessionController extends Controller
 
     public function create(): View
     {
-        $sharedRooms = Room::where('owner_id', auth('owner')->id())
+        $sharedRooms = Room::where('owner_id', TenantContext::id())
             ->where('type', 'shared')
             ->withSum(['sharedSessions as occupied_seats' => function ($q) {
                 $q->where('status', 'open');
@@ -72,7 +76,7 @@ class SharedSessionController extends Controller
             'party_size' => 'nullable|integer|min:1',
         ]);
 
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
         $ownerId = $owner->id;
         $partySize = (int) ($request->input('party_size') ?: 1);
 
@@ -151,6 +155,12 @@ class SharedSessionController extends Controller
             return back()->withInput()->with('error', $error);
         }
 
+        $session = SharedSession::where('owner_id', $ownerId)->where('room_id', $request->room_id)
+            ->where('hotspot_user_id', $user->id)->where('status', 'open')->latest('id')->first();
+        if ($session) {
+            $this->activityLogger->log('shared_session.opened', $session, "Opened session for {$user->name} in {$roomName}");
+        }
+
         return redirect()->route('shared-sessions.index')
             ->with('success', "Session opened for {$user->name} in {$roomName}.");
     }
@@ -158,7 +168,7 @@ class SharedSessionController extends Controller
     public function closePreview(int $sessionId): JsonResponse
     {
         $session = SharedSession::where('id', $sessionId)
-            ->where('owner_id', auth('owner')->id())
+            ->where('owner_id', TenantContext::id())
             ->where('status', 'open')
             ->with(['room', 'hotspotUser', 'sale.items'])
             ->firstOrFail();
@@ -198,7 +208,7 @@ class SharedSessionController extends Controller
     /** Add a product to the session's running tab. Routed under feature:booking + feature:sales. */
     public function addItem(Request $request, int $sessionId, SalesService $sales): JsonResponse
     {
-        $ownerId = auth('owner')->id();
+        $ownerId = TenantContext::id();
 
         $session = SharedSession::where('id', $sessionId)
             ->where('owner_id', $ownerId)
@@ -218,13 +228,15 @@ class SharedSessionController extends Controller
         $sale = $sales->saleForSharedSession($session);
         $sales->addItem($sale, $product, (int) $validated['quantity']);
 
+        $this->activityLogger->log('shared_session.item_added', $session, "Added {$validated['quantity']}x {$product->name} to session #{$session->id}");
+
         return response()->json(['success' => true]);
     }
 
     /** Remove a line item from the session's running tab. */
     public function removeItem(int $sessionId, int $itemId, SalesService $sales): JsonResponse
     {
-        $ownerId = auth('owner')->id();
+        $ownerId = TenantContext::id();
 
         $session = SharedSession::where('id', $sessionId)
             ->where('owner_id', $ownerId)
@@ -238,6 +250,8 @@ class SharedSessionController extends Controller
                 ->firstOrFail();
 
             $sales->removeItem($item);
+
+            $this->activityLogger->log('shared_session.item_removed', $session, "Removed a line item from session #{$session->id}");
         }
 
         return response()->json(['success' => true]);
@@ -275,7 +289,7 @@ class SharedSessionController extends Controller
      */
     public function close(int $sessionId, SalesService $sales): JsonResponse
     {
-        $ownerId = auth('owner')->id();
+        $ownerId = TenantContext::id();
         $closedAt = now();
 
         return DB::transaction(function () use ($sessionId, $ownerId, $closedAt, $sales) {
@@ -329,6 +343,8 @@ class SharedSessionController extends Controller
             }
 
             $grandTotal = $totalPrice + (float) ($session->sale?->total ?? 0);
+
+            $this->activityLogger->log('shared_session.closed', $session, "Closed session #{$session->id}, total ج.م ".number_format($grandTotal, 2));
 
             return response()->json([
                 'success' => true,

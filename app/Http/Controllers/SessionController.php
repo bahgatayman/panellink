@@ -4,18 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\HotspotUser;
 use App\Services\HotspotSyncService;
+use App\Support\TenantContext;
 use Exception;
 use Illuminate\View\View;
 
 class SessionController extends Controller
 {
-    public function __construct(private HotspotSyncService $sync)
-    {
-    }
+    public function __construct(private HotspotSyncService $sync) {}
 
     public function index(): View
     {
-        $owner = auth('owner')->user();
+        $owner = TenantContext::user();
         $sessions = [];
         $error = null;
 
@@ -32,7 +31,7 @@ class SessionController extends Controller
                 $local = $localUsers->get($session['phone'] ?? $session['username'] ?? null);
 
                 return array_merge($session, [
-                    'name'    => $local?->name ?? 'Unknown',
+                    'name' => $local?->name ?? 'Unknown',
                     'user_id' => $local?->id ?? null,
                 ]);
             })->toArray();
@@ -42,7 +41,7 @@ class SessionController extends Controller
 
         return view('sessions.index', [
             'sessions' => $sessions,
-            'error'    => $error,
+            'error' => $error,
         ]);
     }
 }

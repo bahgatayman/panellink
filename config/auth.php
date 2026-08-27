@@ -1,5 +1,8 @@
 <?php
 
+use App\Models\Admin;
+use App\Models\Owner;
+use App\Models\Staff;
 use App\Models\User;
 
 return [
@@ -52,6 +55,11 @@ return [
             'driver' => 'session',
             'provider' => 'admins',
         ],
+
+        'staff' => [
+            'driver' => 'session',
+            'provider' => 'staff',
+        ],
     ],
 
     /*
@@ -79,12 +87,17 @@ return [
 
         'owners' => [
             'driver' => 'eloquent',
-            'model' => App\Models\Owner::class,
+            'model' => Owner::class,
         ],
 
         'admins' => [
             'driver' => 'eloquent',
-            'model' => App\Models\Admin::class,
+            'model' => Admin::class,
+        ],
+
+        'staff' => [
+            'driver' => 'eloquent',
+            'model' => Staff::class,
         ],
     ],
 

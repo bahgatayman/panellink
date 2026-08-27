@@ -3,15 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Services\ActivityLogger;
+use App\Support\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class ProductController extends Controller
 {
+    public function __construct(private ActivityLogger $activityLogger) {}
+
     public function index(): View
     {
-        $products = Product::where('owner_id', auth('owner')->id())
+        $products = Product::where('owner_id', TenantContext::id())
             ->orderBy('name')
             ->paginate(15);
 
@@ -25,15 +29,17 @@ class ProductController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        if (! auth('owner')->user()->canAddMoreProducts()) {
+        if (! TenantContext::user()->canAddMoreProducts()) {
             return back()->withInput()->with('error', __('app.plan_limit.products'));
         }
 
         $data = $this->validateProduct($request);
 
-        Product::create(array_merge($data, [
-            'owner_id' => auth('owner')->id(),
+        $product = Product::create(array_merge($data, [
+            'owner_id' => TenantContext::id(),
         ]));
+
+        $this->activityLogger->log('product.created', $product, "Added product {$product->name}");
 
         return redirect('/products')->with('success', __('app.sales.product_created'));
     }
@@ -41,7 +47,7 @@ class ProductController extends Controller
     public function edit(int $id): View
     {
         $product = Product::where('id', $id)
-            ->where('owner_id', auth('owner')->id())
+            ->where('owner_id', TenantContext::id())
             ->firstOrFail();
 
         return view('sales.products.edit', compact('product'));
@@ -50,10 +56,12 @@ class ProductController extends Controller
     public function update(Request $request, int $id): RedirectResponse
     {
         $product = Product::where('id', $id)
-            ->where('owner_id', auth('owner')->id())
+            ->where('owner_id', TenantContext::id())
             ->firstOrFail();
 
         $product->update($this->validateProduct($request));
+
+        $this->activityLogger->log('product.updated', $product, "Updated product {$product->name}");
 
         return redirect('/products')->with('success', __('app.sales.product_updated'));
     }
@@ -61,8 +69,10 @@ class ProductController extends Controller
     public function destroy(int $id): RedirectResponse
     {
         $product = Product::where('id', $id)
-            ->where('owner_id', auth('owner')->id())
+            ->where('owner_id', TenantContext::id())
             ->firstOrFail();
+
+        $this->activityLogger->log('product.deleted', $product, "Deleted product {$product->name}");
 
         $product->delete();
 
@@ -72,10 +82,12 @@ class ProductController extends Controller
     public function toggleActive(int $id): RedirectResponse
     {
         $product = Product::where('id', $id)
-            ->where('owner_id', auth('owner')->id())
+            ->where('owner_id', TenantContext::id())
             ->firstOrFail();
 
         $product->update(['is_active' => ! $product->is_active]);
+
+        $this->activityLogger->log('product.toggled', $product, "{$product->name} ".($product->is_active ? 'activated' : 'deactivated'));
 
         return back()->with('success', __('app.sales.product_updated'));
     }

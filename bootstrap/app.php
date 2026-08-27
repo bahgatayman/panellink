@@ -1,5 +1,10 @@
 <?php
 
+use App\Http\Middleware\CheckFeature;
+use App\Http\Middleware\CheckPermission;
+use App\Http\Middleware\CheckStaffActive;
+use App\Http\Middleware\CheckSubscription;
+use App\Http\Middleware\SetLocale;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -13,12 +18,14 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web([
-            \App\Http\Middleware\SetLocale::class,
+            SetLocale::class,
         ]);
 
         $middleware->alias([
-            'subscription.active' => \App\Http\Middleware\CheckSubscription::class,
-            'feature'             => \App\Http\Middleware\CheckFeature::class,
+            'subscription.active' => CheckSubscription::class,
+            'feature' => CheckFeature::class,
+            'staff.active' => CheckStaffActive::class,
+            'permission' => CheckPermission::class,
         ]);
 
         // Single sign-in page for every guard.
