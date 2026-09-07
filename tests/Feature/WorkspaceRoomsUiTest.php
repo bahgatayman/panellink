@@ -62,6 +62,6 @@ class WorkspaceRoomsUiTest extends TestCase
         $this->withSession(['locale' => 'ar'])
             ->actingAs($o,'owner')->get(route('workspaces.show', $ws))
             ->assertOk()
-            ->assertSee('مكتب خاص');
+            ->assertSee('مكتب');
     }
 }

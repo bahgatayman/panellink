@@ -822,6 +822,11 @@ return [
         'open_room' => 'Open room',
         'type_change_blocked_open_session' => 'This room has an open shared session. Close it before changing the room type.',
         'capacity_below_committed_usage' => 'Capacity cannot go below :count, the largest committed usage already booked or currently occupied for this room.',
+
+        // Shared-room session billing
+        'billing_unit' => 'Session billing',
+        'billing_unit_block_hint' => 'Customers are charged for each full block they start, even if they leave early.',
+        'billing_example' => 'e.g. :minutes minutes → ج.م :price',
     ],
 
     /*
@@ -833,7 +838,19 @@ return [
         'meeting' => 'Meeting Room',
         'training' => 'Training Room',
         'shared' => 'Shared Space',
-        'office' => 'Private Office',
+        'office' => 'Office',
+        'studio' => 'Studio',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Shared-room session billing units
+    |--------------------------------------------------------------------------
+    */
+    'billing_unit' => [
+        'minute' => 'Per minute',
+        'half_hour' => 'Per 30 minutes',
+        'hour' => 'Per hour',
     ],
 
     /*
@@ -927,6 +944,12 @@ return [
         'party_of' => 'party of :count',
         'capacity_hint' => 'Room capacity = number of seats available for shared sessions.',
         'outside_working_hours' => 'This time falls outside your configured working hours.',
+        'used_vs_billed' => ':used used · billed :billed',
+        'billed_per' => [
+            'minute' => 'Billed per minute',
+            'half_hour' => 'Billed per 30 minutes',
+            'hour' => 'Billed per hour',
+        ],
     ],
 
     /*

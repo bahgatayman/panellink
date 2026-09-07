@@ -80,8 +80,10 @@
                     </thead>
                     <tbody>
                         @foreach ($openSessions as $session)
+                        @php $billingUnit = $session->billing_unit ?? 'minute'; @endphp
                         <tr data-opened-at="{{ $session->opened_at->toIso8601String() }}"
-                            data-price-per-hour="{{ $session->room->price_per_hour }}">
+                            data-price-per-hour="{{ $session->billed_price_per_hour ?? $session->room->price_per_hour }}"
+                            data-billing-unit="{{ $billingUnit }}">
                             <td class="px-4 py-3 font-medium text-gray-900">
                                 {{ $session->hotspotUser->name }}
                                 @if ($session->party_size > 1)
@@ -96,7 +98,13 @@
                             <td class="px-4 py-3 whitespace-nowrap">{{ $session->session_date?->format('M d') ?? $session->opened_at->format('M d') }}</td>
                             <td class="px-4 py-3 whitespace-nowrap">{{ $session->opened_at->format('h:i A') }}</td>
                             <td class="px-4 py-3 font-medium"><span class="duration-display">--</span></td>
-                            <td class="px-4 py-3 font-medium text-blue-700"><span class="price-display">--</span></td>
+                            <td class="px-4 py-3 font-medium text-blue-700">
+                                @if ($billingUnit === 'minute')
+                                    <span class="price-display">--</span>
+                                @else
+                                    <span class="text-xs font-medium text-gray-500">{{ __('app.session.billed_per.'.$billingUnit) }}</span>
+                                @endif
+                            </td>
                             <td class="px-4 py-3">
                                 <button onclick="openCloseModal({{ $session->id }})"
                                     class="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1.5 rounded-lg text-sm font-medium">
@@ -139,6 +147,10 @@
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-500">{{ __('app.session.duration') }}</span>
                         <span id="modal-duration" class="font-medium text-gray-900"></span>
+                    </div>
+                    <div id="modal-billed-row" class="flex justify-between text-sm hidden">
+                        <span class="text-gray-500"></span>
+                        <span id="modal-billed" class="text-xs text-amber-600"></span>
                     </div>
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-500">{{ __('app.session.rate') }}</span>
@@ -217,10 +229,20 @@
             const h         = Math.floor(diffMins / 60);
             const m         = diffMins % 60;
             const duration  = (h > 0 ? h + 'h ' : '') + m + 'm';
+            el.querySelector('.duration-display').textContent = duration;
+
+            // Only a continuously-billed (per-minute) room gets a live running
+            // total — a block-billed room shows a static "Billed per X" label
+            // instead (rendered server-side), since a smoothly climbing number
+            // would visibly disagree with the real close price at every block
+            // boundary. The authoritative price always comes from the close
+            // preview regardless.
+            if (el.dataset.billingUnit !== 'minute') return;
+            const priceDisplay = el.querySelector('.price-display');
+            if (!priceDisplay) return;
             const priceHour = parseFloat(el.dataset.pricePerHour);
             const price     = ((diffMins / 60) * priceHour).toFixed(2);
-            el.querySelector('.duration-display').textContent = duration;
-            el.querySelector('.price-display').textContent    = 'ج.م ' + price;
+            priceDisplay.textContent = 'ج.م ' + price;
         });
     }
     updateDurations();
@@ -229,7 +251,8 @@
     let currentSessionId  = null;
     let currentCloseData  = null;
 
-    const SALES_ENABLED = @json($canSell);
+    const SALES_ENABLED     = @json($canSell);
+    const USED_VS_BILLED    = @json(__('app.session.used_vs_billed'));
 
     function openCloseModal(sessionId) {
         currentSessionId = sessionId;
@@ -265,6 +288,18 @@
         document.getElementById('modal-duration').textContent = data.duration;
         document.getElementById('modal-rate').textContent     = 'ج.م ' + data.price_per_hour + ' / hr';
         document.getElementById('modal-total').textContent    = 'ج.م ' + data.total_price;
+
+        // Only shown when block billing rounded the charge up past the time
+        // actually used — a session billed exactly what it used has nothing
+        // to clarify here.
+        const billedRow = document.getElementById('modal-billed-row');
+        if (data.billed_duration) {
+            document.getElementById('modal-billed').textContent =
+                USED_VS_BILLED.replace(':used', data.duration).replace(':billed', data.billed_duration);
+            billedRow.classList.remove('hidden');
+        } else {
+            billedRow.classList.add('hidden');
+        }
 
         if (SALES_ENABLED) {
             document.getElementById('modal-items-total').textContent = 'ج.م ' + data.items_total;

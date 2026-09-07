@@ -13,6 +13,7 @@ use App\Services\ActivityLogger;
 use App\Services\AvailabilityService;
 use App\Services\BusinessHoursService;
 use App\Services\SalesService;
+use App\Services\SharedSessionBillingService;
 use App\Support\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -23,7 +24,10 @@ use Illuminate\View\View;
 
 class SharedSessionController extends Controller
 {
-    public function __construct(private ActivityLogger $activityLogger) {}
+    public function __construct(
+        private ActivityLogger $activityLogger,
+        private SharedSessionBillingService $billing,
+    ) {}
 
     public function index(): View
     {
@@ -130,6 +134,10 @@ class SharedSessionController extends Controller
 
                 $openedAt = Carbon::parse($request->session_date.' '.$request->start_time);
 
+                // Snapshotted from the room now, at open time — never read live
+                // from the room again for this session. Without this, an Owner
+                // changing the room's billing_unit or price_per_hour while this
+                // session is already open would silently change its final bill.
                 SharedSession::create([
                     'owner_id' => $ownerId,
                     'room_id' => $room->id,
@@ -139,6 +147,8 @@ class SharedSessionController extends Controller
                     'start_time' => $request->start_time,
                     'opened_at' => $openedAt,
                     'status' => 'open',
+                    'billing_unit' => $room->billing_unit,
+                    'billed_price_per_hour' => $room->price_per_hour,
                 ]);
 
                 if ($availability->usedCapacityNow($room) > $room->effectiveCapacity()) {
@@ -174,16 +184,22 @@ class SharedSessionController extends Controller
             ->firstOrFail();
 
         $closedAt = now();
-        $totalMinutes = round($session->opened_at->diffInSeconds($closedAt) / 60, 2);
-        $totalHours = round($totalMinutes / 60, 4);
-        $totalPrice = round($totalHours * $session->room->price_per_hour, 2);
+        $billingUnit = $session->billing_unit ?? 'minute';
+        $pricePerHour = (float) ($session->billed_price_per_hour ?? $session->room->price_per_hour);
 
-        $h = intdiv((int) $totalMinutes, 60);
-        $m = (int) $totalMinutes % 60;
-        $duration = ($h > 0 ? $h.'h ' : '').$m.'m';
+        $billed = $this->billing->calculate($session->opened_at, $closedAt, $billingUnit, $pricePerHour);
+
+        $duration = $this->formatMinutes($billed['total_minutes']);
+
+        // Only shown when the billed time actually differs from the time
+        // used (block billing rounded up) — a session billed exactly what it
+        // used has nothing to clarify.
+        $billedDuration = abs($billed['total_minutes'] - $billed['billed_minutes']) > 0.01
+            ? $this->formatMinutes($billed['billed_minutes'])
+            : null;
 
         $itemsTotal = (float) ($session->sale?->total ?? 0);
-        $grandTotal = round($totalPrice + $itemsTotal, 2);
+        $grandTotal = round($billed['total_price'] + $itemsTotal, 2);
 
         return response()->json([
             'session_id' => $session->id,
@@ -195,10 +211,11 @@ class SharedSessionController extends Controller
             'end_time' => $closedAt->format('h:i A'),
             'closed_at_datetime' => $closedAt->toDateTimeString(),
             'duration' => $duration,
-            'total_minutes' => $totalMinutes,
-            'price_per_hour' => number_format($session->room->price_per_hour, 2),
-            'total_price' => number_format($totalPrice, 2),
-            'total_price_raw' => $totalPrice,
+            'billed_duration' => $billedDuration,
+            'total_minutes' => $billed['total_minutes'],
+            'price_per_hour' => number_format($pricePerHour, 2),
+            'total_price' => number_format($billed['total_price'], 2),
+            'total_price_raw' => $billed['total_price'],
             'items' => $this->itemsPayload($session),
             'items_total' => number_format($itemsTotal, 2),
             'grand_total' => number_format($grandTotal, 2),
@@ -257,6 +274,15 @@ class SharedSessionController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /** 'Xh Ym' for a fractional-minutes value, used by both the actual and billed duration strings. */
+    private function formatMinutes(float $minutes): string
+    {
+        $h = intdiv((int) $minutes, 60);
+        $m = (int) $minutes % 60;
+
+        return ($h > 0 ? $h.'h ' : '').$m.'m';
+    }
+
     /** Serialise the tab's line items for the close modal. */
     private function itemsPayload(SharedSession $session): array
     {
@@ -310,11 +336,13 @@ class SharedSessionController extends Controller
                 ->with(['room', 'hotspotUser', 'sale'])
                 ->firstOrFail();
 
-            // Same precision as closePreview() — the two must never disagree on
-            // what a session is about to cost.
-            $totalMinutes = round($session->opened_at->diffInSeconds($closedAt) / 60, 2);
-            $totalHours = round($totalMinutes / 60, 4);
-            $totalPrice = round($totalHours * $session->room->price_per_hour, 2);
+            // Same service (and the same snapshotted billing_unit/
+            // billed_price_per_hour) as closePreview() — the two must never
+            // disagree on what a session is about to cost.
+            $billingUnit = $session->billing_unit ?? 'minute';
+            $pricePerHour = (float) ($session->billed_price_per_hour ?? $session->room->price_per_hour);
+            $billed = $this->billing->calculate($session->opened_at, $closedAt, $billingUnit, $pricePerHour);
+            $totalHours = round($billed['billed_minutes'] / 60, 4);
 
             $booking = Booking::create([
                 'owner_id' => $ownerId,
@@ -324,16 +352,16 @@ class SharedSessionController extends Controller
                 'booking_date' => $session->session_date,
                 'start_time' => $session->start_time,
                 'end_time' => $closedAt->format('H:i'),
-                'price_per_hour' => $session->room->price_per_hour,
+                'price_per_hour' => $pricePerHour,
                 'total_hours' => $totalHours,
-                'total_price' => $totalPrice,
+                'total_price' => $billed['total_price'],
                 'status' => 'completed',
                 'notes' => 'Auto-created from shared session.',
             ]);
 
             $session->update([
-                'total_minutes' => $totalMinutes,
-                'total_price' => $totalPrice,
+                'total_minutes' => $billed['total_minutes'],
+                'total_price' => $billed['total_price'],
                 'booking_id' => $booking->id,
             ]);
 
@@ -342,7 +370,7 @@ class SharedSessionController extends Controller
                 $sales->transferToBooking($session->sale, $booking);
             }
 
-            $grandTotal = $totalPrice + (float) ($session->sale?->total ?? 0);
+            $grandTotal = $billed['total_price'] + (float) ($session->sale?->total ?? 0);
 
             $this->activityLogger->log('shared_session.closed', $session, "Closed session #{$session->id}, total ج.م ".number_format($grandTotal, 2));
 

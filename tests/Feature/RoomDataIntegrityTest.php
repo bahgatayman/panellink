@@ -356,4 +356,57 @@ class RoomDataIntegrityTest extends TestCase
         // Capacity is decorative for exclusive rooms — effectiveCapacity() stays 1 regardless.
         $this->assertSame(1, $fresh->effectiveCapacity());
     }
+
+    public function test_a_studio_room_can_be_created(): void
+    {
+        $owner = $this->owner();
+        $workspace = $this->workspace($owner);
+
+        $response = $this->actingAs($owner, 'owner')
+            ->post("/workspaces/{$workspace->id}/rooms", [
+                'name' => 'Podcast Studio', 'type' => 'studio', 'capacity' => 1,
+                'price_per_hour' => '150', 'description' => null,
+            ]);
+
+        $response->assertRedirect()->assertSessionHas('success');
+        $room = Room::where('owner_id', $owner->id)->where('name', 'Podcast Studio')->firstOrFail();
+        $this->assertSame('studio', $room->type);
+        // Studio is booking-only (like meeting/training/office) — never shared.
+        $this->assertFalse($room->isShared());
+        $this->assertSame(1, $room->effectiveCapacity());
+    }
+
+    public function test_billing_unit_defaults_to_minute_for_non_shared_room_types_regardless_of_submitted_value(): void
+    {
+        $owner = $this->owner();
+        $workspace = $this->workspace($owner);
+
+        // A billing_unit submitted for a non-shared type must never stick —
+        // the field isn't even shown for these types in the UI.
+        $response = $this->actingAs($owner, 'owner')
+            ->post("/workspaces/{$workspace->id}/rooms", [
+                'name' => 'Meeting A', 'type' => 'meeting', 'capacity' => 1,
+                'price_per_hour' => '100', 'billing_unit' => 'hour', 'description' => null,
+            ]);
+
+        $response->assertRedirect()->assertSessionHas('success');
+        $room = Room::where('owner_id', $owner->id)->where('name', 'Meeting A')->firstOrFail();
+        $this->assertSame('minute', $room->billing_unit);
+    }
+
+    public function test_shared_room_can_be_created_with_block_billing(): void
+    {
+        $owner = $this->owner();
+        $workspace = $this->workspace($owner);
+
+        $response = $this->actingAs($owner, 'owner')
+            ->post("/workspaces/{$workspace->id}/rooms", [
+                'name' => 'Lounge', 'type' => 'shared', 'capacity' => 8,
+                'price_per_hour' => '60', 'billing_unit' => 'half_hour', 'description' => null,
+            ]);
+
+        $response->assertRedirect()->assertSessionHas('success');
+        $room = Room::where('owner_id', $owner->id)->where('name', 'Lounge')->firstOrFail();
+        $this->assertSame('half_hour', $room->billing_unit);
+    }
 }

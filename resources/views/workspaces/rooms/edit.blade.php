@@ -29,7 +29,7 @@
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('app.workspace.type') }} <span class="text-red-500">*</span></label>
-                        <select name="type" required
+                        <select name="type" id="room_type" required
                             class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             @foreach($roomTypes as $key => $label)
                                 <option value="{{ $key }}" {{ old('type', $room->type) === $key ? 'selected' : '' }}>{{ $label }}</option>
@@ -50,10 +50,29 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('app.workspace.price_per_hour') }} <span class="text-red-500">*</span></label>
                         <div class="relative">
                             <span class="absolute left-3 top-2 text-gray-500">ج.م</span>
-                            <input type="number" name="price_per_hour" value="{{ old('price_per_hour', $room->price_per_hour) }}" step="0.01" min="0" required
+                            <input type="number" name="price_per_hour" id="price_per_hour" value="{{ old('price_per_hour', $room->price_per_hour) }}" step="0.01" min="0" required
                                 class="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
                         @error('price_per_hour') <p class="text-xs text-red-500 mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div id="billing-unit-field" class="hidden">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ __('app.workspace.billing_unit') }}</label>
+                        <div class="space-y-2">
+                            @foreach(['minute' => 1, 'half_hour' => 30, 'hour' => 60] as $unitKey => $unitMinutes)
+                                <label class="flex items-start gap-2 border border-gray-200 rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-50">
+                                    <input type="radio" name="billing_unit" value="{{ $unitKey }}"
+                                        class="billing-unit-radio mt-0.5 text-blue-600 focus:ring-blue-500"
+                                        {{ old('billing_unit', $room->billing_unit ?? 'minute') === $unitKey ? 'checked' : '' }}>
+                                    <span class="text-sm">
+                                        <span class="block font-medium text-gray-800">{{ __('app.billing_unit.'.$unitKey) }}</span>
+                                        <span class="block text-xs text-gray-500 billing-example" data-unit-minutes="{{ $unitMinutes }}">&nbsp;</span>
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                        <p class="text-xs text-gray-400 mt-2">{{ __('app.workspace.billing_unit_block_hint') }}</p>
+                        @error('billing_unit') <p class="text-xs text-red-500 mt-1">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
@@ -75,4 +94,38 @@
             </form>
         </div>
     </div>
+
+    <script>
+    (function () {
+        const typeSelect = document.getElementById('room_type');
+        const priceInput = document.getElementById('price_per_hour');
+        const billingField = document.getElementById('billing-unit-field');
+        const exampleTemplate = @json(__('app.workspace.billing_example'));
+        const EXAMPLE_MINUTES = 10;
+
+        function toggleBillingField() {
+            billingField.classList.toggle('hidden', typeSelect.value !== 'shared');
+        }
+
+        // Charging every started block, rounded up — mirrors
+        // SharedSessionBillingService::calculate() exactly, just for a fixed
+        // 10-minute example so the owner sees the real consequence of each
+        // choice before saving.
+        function updateExamples() {
+            const price = parseFloat(priceInput.value) || 100;
+            document.querySelectorAll('.billing-example').forEach(el => {
+                const unitMinutes = parseInt(el.dataset.unitMinutes, 10);
+                const blocks = Math.ceil(EXAMPLE_MINUTES / unitMinutes);
+                const total = (blocks * unitMinutes / 60) * price;
+                el.textContent = exampleTemplate.replace(':minutes', EXAMPLE_MINUTES).replace(':price', total.toFixed(2));
+            });
+        }
+
+        typeSelect.addEventListener('change', toggleBillingField);
+        priceInput.addEventListener('input', updateExamples);
+
+        toggleBillingField();
+        updateExamples();
+    })();
+    </script>
 @endsection

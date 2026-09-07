@@ -127,7 +127,14 @@ return [
         'meeting' => 'غرفة اجتماعات',
         'training' => 'قاعة تدريب',
         'shared' => 'مساحة مشتركة',
-        'office' => 'مكتب خاص',
+        'office' => 'مكتب',
+        'studio' => 'استوديو',
+    ],
+
+    'billing_unit' => [
+        'minute' => 'بالدقيقة',
+        'half_hour' => 'كل 30 دقيقة',
+        'hour' => 'بالساعة',
     ],
 
     'plan_limit' => [
@@ -716,6 +723,11 @@ return [
         'mark_unavailable' => 'تعيين كغير متاح',
         'capacity_label' => 'السعة:',
         'price_suffix' => '/ ساعة',
+
+        // Shared-room session billing
+        'billing_unit' => 'طريقة احتساب الجلسة',
+        'billing_unit_block_hint' => 'يُحاسب العميل عن كل فترة كاملة يبدأها، حتى لو غادر مبكرًا.',
+        'billing_example' => 'مثال: :minutes دقيقة ← ج.م :price',
     ],
 
     'booking' => [
@@ -796,6 +808,12 @@ return [
         'party_of' => 'مجموعة من :count',
         'capacity_hint' => 'سعة الغرفة = عدد المقاعد المتاحة للجلسات المشتركة.',
         'outside_working_hours' => 'هذا الوقت يقع خارج ساعات العمل المحددة.',
+        'used_vs_billed' => ':used مستخدمة · محسوبة :billed',
+        'billed_per' => [
+            'minute' => 'يُحاسب بالدقيقة',
+            'half_hour' => 'يُحاسب كل 30 دقيقة',
+            'hour' => 'يُحاسب بالساعة',
+        ],
     ],
 
     'user' => [

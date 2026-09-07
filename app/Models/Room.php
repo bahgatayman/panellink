@@ -19,6 +19,7 @@ class Room extends Model
         'type',
         'capacity',
         'price_per_hour',
+        'billing_unit',
         'description',
         'is_available',
     ];
@@ -83,6 +84,7 @@ class Room extends Model
             'training' => 'purple',
             'shared' => 'green',
             'office' => 'orange',
+            'studio' => 'pink',
             default => 'gray',
         };
     }
@@ -90,6 +92,14 @@ class Room extends Model
     public function isShared(): bool
     {
         return $this->type === 'shared';
+    }
+
+    /** Bilingual label for this room's session-billing rule; unknown values fall back to the raw value. */
+    public function billingUnitLabel(): string
+    {
+        $key = 'app.billing_unit.'.$this->billing_unit;
+
+        return Lang::has($key) ? __($key) : ucfirst((string) $this->billing_unit);
     }
 
     /**
