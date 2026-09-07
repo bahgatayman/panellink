@@ -1039,6 +1039,8 @@ return [
     |--------------------------------------------------------------------------
     */
     'landing' => [
+        'skip_to_content' => 'Skip to content',
+        'toggle_menu' => 'Toggle menu',
         'product' => 'Product',
         'how_it_works' => 'How It Works',
         'pricing' => 'Pricing',
@@ -1048,7 +1050,6 @@ return [
         'run_your_space' => 'Run Your Coworking Space',
         'from_one_place' => 'From One Place',
         'hero_description' => 'Manage your coworking space, internet users, and room bookings all from a single dashboard.',
-        'hero_badge' => 'Wi-Fi · Rooms · Bookings — unified',
         'hero_visual_alt' => 'Link Space Panel managing a coworking space',
         'chip_live' => 'Live now',
         'chip_online' => 'online',
@@ -1119,6 +1120,7 @@ return [
         'no_credit_card_needed' => 'No Credit Card Needed',
         'footer_text' => 'Link Space Panel — All-in-one coworking management platform.',
         'all_rights_reserved' => 'All rights reserved.',
+        'request_demo' => 'Request a Demo',
         'demo_modal_title' => 'Request a Demo',
         'demo_modal_subtitle' => 'Fill in the form and we\'ll get back to you within 24 hours.',
         'your_full_name' => 'Your Full Name',

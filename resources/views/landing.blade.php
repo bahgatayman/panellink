@@ -96,6 +96,7 @@
         .cta-btn {
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 8px;
             padding: 14px 28px;
             border-radius: 12px;
@@ -105,6 +106,8 @@
             cursor: pointer;
             border: none;
         }
+        .cta-btn:active { transform: translateY(0) scale(0.98); }
+        .cta-btn:focus-visible { outline: 2px solid #6f96d1; outline-offset: 2px; }
         .cta-primary {
             background: #163c85;
             color: white;
@@ -112,15 +115,15 @@
         }
         .cta-primary:hover {
             background: #123068;
-            box-shadow: 0 8px 24px -4px rgba(22, 60, 133, 0.3);
-            transform: translateY(-1px);
+            box-shadow: 0 10px 28px -6px rgba(22, 60, 133, 0.4);
+            transform: translateY(-2px);
         }
         .cta-secondary {
             background: white;
             color: #1c1917;
             border: 1px solid #e7e5e4;
         }
-        .cta-secondary:hover { border-color: #b0c6e6; box-shadow: 0 4px 16px -4px rgba(0,0,0,0.06); transform: translateY(-1px); }
+        .cta-secondary:hover { border-color: #b0c6e6; color: #163c85; box-shadow: 0 8px 24px -6px rgba(0,0,0,0.08); transform: translateY(-2px); }
 
         .pricing-card {
             background: white;
@@ -145,6 +148,11 @@
 
         /* Nav elevation on scroll */
         nav.nav-scrolled { box-shadow: 0 6px 24px -14px rgba(28, 25, 23, 0.22); }
+
+        /* Scroll-spy active nav link — a dedicated class rather than juggling
+           Tailwind color utilities, since desktop and mobile nav links start
+           from different base colors (surface-500 vs surface-600). */
+        [data-nav-link].nav-active { color: #123068; }
 
         .modal-overlay { background: rgba(28, 25, 23, 0.5); backdrop-filter: blur(8px); }
 
@@ -178,7 +186,14 @@
         .scroll-cue { animation: cueBounce 2s ease-in-out infinite; }
 
         @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
             .hero-glow.g1, .hero-glow.g2, .scroll-cue { animation: none; }
+            .fade-in { transition: opacity 0.3s ease; transform: none !important; }
+            .cta-primary:hover, .cta-secondary:hover, .cta-btn:active,
+            .product-screen:hover, .flow-step:hover, .pricing-card:hover,
+            .pricing-card.featured, .pricing-card.featured:hover {
+                transform: none !important;
+            }
         }
 
         @media (max-width: 640px) {
@@ -187,6 +202,8 @@
     </style>
 </head>
 <body>
+
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 {{ $isRtl ? 'focus:right-3' : 'focus:left-3' }} focus:z-[100] focus:bg-white focus:text-brand-700 focus:font-semibold focus:text-sm focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-lg">{{ __('app.landing.skip_to_content') }}</a>
 
     <!-- Fixed real workspace photo behind every section -->
     <div class="page-bg" aria-hidden="true"></div>
@@ -204,11 +221,11 @@
                 </a>
 
                 <div class="hidden sm:flex items-center gap-8">
-                    <a href="#product" class="text-sm font-medium text-surface-500 hover:text-surface-900 transition">{{ __('app.landing.product') }}</a>
-                    <a href="#how-it-works" class="text-sm font-medium text-surface-500 hover:text-surface-900 transition">{{ __('app.landing.how_it_works') }}</a>
-                    <a href="#pricing" class="text-sm font-medium text-surface-500 hover:text-surface-900 transition">{{ __('app.landing.pricing') }}</a>
+                    <a href="#product" data-nav-link class="text-sm font-medium text-surface-500 hover:text-surface-900 transition">{{ __('app.landing.product') }}</a>
+                    <a href="#how-it-works" data-nav-link class="text-sm font-medium text-surface-500 hover:text-surface-900 transition">{{ __('app.landing.how_it_works') }}</a>
+                    <a href="#pricing" data-nav-link class="text-sm font-medium text-surface-500 hover:text-surface-900 transition">{{ __('app.landing.pricing') }}</a>
                     <a href="/login" class="text-sm font-medium text-surface-500 hover:text-surface-900 transition">{{ __('app.landing.sign_in') }}</a>
-                    <a href="/register" class="cta-primary !py-2.5 !px-5 text-sm">{{ __('app.landing.get_started') }}</a>
+                    <a href="/register" class="cta-btn cta-primary !py-2.5 !px-5 text-sm">{{ __('app.landing.get_started') }}</a>
                     <form method="POST" action="{{ route('language.switch', $isRtl ? 'en' : 'ar') }}" class="flex items-center gap-1.5 ml-2">
                         @csrf
                         <button type="submit" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none {{ $isRtl ? 'bg-brand-600' : 'bg-gray-300' }}" role="switch" aria-checked="{{ $isRtl ? 'true' : 'false' }}">
@@ -218,18 +235,19 @@
                     </form>
                 </div>
 
-                <button class="sm:hidden p-2 text-surface-600" onclick="toggleMobile()">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                <button id="mobile-menu-btn" class="sm:hidden p-2 text-surface-600" onclick="toggleMobile()" aria-expanded="false" aria-controls="mobile-menu" aria-label="{{ __('app.landing.toggle_menu') }}">
+                    <svg id="mobile-menu-icon-open" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    <svg id="mobile-menu-icon-close" class="w-5 h-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
         </div>
         <div id="mobile-menu" class="hidden sm:hidden border-t border-surface-100 bg-white">
             <div class="px-5 py-4 space-y-3">
-                <a href="#product" class="block text-sm font-medium text-surface-600 py-2">{{ __('app.landing.product') }}</a>
-                <a href="#how-it-works" class="block text-sm font-medium text-surface-600 py-2">{{ __('app.landing.how_it_works') }}</a>
-                <a href="#pricing" class="block text-sm font-medium text-surface-600 py-2">{{ __('app.landing.pricing') }}</a>
+                <a href="#product" data-nav-link class="block text-sm font-medium text-surface-600 py-2">{{ __('app.landing.product') }}</a>
+                <a href="#how-it-works" data-nav-link class="block text-sm font-medium text-surface-600 py-2">{{ __('app.landing.how_it_works') }}</a>
+                <a href="#pricing" data-nav-link class="block text-sm font-medium text-surface-600 py-2">{{ __('app.landing.pricing') }}</a>
                 <a href="/login" class="block text-sm font-medium text-brand-600 py-2">{{ __('app.landing.sign_in') }}</a>
-                <a href="/register" class="block w-full cta-primary justify-center text-sm">{{ __('app.landing.get_started') }}</a>
+                <a href="/register" class="block w-full cta-btn cta-primary text-sm">{{ __('app.landing.get_started') }}</a>
                 <form method="POST" action="{{ route('language.switch', $isRtl ? 'en' : 'ar') }}" class="flex items-center gap-1.5 pt-2">
                     @csrf
                     <button type="submit" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none {{ $isRtl ? 'bg-brand-600' : 'bg-gray-300' }}" role="switch" aria-checked="{{ $isRtl ? 'true' : 'false' }}">
@@ -241,6 +259,8 @@
         </div>
     </nav>
 
+    <main id="main-content">
+
     <!-- ═══════════════════════════════════════════
          IDENTITY SCREEN
          ═══════════════════════════════════════════ -->
@@ -250,14 +270,6 @@
         <div class="hero-glow g2 bg-brand-400/25" style="width:540px;height:540px;bottom:-180px;{{ $isRtl ? 'left' : 'right' }}:-150px;"></div>
 
         <div class="relative z-10 max-w-3xl mx-auto text-center">
-            <span class="inline-flex items-center gap-2 rounded-full bg-white/80 backdrop-blur border border-brand-100 px-3.5 py-1.5 mb-7 shadow-sm shadow-brand-500/5 fade-in">
-                <span class="relative flex h-2 w-2">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                </span>
-                <span class="text-xs font-semibold text-brand-700">{{ __('app.landing.hero_badge') }}</span>
-            </span>
-
             <h1 class="text-[clamp(2.5rem,6vw,4.5rem)] font-extrabold tracking-tight leading-[1.08] mb-6 fade-in">
                 <span class="text-surface-900">{{ __('app.landing.run_your_space') }}</span>
                 <br>
@@ -268,14 +280,49 @@
                 {{ __('app.landing.hero_description') }}
             </p>
 
-            <div class="flex flex-col sm:flex-row gap-3 justify-center mb-14 fade-in" style="transition-delay:0.15s">
-                <a href="/register" class="cta-primary justify-center">
+            <div class="flex flex-col sm:flex-row gap-3 justify-center mb-4 fade-in" style="transition-delay:0.15s">
+                <a href="/register" class="cta-btn cta-primary">
                     {{ __('app.landing.get_started') }}
                     <svg class="w-4 h-4 {{ $isRtl ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
                 </a>
-                <button onclick="document.getElementById('product').scrollIntoView({behavior:'smooth'})" class="cta-secondary justify-center bg-white/85 backdrop-blur">
+                <button onclick="document.getElementById('product').scrollIntoView({behavior:'smooth'})" class="cta-btn cta-secondary bg-white/85 backdrop-blur">
                     {{ __('app.landing.see_how_it_works') }}
                 </button>
+            </div>
+            <p class="text-xs text-surface-400 mb-12 fade-in" style="transition-delay:0.18s">{{ __('app.landing.no_credit_card_needed') }}</p>
+
+            <!-- Hero visual: an immediate, tangible glimpse of the product — the
+                 fuller, interactive version of this same data lives in the
+                 Dashboard Preview section further down the page. Purely
+                 decorative/illustrative, so it's exposed to assistive tech as
+                 one described image rather than a wall of unrelated numbers. -->
+            <div class="fade-in" style="transition-delay:0.22s" role="img" aria-label="{{ __('app.landing.hero_visual_alt') }}">
+                <div class="product-screen max-w-2xl mx-auto text-left">
+                    <div class="flex items-center gap-1.5 px-4 py-3 border-b border-surface-100">
+                        <span class="w-2.5 h-2.5 rounded-full bg-red-300"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-300"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-green-300"></span>
+                        <span class="ms-3 text-[0.65rem] font-medium text-surface-400 truncate">linkspace.app/dashboard</span>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 sm:p-5">
+                        <div class="mockup-stat text-center">
+                            <p class="text-[0.65rem] text-surface-400">Active Users</p>
+                            <p class="text-xl font-bold text-surface-900 mt-1">128</p>
+                        </div>
+                        <div class="mockup-stat text-center">
+                            <p class="text-[0.65rem] text-surface-400">Online Now</p>
+                            <p class="text-xl font-bold text-brand-600 mt-1">24</p>
+                        </div>
+                        <div class="mockup-stat text-center">
+                            <p class="text-[0.65rem] text-surface-400">Today's Bookings</p>
+                            <p class="text-xl font-bold text-amber-600 mt-1">8</p>
+                        </div>
+                        <div class="mockup-stat text-center">
+                            <p class="text-[0.65rem] text-surface-400">Month Revenue</p>
+                            <p class="text-xl font-bold text-green-600 mt-1">ج.م 3,240</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
         </div>
@@ -808,9 +855,9 @@
                             @endforeach
                         </ul>
                         @if(!empty($plan['href']))
-                            <a href="{{ $plan['href'] }}" class="w-full justify-center font-semibold {{ $feat ? 'inline-flex items-center bg-white text-brand-900 hover:bg-brand-50 rounded-xl px-4 py-3 transition' : 'cta-secondary' }}">{{ $plan['cta'] }}</a>
+                            <a href="{{ $plan['href'] }}" class="w-full font-semibold {{ $feat ? 'inline-flex items-center justify-center bg-white text-brand-900 hover:bg-brand-50 rounded-xl px-4 py-3 transition' : 'cta-btn cta-secondary' }}">{{ $plan['cta'] }}</a>
                         @else
-                            <button onclick="openDemoModal()" class="w-full justify-center font-semibold {{ $feat ? 'inline-flex items-center bg-white text-brand-900 hover:bg-brand-50 rounded-xl px-4 py-3 transition' : 'cta-secondary' }}">{{ $plan['cta'] }}</button>
+                            <button onclick="openDemoModal()" class="w-full font-semibold {{ $feat ? 'inline-flex items-center justify-center bg-white text-brand-900 hover:bg-brand-50 rounded-xl px-4 py-3 transition' : 'cta-btn cta-secondary' }}">{{ $plan['cta'] }}</button>
                         @endif
                     </div>
                 @endforeach
@@ -846,6 +893,8 @@
             </div>
         </div>
     </section>
+
+    </main>
 
     <!-- ═══════════════════════════════════════════
          FOOTER
@@ -932,7 +981,7 @@
                     <textarea name="message" rows="3" placeholder="{{ __('app.placeholder.space_description') }}"
                               class="w-full border border-surface-200 rounded-xl px-4 py-3 text-sm text-surface-900 placeholder-surface-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition"></textarea>
                 </div>
-                <button type="submit" class="w-full cta-primary justify-center !py-3.5">
+                <button type="submit" class="w-full cta-btn cta-primary !py-3.5">
                     {{ __('app.landing.send_request') }}
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                 </button>
@@ -980,9 +1029,27 @@
         document.addEventListener('click', e => { if (e.target.id === 'demo-modal') closeDemoModal(); });
 
         // Mobile menu
+        const mobileMenu       = document.getElementById('mobile-menu');
+        const mobileMenuBtn    = document.getElementById('mobile-menu-btn');
+        const mobileIconOpen   = document.getElementById('mobile-menu-icon-open');
+        const mobileIconClose  = document.getElementById('mobile-menu-icon-close');
+
         function toggleMobile() {
-            document.getElementById('mobile-menu').classList.toggle('hidden');
+            const willOpen = mobileMenu.classList.contains('hidden');
+            mobileMenu.classList.toggle('hidden');
+            mobileIconOpen.classList.toggle('hidden', willOpen);
+            mobileIconClose.classList.toggle('hidden', !willOpen);
+            mobileMenuBtn.setAttribute('aria-expanded', String(willOpen));
+            document.body.style.overflow = willOpen ? 'hidden' : '';
         }
+
+        // Tapping any link inside the mobile menu should close it — a plain
+        // anchor click otherwise leaves the menu open, covering the section
+        // it just scrolled the page to.
+        mobileMenu.addEventListener('click', e => { if (e.target.tagName === 'A') toggleMobile(); });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && !mobileMenu.classList.contains('hidden')) toggleMobile();
+        });
 
         // Scroll animations
         const observer = new IntersectionObserver((entries) => {
@@ -998,6 +1065,25 @@
             const onScroll = () => siteNav.classList.toggle('nav-scrolled', window.scrollY > 8);
             onScroll();
             window.addEventListener('scroll', onScroll, { passive: true });
+        }
+
+        // Scroll-spy: highlight whichever section's nav link matches what's
+        // currently in view, so a visitor scrolling a long one-page site
+        // always has a sense of where they are.
+        const navLinks = document.querySelectorAll('a[data-nav-link]');
+        const spySections = ['product', 'how-it-works', 'pricing']
+            .map(id => document.getElementById(id))
+            .filter(Boolean);
+        if (navLinks.length && spySections.length) {
+            const spyObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) return;
+                    navLinks.forEach(link => {
+                        link.classList.toggle('nav-active', link.getAttribute('href') === `#${entry.target.id}`);
+                    });
+                });
+            }, { rootMargin: '-45% 0px -50% 0px' });
+            spySections.forEach(section => spyObserver.observe(section));
         }
     </script>
 </body>
