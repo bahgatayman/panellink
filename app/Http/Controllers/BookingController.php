@@ -24,6 +24,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
 
 class BookingController extends Controller
@@ -85,12 +86,18 @@ class BookingController extends Controller
         ));
     }
 
-    public function store(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours, RoomPricingService $pricing): RedirectResponse
+    public function store(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours, RoomPricingService $pricing): RedirectResponse|JsonResponse
     {
         $owner = TenantContext::user();
+
+        // The quick-booking modal posts with Accept: application/json and needs
+        // a JSON answer; the full booking page keeps its redirect-with-flash.
+        $fail = fn (string $message) => $request->wantsJson()
+            ? response()->json(['success' => false, 'message' => $message], 422)
+            : back()->withInput()->with('error', $message);
         $ownerId = $owner->id;
 
-        $validated = $request->validate([
+        $rules = [
             'room_id' => 'required|exists:rooms,id',
             'hotspot_user_id' => 'required|exists:hotspot_users,id',
             'booking_date' => 'required|date|after_or_equal:today',
@@ -100,10 +107,22 @@ class BookingController extends Controller
             'guest_count' => 'nullable|integer|min:1|max:999',
             'amount_paid' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:500',
-        ]);
+        ];
+
+        // Web routes only render validation errors as JSON for api/* (bootstrap/app.php),
+        // so the modal gets them explicitly; the form keeps the redirect-with-errors.
+        if ($request->wantsJson()) {
+            $validator = Validator::make($request->all(), $rules);
+            if ($validator->fails()) {
+                return response()->json(['success' => false, 'message' => $validator->errors()->first(), 'errors' => $validator->errors()->toArray()], 422);
+            }
+            $validated = $validator->validated();
+        } else {
+            $validated = $request->validate($rules);
+        }
 
         if (! $businessHours->isWithinWorkingHours($owner, $validated['booking_date'], $validated['start_time'], $validated['end_time'])) {
-            return back()->withInput()->with('error', __('app.booking.outside_working_hours'));
+            return $fail(__('app.booking.outside_working_hours'));
         }
 
         $room = Room::where('id', $validated['room_id'])
@@ -135,7 +154,7 @@ class BookingController extends Controller
         $amountPaid = $room->isShared() ? 0.0 : round((float) ($validated['amount_paid'] ?? 0), 2);
 
         if ($amountPaid > $quote->totalPrice) {
-            return back()->withInput()->with('error', __('app.booking.payment.exceeds_total', ['total' => number_format($quote->totalPrice, 2)]));
+            return $fail(__('app.booking.payment.exceeds_total', ['total' => number_format($quote->totalPrice, 2)]));
         }
 
         try {
@@ -188,12 +207,20 @@ class BookingController extends Controller
         }
 
         if (! $booking) {
-            return back()->withInput()->with('error',
-                'This room is already booked for the selected time slot. Please choose a different time.');
+            return $fail('This room is already booked for the selected time slot. Please choose a different time.');
         }
 
         $paidNote = $amountPaid > 0 ? " (paid {$amountPaid})" : '';
         $this->activityLogger->log('booking.created', $booking, "Booked {$booking->room->name} for {$booking->booking_date->format('M d, Y')}{$paidNote}");
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'booking_id' => $booking->id,
+                'url' => "/bookings/{$booking->id}",
+                'message' => __('app.quick_booking.booked', ['name' => $hotspotUser->name, 'total' => Money::format((float) $booking->total_price)]),
+            ]);
+        }
 
         return redirect("/bookings/{$booking->id}")->with('success', 'Booking confirmed successfully.');
     }
@@ -791,6 +818,7 @@ class BookingController extends Controller
                 'price_per_hour_display' => Money::format((float) $room->price_per_hour),
                 'price_summary' => $room->pricingSummary(),
                 'pricing_model' => $room->pricingRules()->model,
+                'uses_people' => $room->pricingRules()->usesPeople(),
                 'total_hours' => $quote->totalHours(),
                 'total_price' => $quote->totalPrice,
                 'total_price_display' => Money::format($quote->totalPrice),

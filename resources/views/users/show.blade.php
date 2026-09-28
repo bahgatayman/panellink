@@ -65,7 +65,7 @@
                             </button>
                         </form>
                         @if ($owner->hasFeature('booking'))
-                            <a href="/bookings/create?hotspot_user_id={{ $user->id }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <a href="/bookings/create?hotspot_user_id={{ $user->id }}" data-book-name="{{ $user->name }}" data-book-phone="{{ $user->phone }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                 {{ __('app.booking.new_booking') }}
                             </a>
                         @endif
@@ -194,7 +194,7 @@
                     @if ($recentBookings->isEmpty())
                         <div class="px-5 lg:px-6 py-8 text-center">
                             <p class="text-sm text-gray-400">{{ __('app.empty.no_bookings') }}</p>
-                            <a href="/bookings/create?hotspot_user_id={{ $user->id }}" class="text-blue-600 hover:underline text-sm font-medium mt-2 inline-block">
+                            <a href="/bookings/create?hotspot_user_id={{ $user->id }}" data-book-name="{{ $user->name }}" data-book-phone="{{ $user->phone }}" class="text-blue-600 hover:underline text-sm font-medium mt-2 inline-block">
                                 {{ __('app.booking.new_booking') }}
                             </a>
                         </div>

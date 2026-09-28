@@ -258,5 +258,10 @@
         });
     });
     </script>
+
+    {{-- EXPERIMENT: quick booking modal (opens from any /bookings/create link). Remove to switch off. --}}
+    @if ($currentOwner->hasFeature('booking') && $can('bookings.create') && $can('bookings.view'))
+        @include('bookings._quick-modal')
+    @endif
 </body>
 </html>
