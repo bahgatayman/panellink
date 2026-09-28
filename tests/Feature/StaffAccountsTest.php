@@ -492,6 +492,36 @@ class StaffAccountsTest extends TestCase
         }
     }
 
+    /**
+     * Companion to the permissions-render test above: RoleSeeder (and its
+     * role->permissions sync) has the identical migrate-only-environment
+     * gap — it only ever ran via `db:seed`. An environment that only ran
+     * `migrate` had a completely EMPTY `roles` table, so the Staff form's
+     * Role dropdown had nothing in it at all. See database/migrations/
+     * 2026_09_29_000002_seed_system_roles_and_role_permissions.php.
+     */
+    public function test_all_system_roles_exist_with_their_full_permission_bundles(): void
+    {
+        $expectedCounts = ['receptionist' => 9, 'staff' => 11, 'manager' => 19];
+
+        $roles = Role::whereNull('owner_id')->get()->keyBy('key');
+
+        $this->assertEqualsCanonicalizing(array_keys($expectedCounts), $roles->keys()->all());
+
+        foreach ($expectedCounts as $key => $count) {
+            $this->assertTrue($roles[$key]->is_system);
+            $this->assertSame($count, $roles[$key]->permissions()->count(), "role '{$key}' permission count");
+        }
+
+        // Manager is a strict superset of Staff, which is a strict superset
+        // of Receptionist — matches RoleSeeder's array_merge() bundling.
+        $receptionistKeys = $roles['receptionist']->permissions->pluck('key');
+        $staffKeys = $roles['staff']->permissions->pluck('key');
+        $managerKeys = $roles['manager']->permissions->pluck('key');
+        $this->assertTrue($receptionistKeys->diff($staffKeys)->isEmpty());
+        $this->assertTrue($staffKeys->diff($managerKeys)->isEmpty());
+    }
+
     public function test_owner_can_create_edit_and_disable_a_staff_member_end_to_end(): void
     {
         $owner = $this->owner();
