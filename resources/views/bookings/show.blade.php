@@ -72,8 +72,13 @@
                         <dd class="text-gray-900 font-medium mt-1">{{ $booking->total_hours }} {{ __('app.common.hours') }}</dd>
                     </div>
                     <div>
-                        <dt class="text-gray-500">{{ __('app.workspace.price_per_hour') }}</dt>
-                        <dd class="text-gray-900 font-medium mt-1">ج.م {{ number_format($booking->price_per_hour, 2) }}</dd>
+                        @if ($booking->pricing_note)
+                            <dt class="text-gray-500">{{ __('app.pricing.applied') }}</dt>
+                            <dd class="text-gray-900 font-medium mt-1">{{ $booking->pricing_note }}</dd>
+                        @else
+                            <dt class="text-gray-500">{{ __('app.workspace.price_per_hour') }}</dt>
+                            <dd class="text-gray-900 font-medium mt-1">ج.م {{ number_format($booking->price_per_hour, 2) }}</dd>
+                        @endif
                     </div>
                     <div class="md:col-span-2">
                         <dt class="text-gray-500">{{ __('app.booking.total') }}</dt>

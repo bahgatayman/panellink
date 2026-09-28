@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\Room;
 use App\Models\SaleItem;
-use App\Services\SharedSessionBillingService;
+use App\Services\RoomPricingService;
 use App\Support\ActiveSessionsQuery;
 use App\Support\TenantContext;
 use Illuminate\Http\Request;
@@ -13,7 +13,7 @@ use Illuminate\View\View;
 
 class ActiveSessionController extends Controller
 {
-    public function index(Request $request, SharedSessionBillingService $billing): View
+    public function index(Request $request, RoomPricingService $pricing): View
     {
         $owner = TenantContext::user();
         $roomId = $request->get('room_id') ? (int) $request->get('room_id') : null;
@@ -68,16 +68,11 @@ class ActiveSessionController extends Controller
         }
 
         // Running-bill estimate for each open shared session, computed with the
-        // same billing service the close/preview endpoints use — display only,
+        // same pricing service the close/preview endpoints use — display only,
         // the authoritative charge is still computed at close time.
         $now = now();
         $estimates = $allSessions->filter(fn ($row) => $row->isShared())
-            ->mapWithKeys(fn ($row) => [$row->model->id => $billing->calculate(
-                $row->model->opened_at,
-                $now,
-                $row->model->billing_unit ?? 'minute',
-                (float) ($row->model->billed_price_per_hour ?? $row->room->price_per_hour),
-            )['total_price']]);
+            ->mapWithKeys(fn ($row) => [$row->model->id => $pricing->quoteSession($row->model, $now)]);
 
         return view('active-sessions.index', [
             'sessions' => $sessions,

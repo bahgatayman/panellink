@@ -6,10 +6,12 @@ use App\Models\Room;
 use App\Models\Workspace;
 use App\Services\ActivityLogger;
 use App\Services\AvailabilityService;
+use App\Support\Pricing\PricingRules;
 use App\Support\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Lang;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class RoomController extends Controller
@@ -36,6 +38,30 @@ class RoomController extends Controller
         return Lang::get('app.room_type');
     }
 
+    /**
+     * Validate the Pricing section and fold it into the room attributes.
+     * pricing_model defaults to 'hourly' (a form or API client that never
+     * sends it keeps the original behaviour). A rule-based room keeps its
+     * last hourly price (or 0) in price_per_hour so switching back to hourly
+     * later restores it; open shared sessions are unaffected either way
+     * because they priced from a snapshot taken when they opened.
+     */
+    private function withPricing(array $data, ?Room $room = null): array
+    {
+        $model = $data['pricing_model'] ?? PricingRules::HOURLY;
+        [$rules, $errors] = PricingRules::fromInput($model, $data['pricing_rules'] ?? null);
+
+        if ($errors) {
+            throw ValidationException::withMessages(['pricing_rules' => $errors]);
+        }
+
+        $data['pricing_model'] = $model;
+        $data['pricing_rules'] = $rules->toArray();
+        $data['price_per_hour'] = $data['price_per_hour'] ?? $room?->price_per_hour ?? 0;
+
+        return $data;
+    }
+
     public function create(int $workspaceId): View
     {
         $workspace = $this->getWorkspace($workspaceId);
@@ -57,8 +83,10 @@ class RoomController extends Controller
             'name' => 'required|string|max:255',
             'type' => 'required|in:meeting,training,shared,office,studio',
             'capacity' => 'required|integer|min:1|max:999',
-            'price_per_hour' => 'required|numeric|min:0',
+            'price_per_hour' => 'required_unless:pricing_model,duration,people,people_duration|nullable|numeric|min:0',
             'billing_unit' => 'nullable|in:minute,half_hour,hour',
+            'pricing_model' => 'nullable|in:'.implode(',', PricingRules::MODELS),
+            'pricing_rules' => 'nullable|string|max:20000',
             'description' => 'nullable|string|max:1000',
         ]);
 
@@ -66,6 +94,7 @@ class RoomController extends Controller
         // type so a stray submitted value can never linger on a room the
         // billing-unit field isn't even shown for.
         $data['billing_unit'] = $data['type'] === 'shared' ? ($data['billing_unit'] ?? 'minute') : 'minute';
+        $data = $this->withPricing($data);
 
         $room = Room::create(array_merge($data, [
             'workspace_id' => $workspace->id,
@@ -97,12 +126,15 @@ class RoomController extends Controller
             'name' => 'required|string|max:255',
             'type' => 'required|in:meeting,training,shared,office,studio',
             'capacity' => 'required|integer|min:1|max:999',
-            'price_per_hour' => 'required|numeric|min:0',
+            'price_per_hour' => 'required_unless:pricing_model,duration,people,people_duration|nullable|numeric|min:0',
             'billing_unit' => 'nullable|in:minute,half_hour,hour',
+            'pricing_model' => 'nullable|in:'.implode(',', PricingRules::MODELS),
+            'pricing_rules' => 'nullable|string|max:20000',
             'description' => 'nullable|string|max:1000',
         ]);
 
         $data['billing_unit'] = $data['type'] === 'shared' ? ($data['billing_unit'] ?? 'minute') : 'minute';
+        $data = $this->withPricing($data, $room);
 
         // A type flip mid-occupancy is a bigger semantic break than a
         // capacity number changing, so it's blocked outright rather than

@@ -653,6 +653,71 @@ html[dir="rtl"] .ls-qa { font-family: var(--ls-font-ar); }
 .ls-session-foot .ls-btn--tonal, .ls-session-foot .ls-btn--primary { flex: 1; min-width: 0; }
 .ls-session-foot .ls-btn span { overflow: hidden; text-overflow: ellipsis; }
 
+/* ---------- 10a. Product cards (sales/products/index) ---------- */
+.ls-product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: var(--space-4); }
+.ls-product { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: var(--space-5); background: linear-gradient(180deg, var(--color-card-glow), transparent 80px), var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--ls-r-card); transition: border-color var(--ls-t-fast) var(--ls-ease), box-shadow var(--ls-t-med) var(--ls-ease); }
+.ls-product:hover { border-color: var(--color-border-hover); box-shadow: var(--shadow-hover); }
+.ls-product-top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.ls-product-icon { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none; }
+.ls-product-icon svg { width: 18px; height: 18px; }
+/* Product vs service is a category, so it gets a categorisation hue — never a status colour. */
+.ls-product-icon.is-product { background: var(--color-primary-soft); color: var(--color-primary-text); }
+.ls-product-icon.is-service { background: var(--color-violet-soft); color: var(--color-violet); }
+.ls-product-body { min-width: 0; }
+.ls-product-name { margin: 0; font-size: 15px; font-weight: var(--fw-strong); color: var(--color-text); line-height: 1.35; }
+.ls-product-meta { display: flex; gap: 6px; min-width: 0; margin-top: 2px; font-size: 13px; color: var(--color-text-muted); }
+.ls-product-price { font-size: 20px; font-weight: var(--fw-figure); letter-spacing: -.015em; font-variant-numeric: tabular-nums; color: var(--color-text); margin-top: auto; }
+.ls-product-foot { display: flex; align-items: center; gap: var(--space-1); padding-top: var(--space-3); border-top: 1px solid var(--color-border-subtle); }
+.ls-product-foot form { margin: 0; }
+.ls-product-delete { margin-inline-start: auto !important; }
+.ls-product.is-inactive .ls-product-name, .ls-product.is-inactive .ls-product-price { color: var(--color-text-secondary); }
+.ls-product.is-inactive .ls-product-icon { opacity: .6; }
+@media (max-width: 640px) { .ls-product-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-3); } .ls-product { padding: var(--space-4); } }
+
+/* ---------- 10b. Room pricing editor (workspaces/rooms/_pricing) ---------- */
+.ls-pricing { display: grid; gap: var(--space-4); padding-top: var(--space-5); border-top: 1px solid var(--color-border-subtle); }
+.ls-pricing-title { font-size: 15px; font-weight: var(--fw-strong); color: var(--color-text); margin: 0; }
+.ls-pricing-question { margin: calc(var(--space-3) * -1) 0 0; color: var(--color-text-secondary); font-size: 14px; }
+.ls-pricing-models { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+.ls-pricing-model { position: relative; display: grid; gap: 2px; padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border-strong); border-radius: var(--ls-r-card); background: var(--color-surface); cursor: pointer; transition: border-color var(--ls-t-fast) var(--ls-ease), background var(--ls-t-fast) var(--ls-ease), box-shadow var(--ls-t-fast) var(--ls-ease); }
+.ls-pricing-model:hover { border-color: var(--color-border-hover); }
+.ls-pricing-model input { position: absolute; opacity: 0; pointer-events: none; }
+.ls-pricing-model-title { font-weight: var(--fw-strong); font-size: 14px; color: var(--color-text); }
+.ls-pricing-model-desc { font-size: 12.5px; color: var(--color-text-muted); line-height: 1.4; }
+.ls-pricing-model:has(input:checked) { border-color: var(--color-accent); background: var(--color-surface-brand); box-shadow: inset 0 0 0 1px var(--color-accent); }
+.ls-pricing-model:has(input:checked) .ls-pricing-model-title { color: var(--color-primary-text); }
+.ls-pricing-model:has(input:focus-visible) { box-shadow: 0 0 0 3px var(--color-focus-ring), inset 0 0 0 1px var(--color-accent); }
+.ls-pricing-panel { display: grid; gap: var(--space-4); }
+.ls-input-affix { position: relative; }
+.ls-input-affix > span { position: absolute; inset-inline-start: var(--space-3); top: 50%; transform: translateY(-50%); font-size: 13px; color: var(--color-text-muted); pointer-events: none; }
+.ls-input-affix .ls-input { padding-inline-start: 48px; }
+.ls-pricing-units { display: grid; gap: var(--space-2); }
+.ls-pricing-unit { display: flex; gap: var(--space-2); align-items: flex-start; padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--ls-r-ctl); cursor: pointer; }
+.ls-pricing-unit b { display: block; font-weight: var(--fw-medium); font-size: 14px; }
+.ls-pricing-unit input { margin-top: 3px; accent-color: var(--color-primary); }
+.ls-pricing-dim { display: grid; gap: var(--space-2); }
+.ls-pricing-tokens { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ls-token { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 32px; padding-inline: var(--space-3) var(--space-1); border-radius: var(--ls-r-pill); background: var(--color-primary-soft); color: var(--color-primary-text); font-size: 13.5px; font-weight: var(--fw-medium); border: 0; white-space: nowrap; }
+.ls-token-x { width: 24px; height: 24px; border-radius: 50%; border: 0; background: transparent; color: inherit; display: grid; place-items: center; cursor: pointer; opacity: .75; }
+.ls-token-x:hover { opacity: 1; background: var(--color-primary-soft-hover); }
+.ls-token-x svg { width: 12px; height: 12px; }
+.ls-token--add { padding-inline: var(--space-3); background: transparent; color: var(--color-accent); border: 1px dashed var(--color-accent-border); cursor: pointer; font: var(--fw-medium) 13.5px var(--ls-font); }
+html[dir="rtl"] .ls-token--add { font-family: var(--ls-font-ar); }
+.ls-token--add:hover { background: var(--color-accent-soft); }
+.ls-pricing-add { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--ls-r-ctl); background: var(--color-surface-subtle); }
+.ls-pricing-add-row { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+.ls-pricing-add-row .ls-input { width: 120px; }
+.ls-pricing-grid-wrap { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--ls-r-card); }
+.ls-pricing-grid-wrap:empty { display: none; }
+.ls-price-grid { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.ls-price-grid th { text-align: start; font-weight: var(--fw-medium); color: var(--color-text-secondary); padding: var(--space-2) var(--space-3); white-space: nowrap; background: var(--color-surface-subtle); }
+.ls-price-grid thead th { font-size: 12.5px; color: var(--color-text-muted); border-bottom: 1px solid var(--color-border); }
+.ls-price-grid tbody th { position: sticky; inset-inline-start: 0; z-index: 1; color: var(--color-text); }
+.ls-price-grid td { padding: var(--space-2) var(--space-2); border-top: 1px solid var(--color-border-subtle); }
+.ls-price-grid tbody tr:first-child td { border-top: 0; }
+.ls-price-input { min-width: 96px; min-height: 36px; text-align: end; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .ls-pricing-models { grid-template-columns: 1fr; } }
+
 /* ---------- 11. Legacy bridge (unmigrated Tailwind views inside the shell) ---------- */
 .ls-main .border-gray-100 { border-color: var(--color-border); }
 .ls-main .rounded-2xl.shadow-sm, .ls-main .rounded-xl.shadow-sm { box-shadow: none; }

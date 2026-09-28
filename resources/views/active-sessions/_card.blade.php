@@ -31,9 +31,14 @@
         .' '.str_pad((string) $elapsedS, 2, '0', STR_PAD_LEFT).__('app.ui.unit_s');
 
     if ($isShared) {
+        // $estimate: the RoomPricingService quote for "now" (the same service
+        // closePreview()/close() charge with). Only a price that's linear in
+        // time gets a live per-second ticker; package prices change in steps,
+        // so they show the server figure until the next refresh.
         $unit = $model->billing_unit ?? 'minute';
-        $rate = (float) ($model->billed_price_per_hour ?? $row->room->price_per_hour);
-        $roomCharge = (float) ($estimate ?? 0);
+        $rate = (float) ($estimate?->liveRatePerHour ?? 0);
+        $roomCharge = (float) ($estimate?->totalPrice ?? 0);
+        $billingLabel = $estimate?->note ?? __('app.session.billed_per.'.$unit);
         $endsAt = null;
         $endingSoon = false;
     } else {
@@ -44,7 +49,7 @@
         $endingSoon = now()->diffInMinutes($endsAt, false) <= 15;
     }
     $bill = round($roomCharge + $itemsTotal, 2);
-    $liveBill = $isShared && $unit === 'minute';
+    $liveBill = $isShared && $estimate?->liveRatePerHour !== null;
     $liveAttrs = $liveBill
         ? 'data-ls-since="'.$startedAt->toIso8601String().'" data-ls-rate="'.$rate.'" data-ls-extra="'.$itemsTotal.'"'
         : '';
@@ -102,7 +107,7 @@
                 {{ __('app.ui.sessions.since', ['time' => $startedAt->translatedFormat('g:i A')]) }} ·
                 {{ $row->isFromBooking() ? __('app.sales.from_booking', ['id' => str_pad($model->booking_id, 4, '0', STR_PAD_LEFT)]) : __('app.sales.walk_in') }}@if ($model->party_size > 1) · {{ __('app.session.party_of', ['count' => $model->party_size]) }}@endif
             </span>
-            <span class="ls-faint">{{ __('app.session.billed_per.'.$unit) }}</span>
+            <span class="ls-faint ls-trunc">{{ $billingLabel }}</span>
         </div>
     @else
         <div class="ls-session-timing">

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Services\RoomPricingService;
+use App\Support\Pricing\PricingRules;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,6 +22,8 @@ class Room extends Model
         'capacity',
         'price_per_hour',
         'billing_unit',
+        'pricing_model',
+        'pricing_rules',
         'description',
         'is_available',
     ];
@@ -28,8 +32,21 @@ class Room extends Model
     {
         return [
             'price_per_hour' => 'decimal:2',
+            'pricing_rules' => 'array',
             'is_available' => 'boolean',
         ];
+    }
+
+    /** This room's pricing rules; rooms with no rules (every pre-existing room) are plain hourly. */
+    public function pricingRules(): PricingRules
+    {
+        return PricingRules::fromStored($this->pricing_model, $this->pricing_rules);
+    }
+
+    /** "EGP 100.00/hr", "From EGP 50.00" — see RoomPricingService::summary(). */
+    public function pricingSummary(): string
+    {
+        return app(RoomPricingService::class)->summary($this);
     }
 
     public function workspace(): BelongsTo

@@ -33,6 +33,7 @@ class Booking extends Model
         'room_id',
         'hotspot_user_id',
         'party_size',
+        'guest_count',
         'checked_in_party_size',
         'booking_date',
         'start_time',
@@ -40,6 +41,7 @@ class Booking extends Model
         'price_per_hour',
         'total_hours',
         'total_price',
+        'pricing_note',
         'amount_paid',
         'payment_status',
         'status',
@@ -55,6 +57,7 @@ class Booking extends Model
             'total_price' => 'decimal:2',
             'amount_paid' => 'decimal:2',
             'party_size' => 'integer',
+            'guest_count' => 'integer',
             'checked_in_party_size' => 'integer',
         ];
     }

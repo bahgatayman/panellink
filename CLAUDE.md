@@ -70,7 +70,13 @@ Owner routes are wrapped in `['auth:owner','subscription.active']` and then sub-
 - `app/Services/MikroTikService.php` — RouterOS binary-protocol client over raw sockets (login w/ MD5
   challenge, create/delete hotspot user, set speed, create/update/delete profiles, list active users).
   Constructed with an owner's host/port/user/pass.
-- `app/Services/BookingService.php` — duration + price calculation (hours × price_per_hour).
+- `app/Services/RoomPricingService.php` — **the only place a room price is decided** (Room + people + duration → price)
+  for bookings, room quotes, shared-session estimate/preview/close and check-in snapshots. Rooms have
+  `pricing_model` (hourly | duration | people | people_duration) + owner-defined `pricing_rules`
+  (`App\Support\Pricing\PricingRules`); hourly rooms delegate to the two original formulas below, unchanged.
+  Never compute a price in a controller, view or JS — call this service.
+- `app/Services/BookingService.php` — the legacy hours × price_per_hour formula (used by RoomPricingService for hourly rooms).
+- `app/Services/SharedSessionBillingService.php` — legacy shared-session billing_unit blocks (used by RoomPricingService for hourly rooms).
 - `app/Services/NotificationService.php` — idempotent alert generation (`refreshForOwner`): subscription
   expiry/expired, plan-limit-reached, today's & pending bookings. Each alert is keyed by a unique
   `reference` so re-runs never duplicate. Triggered on-demand (throttled 10 min, `layouts.app` view

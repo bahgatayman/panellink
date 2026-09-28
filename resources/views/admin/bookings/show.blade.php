@@ -50,7 +50,7 @@
             </div>
             <div>
                 <dt class="text-gray-500">{{ __('app.booking.rate') }}</dt>
-                <dd class="text-gray-900 font-medium mt-1">ج.م {{ number_format($booking->price_per_hour, 2) }}</dd>
+                <dd class="text-gray-900 font-medium mt-1">{{ $booking->pricing_note ?: 'ج.م '.number_format($booking->price_per_hour, 2) }}</dd>
             </div>
             <div>
                 <dt class="text-gray-500">{{ __('app.booking.total') }}</dt>

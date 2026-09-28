@@ -26,6 +26,9 @@
     $initialEnd = $isEdit ? \Carbon\Carbon::parse($booking->end_time)->format('H:i') : old('end_time', $selectedEndTime ?? '');
     $initialAmountPaid = $isEdit ? old('amount_paid', (float) $booking->amount_paid) : old('amount_paid', '');
     $initialNotes = $isEdit ? old('notes', $booking->notes) : old('notes');
+    // People the booking is priced for (RoomPricingService). Exclusive rooms
+    // keep party_size = 1 for availability; the headcount travels as guest_count.
+    $initialGuests = (int) ($isEdit ? old('guest_count', $booking->guest_count ?? $booking->party_size ?? 1) : old('guest_count', 1));
     $actionUrl = $isEdit ? "/bookings/{$booking->id}" : '/bookings';
 
     // Spelled out ("30 min", "1.5 hr") rather than the compact "1h 30m"
@@ -101,12 +104,24 @@
                     @error('booking_date') <span class="ls-error"><x-ui.icon name="alert" />{{ $message }}</span> @enderror
                 </div>
 
+                <div class="ls-field ls-reservation-people">
+                    <label class="ls-label" for="guest_count">{{ __('app.pricing.people_field') }}</label>
+                    <div class="ls-stepper">
+                        <button type="button" data-guest-step="-1" aria-label="{{ __('app.pricing.people_less') }}">&minus;</button>
+                        <input type="number" name="guest_count" id="guest_count" min="1" max="999" step="1" inputmode="numeric" value="{{ max(1, $initialGuests) }}" aria-describedby="guest-count-hint">
+                        <button type="button" data-guest-step="1" aria-label="{{ __('app.pricing.people_more') }}">+</button>
+                    </div>
+                    <p class="ls-hint" id="guest-count-hint">{{ __('app.pricing.people_field_hint') }}</p>
+                    @error('guest_count') <span class="ls-error"><x-ui.icon name="alert" />{{ $message }}</span> @enderror
+                </div>
+
                 <div class="ls-field ls-reservation-duration">
                     <span class="ls-label">{{ __('app.booking.duration') }}</span>
                     <div class="ls-chips ls-chips-scroll" id="duration-chips" role="group" aria-label="{{ __('app.booking.duration') }}">
                         @foreach ($durationOptions as $opt)
                             <button type="button" class="ls-chip" data-duration-chip data-minutes="{{ $opt['minutes'] }}">{{ $opt['label'] }}</button>
                         @endforeach
+                        <button type="button" class="ls-chip" data-duration-chip data-minutes="fullday" hidden>{{ __('app.pricing.full_day') }}</button>
                         <button type="button" class="ls-chip" data-duration-chip data-minutes="custom">{{ __('app.booking.custom') }}</button>
                     </div>
                 </div>
@@ -197,6 +212,8 @@
     // recomputing an End the user chose on purpose.
     let durationMinutes = null;
     let lastRoomOptions = [];
+    let fullDayWindow = null; // {start, end} of the date's business day, from room-options
+    const guestInput = document.getElementById('guest_count');
 
     function addMinutes(hm, mins) {
         const [h, m] = hm.split(':').map(Number);
@@ -254,6 +271,14 @@
         const endValue = endHidden.value;
         durationChips.forEach(chip => {
             chip.classList.remove('is-active');
+            if (chip.dataset.minutes === 'fullday') {
+                const fd = fullDayWindow;
+                const usable = !!fd && Object.prototype.hasOwnProperty.call(startOptions, fd.start) && Object.prototype.hasOwnProperty.call(endOptions, fd.end);
+                chip.hidden = !usable;
+                chip.disabled = !usable;
+                chip.classList.toggle('is-active', usable && startValue === fd.start && endValue === fd.end);
+                return;
+            }
             if (chip.dataset.minutes === 'custom') {
                 chip.classList.toggle('is-active', durationMinutes === null && !!endValue);
                 chip.disabled = !startValue;
@@ -337,6 +362,21 @@
     durationChips.forEach(chip => {
         chip.addEventListener('click', () => {
             if (chip.disabled) return;
+            if (chip.dataset.minutes === 'fullday') {
+                // The whole business day: lands exactly on the Full Day price.
+                durationMinutes = null;
+                customEndField.style.display = 'none';
+                startHidden.value = fullDayWindow.start;
+                startText.textContent = startOptions[fullDayWindow.start] ?? fullDayWindow.start;
+                startText.classList.remove('is-placeholder');
+                setChecked(startGrid, fullDayWindow.start);
+                refreshStepperState();
+                setEnd(fullDayWindow.end);
+                refreshDurationChips();
+                refreshReservationReadouts();
+                fetchRoomOptions();
+                return;
+            }
             if (chip.dataset.minutes === 'custom') {
                 durationMinutes = null;
                 customEndField.style.display = '';
@@ -386,13 +426,22 @@
 
     let roomOptionsToken = 0;
 
+    // Date-only lookup: the business day behind the "Full day" chip.
+    function fetchFullDay() {
+        if (!dateInput.value) return;
+        fetch(`/bookings/room-options?${new URLSearchParams({ booking_date: dateInput.value })}`)
+            .then(r => r.json())
+            .then(data => { fullDayWindow = data.full_day || null; refreshDurationChips(); })
+            .catch(() => {});
+    }
+
     function fetchRoomOptions() {
         const date = dateInput.value;
         const start = startHidden.value;
         const end = endHidden.value;
         if (!date || !start || !end) return;
 
-        const params = new URLSearchParams({ booking_date: date, start_time: start, end_time: end });
+        const params = new URLSearchParams({ booking_date: date, start_time: start, end_time: end, guest_count: guestInput.value || 1 });
         @if ($isEdit)
             params.set('booking_id', '{{ $booking->id }}');
         @endif
@@ -403,6 +452,8 @@
             .then(data => {
                 if (token !== roomOptionsToken) return; // a newer request already landed
                 lastRoomOptions = data.rooms || [];
+                fullDayWindow = data.full_day || null;
+                refreshDurationChips();
                 const durationText = (start && end) ? durationLabel(diffMinutes(start, end)) : '';
                 lastRoomOptions.forEach(opt => {
                     const card = roomGrid.querySelector(`[data-room-card][data-room-id="${opt.id}"]`);
@@ -476,6 +527,9 @@
         document.getElementById('confirm-duration').textContent = (startHidden.value && endHidden.value)
             ? durationLabel(diffMinutes(startHidden.value, endHidden.value)) : '—';
         document.getElementById('confirm-total').textContent = opt ? opt.total_price_display : '—';
+        const pricingRow = document.getElementById('confirm-pricing-row');
+        pricingRow.hidden = !(opt && opt.price_note);
+        document.getElementById('confirm-pricing').textContent = opt && opt.price_note ? opt.price_note : '';
         document.getElementById('confirm-paid').textContent = opt ? formatMoney(paid) : '—';
         document.getElementById('confirm-remaining').textContent = opt ? formatMoney(remaining) : '—';
         setBadge(document.getElementById('confirm-status-badge'), toneFor[status], paymentStatusLabels[status]);
@@ -535,7 +589,23 @@
 
     dateInput.addEventListener('change', () => {
         updateSummaryAndPayment();
+        fetchFullDay();
         fetchRoomOptions();
+    });
+
+    // People → re-quote every room (people-based rooms change price).
+    let guestTimer = null;
+    function guestsChanged() {
+        clearTimeout(guestTimer);
+        guestTimer = setTimeout(fetchRoomOptions, 200);
+    }
+    guestInput.addEventListener('input', guestsChanged);
+    document.querySelectorAll('[data-guest-step]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const next = Math.min(999, Math.max(1, (parseInt(guestInput.value, 10) || 1) + parseInt(btn.dataset.guestStep, 10)));
+            guestInput.value = next;
+            guestsChanged();
+        });
     });
 
     // member-picker.blade.php defines these globals in its own inline script,
@@ -569,6 +639,7 @@
     if (dateInput.value && startHidden.value && endHidden.value) {
         fetchRoomOptions();
     } else {
+        fetchFullDay();
         updateSummaryAndPayment();
     }
 })();

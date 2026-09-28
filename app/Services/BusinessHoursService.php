@@ -138,6 +138,27 @@ class BusinessHoursService
         return $this->isOpenAt($owner, Carbon::now());
     }
 
+    /**
+     * The business day that "Full Day" pricing means on $date: the longest
+     * open segment (an overnight day's own-date part ends at 24:00). Null
+     * when working hours aren't configured or the business is closed that
+     * day — callers then treat Full Day as the whole calendar day.
+     *
+     * @return array{start: string, end: string, minutes: int}|null
+     */
+    public function fullDayWindow(Owner $owner, string $date): ?array
+    {
+        $best = null;
+        foreach ($this->effectiveWindowForDate($owner, $date) as [$start, $end]) {
+            $minutes = $this->toMinutes($end) - $this->toMinutes($start);
+            if ($minutes > 0 && ($best === null || $minutes > $best['minutes'])) {
+                $best = ['start' => substr($start, 0, 5), 'end' => substr($end, 0, 5), 'minutes' => $minutes];
+            }
+        }
+
+        return $best;
+    }
+
     private function rowFor(Owner $owner, int $dayOfWeek): ?WorkingHour
     {
         return $owner->workingHours()->where('day_of_week', $dayOfWeek)->first();

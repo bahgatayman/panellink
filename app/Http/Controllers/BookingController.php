@@ -14,9 +14,10 @@ use App\Models\SharedSession;
 use App\Models\Workspace;
 use App\Services\ActivityLogger;
 use App\Services\AvailabilityService;
-use App\Services\BookingService;
 use App\Services\BusinessHoursService;
+use App\Services\RoomPricingService;
 use App\Services\SalesService;
+use App\Support\Money;
 use App\Support\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -84,7 +85,7 @@ class BookingController extends Controller
         ));
     }
 
-    public function store(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours): RedirectResponse
+    public function store(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours, RoomPricingService $pricing): RedirectResponse
     {
         $owner = TenantContext::user();
         $ownerId = $owner->id;
@@ -96,6 +97,7 @@ class BookingController extends Controller
             'start_time' => 'required|date_format:H:i',
             'end_time' => 'required|date_format:H:i|after:start_time',
             'party_size' => 'nullable|integer|min:1',
+            'guest_count' => 'nullable|integer|min:1|max:999',
             'amount_paid' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:500',
         ]);
@@ -118,12 +120,11 @@ class BookingController extends Controller
 
         $partySize = (int) ($validated['party_size'] ?? 1);
 
-        $bookingService = new BookingService;
-        $calc = $bookingService->calculateBooking(
-            $validated['start_time'],
-            $validated['end_time'],
-            $room->price_per_hour,
-        );
+        // People the price is quoted for. A shared room's party_size already
+        // is its headcount (seats); an exclusive room's party_size stays 1
+        // (it books the whole room), so its headcount travels separately.
+        $people = $room->isShared() ? $partySize : (int) ($validated['guest_count'] ?? 1);
+        $quote = $pricing->quoteBooking($room, $people, $validated['booking_date'], $validated['start_time'], $validated['end_time']);
 
         // Shared rooms are billed at checkout (SharedSessionController::
         // close()) once the actual elapsed time is known — their total here
@@ -133,12 +134,12 @@ class BookingController extends Controller
         // enforcement of that same rule.
         $amountPaid = $room->isShared() ? 0.0 : round((float) ($validated['amount_paid'] ?? 0), 2);
 
-        if ($amountPaid > $calc['total_price']) {
-            return back()->withInput()->with('error', __('app.booking.payment.exceeds_total', ['total' => number_format($calc['total_price'], 2)]));
+        if ($amountPaid > $quote->totalPrice) {
+            return back()->withInput()->with('error', __('app.booking.payment.exceeds_total', ['total' => number_format($quote->totalPrice, 2)]));
         }
 
         try {
-            $booking = DB::transaction(function () use ($validated, $ownerId, $room, $hotspotUser, $calc, $availability, $partySize, $amountPaid) {
+            $booking = DB::transaction(function () use ($validated, $ownerId, $room, $hotspotUser, $quote, $people, $availability, $partySize, $amountPaid) {
                 // Lock the room row so concurrent store()/update() calls for
                 // this room serialize through here. Genuine row-level locking
                 // on MySQL (production) — compiles to a real `FOR UPDATE`; a
@@ -165,11 +166,13 @@ class BookingController extends Controller
                     'booking_date' => $validated['booking_date'],
                     'start_time' => $validated['start_time'],
                     'end_time' => $validated['end_time'],
-                    'price_per_hour' => $lockedRoom->price_per_hour,
-                    'total_hours' => $calc['total_hours'],
-                    'total_price' => $calc['total_price'],
+                    'guest_count' => $lockedRoom->isShared() ? null : $people,
+                    'price_per_hour' => $quote->ratePerHour,
+                    'total_hours' => $quote->totalHours(),
+                    'total_price' => $quote->totalPrice,
+                    'pricing_note' => $quote->note,
                     'amount_paid' => $amountPaid,
-                    'payment_status' => Booking::derivePaymentStatus($amountPaid, $calc['total_price']),
+                    'payment_status' => Booking::derivePaymentStatus($amountPaid, $quote->totalPrice),
                     'status' => 'confirmed',
                     'notes' => $validated['notes'] ?? null,
                 ]);
@@ -237,7 +240,7 @@ class BookingController extends Controller
         return view('bookings.edit', compact('booking', 'rooms', 'users', 'timeSlots'));
     }
 
-    public function update(Request $request, $id, AvailabilityService $availability, BusinessHoursService $businessHours): RedirectResponse
+    public function update(Request $request, $id, AvailabilityService $availability, BusinessHoursService $businessHours, RoomPricingService $pricing): RedirectResponse
     {
         $owner = TenantContext::user();
         $ownerId = $owner->id;
@@ -255,6 +258,7 @@ class BookingController extends Controller
             'start_time' => 'required|date_format:H:i',
             'end_time' => 'required|date_format:H:i|after:start_time',
             'party_size' => 'nullable|integer|min:1',
+            'guest_count' => 'nullable|integer|min:1|max:999',
             'amount_paid' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:500',
         ]);
@@ -268,13 +272,8 @@ class BookingController extends Controller
             ->firstOrFail();
 
         $partySize = (int) ($validated['party_size'] ?? 1);
-
-        $bookingService = new BookingService;
-        $calc = $bookingService->calculateBooking(
-            $validated['start_time'],
-            $validated['end_time'],
-            $room->price_per_hour,
-        );
+        $people = $room->isShared() ? $partySize : (int) ($validated['guest_count'] ?? $booking->guest_count ?? 1);
+        $quote = $pricing->quoteBooking($room, $people, $validated['booking_date'], $validated['start_time'], $validated['end_time']);
 
         // Falls back to whatever was already recorded so editing the time/
         // room doesn't silently wipe a deposit the request didn't mention —
@@ -282,12 +281,12 @@ class BookingController extends Controller
         // shortening the booking could make an old deposit exceed it.
         $amountPaid = $room->isShared() ? 0.0 : round((float) ($validated['amount_paid'] ?? $booking->amount_paid), 2);
 
-        if ($amountPaid > $calc['total_price']) {
-            return back()->withInput()->with('error', __('app.booking.payment.exceeds_total', ['total' => number_format($calc['total_price'], 2)]));
+        if ($amountPaid > $quote->totalPrice) {
+            return back()->withInput()->with('error', __('app.booking.payment.exceeds_total', ['total' => number_format($quote->totalPrice, 2)]));
         }
 
         try {
-            $updated = DB::transaction(function () use ($validated, $room, $booking, $calc, $availability, $id, $partySize, $amountPaid) {
+            $updated = DB::transaction(function () use ($validated, $room, $booking, $quote, $people, $availability, $id, $partySize, $amountPaid) {
                 // Same lock + post-write re-verify pattern as store() — see
                 // the comment there for why both layers exist.
                 $lockedRoom = Room::where('id', $room->id)->lockForUpdate()->firstOrFail();
@@ -308,11 +307,13 @@ class BookingController extends Controller
                     'booking_date' => $validated['booking_date'],
                     'start_time' => $validated['start_time'],
                     'end_time' => $validated['end_time'],
-                    'price_per_hour' => $lockedRoom->price_per_hour,
-                    'total_hours' => $calc['total_hours'],
-                    'total_price' => $calc['total_price'],
+                    'guest_count' => $lockedRoom->isShared() ? null : $people,
+                    'price_per_hour' => $quote->ratePerHour,
+                    'total_hours' => $quote->totalHours(),
+                    'total_price' => $quote->totalPrice,
+                    'pricing_note' => $quote->note,
                     'amount_paid' => $amountPaid,
-                    'payment_status' => Booking::derivePaymentStatus($amountPaid, $calc['total_price']),
+                    'payment_status' => Booking::derivePaymentStatus($amountPaid, $quote->totalPrice),
                     'notes' => $validated['notes'] ?? null,
                 ]);
 
@@ -395,7 +396,7 @@ class BookingController extends Controller
      * they have no check-in concept and keep their existing four-status
      * lifecycle untouched.
      */
-    public function checkIn(Request $request, $id, AvailabilityService $availability, BusinessHoursService $businessHours): RedirectResponse
+    public function checkIn(Request $request, $id, AvailabilityService $availability, BusinessHoursService $businessHours, RoomPricingService $pricing): RedirectResponse
     {
         $owner = TenantContext::user();
         $ownerId = $owner->id;
@@ -431,7 +432,7 @@ class BookingController extends Controller
         $actualPartySize = (int) $validated['party_size'];
 
         try {
-            $session = DB::transaction(function () use ($booking, $ownerId, $actualPartySize, $availability) {
+            $session = DB::transaction(function () use ($booking, $ownerId, $actualPartySize, $availability, $pricing) {
                 $lockedRoom = Room::where('id', $booking->room_id)->lockForUpdate()->firstOrFail();
 
                 // Atomic claim: only one concurrent check-in attempt on this
@@ -473,6 +474,7 @@ class BookingController extends Controller
                     'booking_id' => $booking->id,
                     'billing_unit' => $lockedRoom->billing_unit,
                     'billed_price_per_hour' => $lockedRoom->price_per_hour,
+                    'pricing_snapshot' => $pricing->snapshotFor($lockedRoom),
                 ]);
 
                 // Post-write defense-in-depth, same reasoning as store()'s.
@@ -620,7 +622,7 @@ class BookingController extends Controller
         return view('bookings.availability', compact('rooms', 'timeSlots'));
     }
 
-    public function checkAvailability(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours): JsonResponse
+    public function checkAvailability(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours, RoomPricingService $pricing): JsonResponse
     {
         $owner = TenantContext::user();
 
@@ -631,6 +633,7 @@ class BookingController extends Controller
             'end_time' => 'required',
             'booking_id' => 'nullable|exists:bookings,id',
             'party_size' => 'nullable|integer|min:1',
+            'guest_count' => 'nullable|integer|min:1|max:999',
         ]);
 
         $room = Room::where('id', $validated['room_id'])
@@ -664,24 +667,26 @@ class BookingController extends Controller
             $validated['end_time'],
         );
 
-        $isAvailable = $partySize <= $remaining && $withinHours;
+        // An exclusive room is booked whole: it needs 1 "seat" however many
+        // people come — the headcount only affects its price. A shared room
+        // needs a seat per person.
+        $seatsNeeded = $room->isShared() ? $partySize : 1;
+        $isAvailable = $seatsNeeded <= $remaining && $withinHours;
 
-        $calc = null;
+        $quote = null;
         if ($isAvailable) {
-            $service = new BookingService;
-            $calc = $service->calculateBooking(
-                $validated['start_time'],
-                $validated['end_time'],
-                $room->price_per_hour,
-            );
+            $people = $room->isShared() ? $partySize : (int) ($validated['guest_count'] ?? $partySize);
+            $quote = $pricing->quoteBooking($room, $people, $validated['booking_date'], $validated['start_time'], $validated['end_time']);
         }
 
         return response()->json([
             'available' => $isAvailable,
             'remaining' => $remaining,
-            'total_hours' => $calc['total_hours'] ?? null,
-            'total_price' => $calc['total_price'] ?? null,
+            'total_hours' => $quote?->totalHours(),
+            'total_price' => $quote?->totalPrice,
             'price_per_hour' => $room->price_per_hour,
+            'price_note' => $quote?->note,
+            'price_summary' => $room->pricingSummary(),
         ]);
     }
 
@@ -690,24 +695,37 @@ class BookingController extends Controller
      * owner's rooms, the price at the currently-selected duration plus a
      * 3-state availability label — in one request instead of the picker
      * calling checkAvailability() once per room. Delegates to the exact same
-     * BookingService/AvailabilityService/BusinessHoursService calls
+     * RoomPricingService/AvailabilityService/BusinessHoursService calls
      * checkAvailability() itself uses; no pricing/availability math is
      * duplicated here. Read-only, no locks — safe to call on every keystroke.
      */
-    public function roomOptions(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours): JsonResponse
+    public function roomOptions(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours, RoomPricingService $pricing): JsonResponse
     {
         $owner = TenantContext::user();
 
         $validated = $request->validate([
             'booking_date' => 'required|date',
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i|after:start_time',
+            'start_time' => 'nullable|required_with:end_time|date_format:H:i',
+            'end_time' => 'nullable|required_with:start_time|date_format:H:i|after:start_time',
             'party_size' => 'nullable|integer|min:1',
+            'guest_count' => 'nullable|integer|min:1|max:999',
             'booking_id' => 'nullable|exists:bookings,id',
         ]);
 
+        // Date only (no time picked yet): just the day's Full Day window, so
+        // the form can offer "Full day" before a start time exists.
+        if (empty($validated['start_time'])) {
+            $fullDay = $businessHours->fullDayWindow($owner, $validated['booking_date']);
+
+            return response()->json([
+                'rooms' => [],
+                'full_day' => $fullDay ? ['start' => $fullDay['start'], 'end' => $fullDay['end']] : null,
+            ]);
+        }
+
         $bookingId = $validated['booking_id'] ?? null;
         $partySize = (int) ($validated['party_size'] ?? 1);
+        $guestCount = (int) ($validated['guest_count'] ?? 1);
 
         // Same for every room at this date/time, so computed once rather
         // than once per room.
@@ -724,9 +742,7 @@ class BookingController extends Controller
             ->orderBy('name')
             ->get();
 
-        $bookingService = new BookingService;
-
-        $options = $rooms->map(function (Room $room) use ($availability, $validated, $bookingId, $partySize, $withinHours, $bookingService) {
+        $options = $rooms->map(function (Room $room) use ($availability, $validated, $bookingId, $partySize, $guestCount, $withinHours, $pricing) {
             $remaining = $availability->availabilityForRange(
                 $room,
                 $validated['booking_date'],
@@ -737,10 +753,12 @@ class BookingController extends Controller
 
             // Priced regardless of availability, so an unavailable card can
             // still show what it would have cost.
-            $calc = $bookingService->calculateBooking(
+            $quote = $pricing->quoteBooking(
+                $room,
+                $room->isShared() ? $partySize : $guestCount,
+                $validated['booking_date'],
                 $validated['start_time'],
                 $validated['end_time'],
-                $room->price_per_hour,
             );
 
             if (! $withinHours) {
@@ -770,24 +788,26 @@ class BookingController extends Controller
                 'capacity' => $room->capacity,
                 'is_shared' => $room->isShared(),
                 'price_per_hour' => (float) $room->price_per_hour,
-                'price_per_hour_display' => $this->formatMoney((float) $room->price_per_hour),
-                'total_hours' => $calc['total_hours'],
-                'total_price' => $calc['total_price'],
-                'total_price_display' => $this->formatMoney($calc['total_price']),
+                'price_per_hour_display' => Money::format((float) $room->price_per_hour),
+                'price_summary' => $room->pricingSummary(),
+                'pricing_model' => $room->pricingRules()->model,
+                'total_hours' => $quote->totalHours(),
+                'total_price' => $quote->totalPrice,
+                'total_price_display' => Money::format($quote->totalPrice),
+                'price_note' => $quote->note,
                 'state' => $state,
                 'reason' => $reason,
             ];
         });
 
-        return response()->json(['rooms' => $options->values()]);
-    }
+        // The date's business day, so the form can offer a one-tap "Full day"
+        // duration that lands exactly on the Full Day price.
+        $fullDay = $businessHours->fullDayWindow($owner, $validated['booking_date']);
 
-    /** Same EN/AR money format as <x-ui.money> (public/js/panel.js's LS.money mirrors it client-side). */
-    private function formatMoney(float $amount): string
-    {
-        $formatted = number_format($amount, 2);
-
-        return app()->getLocale() === 'ar' ? "{$formatted} ج.م" : "EGP {$formatted}";
+        return response()->json([
+            'rooms' => $options->values(),
+            'full_day' => $fullDay ? ['start' => $fullDay['start'], 'end' => $fullDay['end']] : null,
+        ]);
     }
 
     /**

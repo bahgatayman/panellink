@@ -6,8 +6,12 @@
     $rooms          = $workspace->rooms;
     $availableRooms = $rooms->where('is_available', true)->count();
     $totalCapacity  = (int) $rooms->sum('capacity');
-    $minPrice       = $rooms->min('price_per_hour');
-    $maxPrice       = $rooms->max('price_per_hour');
+    // Each room's starting price (its hourly rate, or its lowest rule price);
+    // "/hr" only when every room is priced per hour.
+    $startPrices    = $rooms->map(fn ($r) => $r->pricingRules()->isHourly() ? (float) $r->price_per_hour : $r->pricingRules()->lowestPrice());
+    $minPrice       = $startPrices->min();
+    $maxPrice       = $startPrices->max();
+    $rangeSuffix    = $rooms->every(fn ($r) => $r->pricingRules()->isHourly()) ? __('app.common.slash_hr') : '';
 
     // Tailwind needs the full class name at build time, so map rather than interpolate.
     $tones = [
@@ -113,9 +117,9 @@
                     @if($rooms->isEmpty())
                         —
                     @elseif($minPrice == $maxPrice)
-                        {{ number_format($minPrice, 0) }}<span class="text-xs font-normal text-gray-400"> ج.م{{ __('app.common.slash_hr') }}</span>
+                        {{ number_format($minPrice, 0) }}<span class="text-xs font-normal text-gray-400"> ج.م{{ $rangeSuffix }}</span>
                     @else
-                        {{ number_format($minPrice, 0) }}–{{ number_format($maxPrice, 0) }}<span class="text-xs font-normal text-gray-400"> ج.م{{ __('app.common.slash_hr') }}</span>
+                        {{ number_format($minPrice, 0) }}–{{ number_format($maxPrice, 0) }}<span class="text-xs font-normal text-gray-400"> ج.م{{ $rangeSuffix }}</span>
                     @endif
                 </p>
             </div>
@@ -202,8 +206,13 @@
                                         {{ $room->capacity }} {{ __('app.workspace.seats') }}
                                     </span>
                                     <span class="inline-flex items-center gap-1.5 font-medium text-gray-900">
-                                        ج.م {{ number_format($room->price_per_hour, 0) }}
-                                        <span class="text-xs font-normal text-gray-400">{{ __('app.common.slash_hr') }}</span>
+                                        @if ($room->pricingRules()->isHourly())
+                                            ج.م {{ number_format($room->price_per_hour, 0) }}
+                                            <span class="text-xs font-normal text-gray-400">{{ __('app.common.slash_hr') }}</span>
+                                        @else
+                                            {{ $room->pricingSummary() }}
+                                            <span class="text-xs font-normal text-gray-400">· {{ __('app.pricing.models.'.$room->pricing_model.'.title') }}</span>
+                                        @endif
                                     </span>
                                 </div>
 

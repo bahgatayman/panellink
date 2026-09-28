@@ -32,7 +32,7 @@
     <div class="ls-room-card-meta">
         <span class="ls-num">{{ __('app.booking.rooms.seats', ['count' => $room->capacity]) }}</span>
         <span aria-hidden="true">&middot;</span>
-        <span class="ls-num">{{ number_format($room->price_per_hour, 2) }}{{ __('app.common.slash_hr') }}</span>
+        <span class="ls-num">{{ $room->pricingSummary() }}</span>
     </div>
     <div class="ls-room-card-price" data-room-price>
         <span class="ls-room-card-price-duration"></span>

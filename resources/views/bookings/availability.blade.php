@@ -21,7 +21,7 @@
                             @foreach ($roomsInGroup as $room)
                                 <option value="{{ $room->id }}" data-shared="{{ $room->isShared() ? 'true' : 'false' }}">
                                     {{ $room->name }} — {{ $room->typeLabel() }}
-                                    ({{ number_format($room->price_per_hour, 2) }} ج.م{{ __('app.common.slash_hr') }})
+                                    ({{ $room->pricingSummary() }})
                                 </option>
                             @endforeach
                         </optgroup>
@@ -116,8 +116,11 @@
                         <div class="font-semibold">&#10003; {{ __('app.booking.room_available') }}</div>
                         <div class="mt-1">{{ __('app.common.duration') }}: ${data.total_hours} {{ __('app.common.hours') }}</div>
                         <div>{{ __('app.common.total') }}: ج.م ${data.total_price}</div>
+                        <div data-price-note></div>
                         ${remainingLine}
                     `;
+                    // The matched package / group size, from the same RoomPricingService quote.
+                    resultBox.querySelector('[data-price-note]').textContent = data.price_note ? '{{ __('app.pricing.applied') }}: ' + data.price_note : '';
                 } else {
                     resultBox.className = 'mt-5 rounded-lg p-4 text-sm bg-red-100 text-red-700';
                     resultBox.innerHTML = `

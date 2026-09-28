@@ -8,7 +8,7 @@
 
     // Summary strip — computed from every active session, regardless of the room filter.
     $sumItems = $allSessions->sum(fn ($r) => (float) ($r->sale?->total ?? 0));
-    $sumRooms = $allSessions->sum(fn ($r) => $r->isShared() ? (float) ($estimates[$r->model->id] ?? 0) : (float) $r->model->total_price);
+    $sumRooms = $allSessions->sum(fn ($r) => $r->isShared() ? (float) ($estimates[$r->model->id]?->totalPrice ?? 0) : (float) $r->model->total_price);
     $endingSoon = $allSessions->filter(fn ($r) => ! $r->isShared() && now()->diffInMinutes($r->model->endsAt(), false) <= 15)->count();
     $seatsUsed = (int) $sharedRooms->sum(fn ($room) => $room->occupied_seats ?? 0);
     $seatsTotal = (int) $sharedRooms->sum('capacity');
@@ -288,7 +288,8 @@
         $('modal-party').textContent = data.party_size;
         $('modal-time').textContent = data.start_time + ' → ' + data.end_time;
         $('modal-duration').textContent = data.duration;
-        $('modal-rate').textContent = fill(S.rate_per_hour, { rate: money(data.price_per_hour) });
+        // Rule-priced rooms explain the matched package/tier instead of a flat rate.
+        $('modal-rate').textContent = data.pricing_note || fill(S.rate_per_hour, { rate: money(data.price_per_hour) });
         $('modal-total').textContent = money(data.total_price);
         show('modal-billed-row', !!data.billed_duration);
         if (data.billed_duration) $('modal-billed').textContent = fill(L.usedVsBilled, { used: data.duration, billed: data.billed_duration });

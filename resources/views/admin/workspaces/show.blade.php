@@ -80,7 +80,7 @@
                             </div>
                             <div class="text-xs text-gray-500 space-y-1">
                                 <p>{{ __('app.workspace.capacity') }}: {{ $room->capacity }}</p>
-                                <p>${{ number_format($room->price_per_hour, 2) }} {{ __('app.common.slash_hr') }}</p>
+                                <p>{{ $room->pricingSummary() }}</p>
                                 @if($room->description)
                                     <p class="text-gray-400 mt-2">{{ Str::limit($room->description, 60) }}</p>
                                 @endif
