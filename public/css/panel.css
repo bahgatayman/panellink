@@ -667,12 +667,12 @@ html[dir="rtl"] .ls-qa { font-family: var(--ls-font-ar); }
 .ls-product-name { margin: 0; font-size: 15px; font-weight: var(--fw-strong); color: var(--color-text); line-height: 1.35; }
 .ls-product-meta { display: flex; gap: 6px; min-width: 0; margin-top: 2px; font-size: 13px; color: var(--color-text-muted); }
 .ls-product-price { font-size: 20px; font-weight: var(--fw-figure); letter-spacing: -.015em; font-variant-numeric: tabular-nums; color: var(--color-text); margin-top: auto; }
-.ls-product-foot { display: flex; align-items: center; gap: var(--space-1); padding-top: var(--space-3); border-top: 1px solid var(--color-border-subtle); }
+.ls-product-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); padding-top: var(--space-3); border-top: 1px solid var(--color-border-subtle); }
 .ls-product-foot form { margin: 0; }
 .ls-product-delete { margin-inline-start: auto !important; }
 .ls-product.is-inactive .ls-product-name, .ls-product.is-inactive .ls-product-price { color: var(--color-text-secondary); }
 .ls-product.is-inactive .ls-product-icon { opacity: .6; }
-@media (max-width: 640px) { .ls-product-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-3); } .ls-product { padding: var(--space-4); } }
+@media (max-width: 640px) { .ls-product-grid { grid-template-columns: 1fr; gap: var(--space-3); } .ls-product { padding: var(--space-4); } }
 
 /* ---------- 10b. Room pricing editor (workspaces/rooms/_pricing) ---------- */
 .ls-pricing { display: grid; gap: var(--space-4); padding-top: var(--space-5); border-top: 1px solid var(--color-border-subtle); }
