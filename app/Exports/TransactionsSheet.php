@@ -31,7 +31,7 @@ class TransactionsSheet implements FromCollection, WithHeadings, WithTitle
             'Date', 'Booking #', 'Customer', 'Room', 'Room Type',
             'Start Time', 'End Time', 'Hours',
             'Room Revenue', 'Products Revenue', 'Discount', 'Tax', 'Grand Total',
-            'Status', 'Origin', 'Party Size',
+            'Status', 'Origin', 'Party Size', 'Amount Paid', 'Payment Status',
         ];
     }
 
@@ -62,6 +62,8 @@ class TransactionsSheet implements FromCollection, WithHeadings, WithTitle
                 $booking->statusLabel(),
                 $booking->sharedSession ? 'Shared Session #'.$booking->sharedSession->id : 'Direct Booking',
                 $booking->party_size,
+                (float) $booking->amount_paid,
+                $booking->paymentStatusLabel(),
             ];
         });
     }

@@ -3,8 +3,15 @@
 @section('page-title', __('app.session.open_new_session'))
 
 @section('content')
+    @if (session('error'))
+        <div class="mb-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3">{{ session('error') }}</div>
+    @endif
+    @if (session('success'))
+        <div class="mb-4 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm px-4 py-3">{{ session('success') }}</div>
+    @endif
+
     <div class="mb-6">
-        <a href="{{ route('shared-sessions.index') }}" class="text-sm text-gray-500 hover:text-gray-700">&larr; {{ __('app.btn.back_to_shared_sessions') }}</a>
+        <a href="{{ route('active-sessions.index') }}" class="text-sm text-gray-500 hover:text-gray-700">&larr; {{ __('app.btn.back_to_shared_sessions') }}</a>
     </div>
 
     <h1 class="text-2xl font-bold text-gray-900 mb-6">{{ __('app.session.open_new_session') }}</h1>

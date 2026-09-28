@@ -29,34 +29,6 @@ class SharedSessionController extends Controller
         private SharedSessionBillingService $billing,
     ) {}
 
-    public function index(): View
-    {
-        $owner = TenantContext::user();
-
-        $openSessions = SharedSession::where('owner_id', $owner->id)
-            ->where('status', 'open')
-            ->with(['room.workspace', 'hotspotUser'])
-            ->orderBy('opened_at', 'asc')
-            ->get();
-
-        // occupied_seats sums party_size, not row count — a party of 5 must
-        // register as 5 seats used, not 1 (see Room::availableSharedSlots()).
-        $sharedRooms = Room::where('owner_id', $owner->id)
-            ->where('type', 'shared')
-            ->withSum(['sharedSessions as occupied_seats' => function ($q) {
-                $q->where('status', 'open');
-            }], 'party_size')
-            ->with('workspace')
-            ->get();
-
-        // Catalog for the running-tab picker (only when the sales feature is on).
-        $products = $owner->hasFeature('sales')
-            ? Product::where('owner_id', $owner->id)->where('is_active', true)->orderBy('name')->get()
-            : collect();
-
-        return view('shared-sessions.index', compact('openSessions', 'sharedRooms', 'products'));
-    }
-
     public function create(): View
     {
         $sharedRooms = Room::where('owner_id', TenantContext::id())
@@ -67,7 +39,7 @@ class SharedSessionController extends Controller
             ->with('workspace')
             ->get();
 
-        return view('shared-sessions.create', compact('sharedRooms'));
+        return view('active-sessions.create', compact('sharedRooms'));
     }
 
     public function store(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours): RedirectResponse
@@ -171,7 +143,7 @@ class SharedSessionController extends Controller
             $this->activityLogger->log('shared_session.opened', $session, "Opened session for {$user->name} in {$roomName}");
         }
 
-        return redirect()->route('shared-sessions.index')
+        return redirect()->route('active-sessions.index')
             ->with('success', "Session opened for {$user->name} in {$roomName}.");
     }
 
@@ -355,6 +327,12 @@ class SharedSessionController extends Controller
                 'price_per_hour' => $pricePerHour,
                 'total_hours' => $totalHours,
                 'total_price' => $billed['total_price'],
+                // A closed shared/walk-in session is cash collected at the
+                // register right now — always fully paid. Without this, the
+                // Financials revenue switch to amount_paid would silently
+                // zero out every walk-in session's revenue.
+                'amount_paid' => $billed['total_price'],
+                'payment_status' => Booking::PAYMENT_PAID,
                 'status' => 'completed',
                 'notes' => 'Auto-created from shared session.',
             ]);

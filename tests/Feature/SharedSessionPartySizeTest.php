@@ -74,7 +74,7 @@ class SharedSessionPartySizeTest extends TestCase
                 'room_id' => $room->id, 'hotspot_user_id' => $user->id,
                 'session_date' => today()->toDateString(), 'start_time' => '10:00',
             ])
-            ->assertRedirect(route('shared-sessions.index'));
+            ->assertRedirect(route('active-sessions.index'));
 
         $session = SharedSession::where('room_id', $room->id)->firstOrFail();
         $this->assertSame(1, $session->party_size);
@@ -92,7 +92,7 @@ class SharedSessionPartySizeTest extends TestCase
                 'session_date' => today()->toDateString(), 'start_time' => '10:00',
                 'party_size' => 3,
             ])
-            ->assertRedirect(route('shared-sessions.index'));
+            ->assertRedirect(route('active-sessions.index'));
 
         $session = SharedSession::where('room_id', $room->id)->firstOrFail();
         $this->assertSame(3, $session->party_size);
@@ -199,7 +199,7 @@ class SharedSessionPartySizeTest extends TestCase
                 'room_id' => $room->id, 'hotspot_user_id' => $this->member($owner, 'First')->id,
                 'session_date' => today()->toDateString(), 'start_time' => '10:00',
                 'party_size' => 4,
-            ])->assertRedirect(route('shared-sessions.index'));
+            ])->assertRedirect(route('active-sessions.index'));
 
         // A second request for the now-full room must fail, not silently overbook.
         $this->actingAs($owner, 'owner')

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Booking;
 use App\Models\HotspotUser;
 use App\Models\Owner;
 use App\Models\Plan;
@@ -10,6 +11,8 @@ use App\Models\Room;
 use App\Models\Sale;
 use App\Models\SharedSession;
 use App\Models\Workspace;
+use App\Services\AnalyticsPeriod;
+use App\Services\RevenueAnalyticsService;
 use Carbon\Carbon;
 use Database\Seeders\FeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -136,6 +139,15 @@ class SharedSessionSalesTest extends TestCase
         $this->assertNotNull($booking);
         // Time charge lives on the booking, untouched by items.
         $this->assertEquals(60, (float) $booking->total_price);
+
+        // A closed walk-in session is cash collected right now — always
+        // fully paid, so RevenueAnalyticsService::bookingRevenue() (which
+        // sums amount_paid, not total_price) still counts it.
+        $this->assertEquals(60, (float) $booking->amount_paid);
+        $this->assertSame(Booking::PAYMENT_PAID, $booking->payment_status);
+        $revenue = app(RevenueAnalyticsService::class);
+        $period = AnalyticsPeriod::custom(Carbon::parse('2026-08-01'), Carbon::parse('2026-08-01'));
+        $this->assertEquals(60, $revenue->bookingRevenue($owner, $period));
 
         // The tab moved onto the booking, keeping its line items.
         $sale = Sale::where('booking_id', $booking->id)->with('items')->firstOrFail();

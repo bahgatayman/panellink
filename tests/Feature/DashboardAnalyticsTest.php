@@ -99,6 +99,7 @@ class DashboardAnalyticsTest extends TestCase
             'party_size' => 1,
             'booking_date' => $date, 'start_time' => $start, 'end_time' => $end,
             'price_per_hour' => $totalPrice / 2, 'total_hours' => 2, 'total_price' => $totalPrice,
+            'amount_paid' => $totalPrice, 'payment_status' => 'paid',
             'status' => $status,
         ]);
     }

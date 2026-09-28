@@ -97,6 +97,7 @@ class FinancialsModuleTest extends TestCase
             'owner_id' => $owner->id, 'room_id' => $room->id, 'hotspot_user_id' => $member->id,
             'party_size' => 1, 'booking_date' => $date, 'start_time' => '10:00', 'end_time' => '11:00',
             'price_per_hour' => $totalPrice, 'total_hours' => 1, 'total_price' => $totalPrice,
+            'amount_paid' => $totalPrice, 'payment_status' => 'paid',
             'status' => $status,
         ]);
     }
