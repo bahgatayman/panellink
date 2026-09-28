@@ -8,14 +8,17 @@ use App\Models\Sale;
 use App\Models\SaleItem;
 
 /**
- * Combines Booking.total_price (room revenue) and Sale.total (product/
- * service revenue) for a period. Deliberately never sums
+ * Combines Booking.amount_paid (room revenue — cash actually collected, not
+ * billed value) and Sale.total (product/service revenue, still assumed
+ * fully settled — see SaleItem/SalesService, there is no partial-payment
+ * concept there) for a period. Deliberately never sums
  * SharedSession.total_price separately: on SharedSession::close(), the
  * controller auto-creates a completed Booking carrying the identical
- * total_price and links it via shared_sessions.booking_id — a closed
- * session and its spawned booking describe one economic event twice, so
- * summing both here would double-count it. Only bookingRevenue()/
- * totalRevenue() are the source of truth for money earned.
+ * total_price (and amount_paid, always fully paid at close) and links it
+ * via shared_sessions.booking_id — a closed session and its spawned booking
+ * describe one economic event twice, so summing both here would
+ * double-count it. Only bookingRevenue()/totalRevenue() are the source of
+ * truth for money earned.
  */
 class RevenueAnalyticsService
 {
@@ -25,7 +28,7 @@ class RevenueAnalyticsService
             ->where('status', 'completed')
             ->whereDate('booking_date', '>=', $period->startDate())
             ->whereDate('booking_date', '<=', $period->endDate())
-            ->sum('total_price');
+            ->sum('amount_paid');
     }
 
     public function saleRevenue(Owner $owner, AnalyticsPeriod $period): float
@@ -75,7 +78,7 @@ class RevenueAnalyticsService
             return null;
         }
 
-        return round(((float) (clone $completed)->sum('total_price')) / $count, 2);
+        return round(((float) (clone $completed)->sum('amount_paid')) / $count, 2);
     }
 
     /**
@@ -96,7 +99,7 @@ class RevenueAnalyticsService
             ->where('status', 'completed')
             ->whereDate('booking_date', '>=', $period->startDate())
             ->whereDate('booking_date', '<=', $period->endDate())
-            ->selectRaw('date(booking_date) as d, SUM(total_price) as total')
+            ->selectRaw('date(booking_date) as d, SUM(amount_paid) as total')
             ->groupBy('d')
             ->pluck('total', 'd');
 
@@ -132,7 +135,7 @@ class RevenueAnalyticsService
             ->whereDate('bookings.booking_date', '>=', $period->startDate())
             ->whereDate('bookings.booking_date', '<=', $period->endDate())
             ->join('rooms', 'rooms.id', '=', 'bookings.room_id')
-            ->selectRaw('rooms.id as room_id, rooms.name as room_name, SUM(bookings.total_price) as revenue, COUNT(*) as bookings')
+            ->selectRaw('rooms.id as room_id, rooms.name as room_name, SUM(bookings.amount_paid) as revenue, COUNT(*) as bookings')
             ->groupBy('rooms.id', 'rooms.name')
             ->orderByDesc('revenue')
             ->get()
@@ -158,7 +161,7 @@ class RevenueAnalyticsService
             ->whereDate('bookings.booking_date', '>=', $period->startDate())
             ->whereDate('bookings.booking_date', '<=', $period->endDate())
             ->join('rooms', 'rooms.id', '=', 'bookings.room_id')
-            ->selectRaw('rooms.type as type, SUM(bookings.total_price) as revenue, COUNT(*) as bookings')
+            ->selectRaw('rooms.type as type, SUM(bookings.amount_paid) as revenue, COUNT(*) as bookings')
             ->groupBy('rooms.type')
             ->orderByDesc('revenue')
             ->get()

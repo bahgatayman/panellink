@@ -70,14 +70,17 @@ class RevenueAnalyticsServiceTest extends TestCase
         ]);
     }
 
-    private function booking(Owner $owner, Room $room, string $date, float $totalPrice, string $status = 'completed'): Booking
+    private function booking(Owner $owner, Room $room, string $date, float $totalPrice, string $status = 'completed', ?float $amountPaid = null): Booking
     {
+        $amountPaid ??= $totalPrice;
+
         return Booking::create([
             'owner_id' => $owner->id, 'room_id' => $room->id,
             'hotspot_user_id' => $this->member($owner)->id,
             'party_size' => 1,
             'booking_date' => $date, 'start_time' => '10:00', 'end_time' => '12:00',
             'price_per_hour' => $totalPrice / 2, 'total_hours' => 2, 'total_price' => $totalPrice,
+            'amount_paid' => $amountPaid, 'payment_status' => Booking::derivePaymentStatus($amountPaid, $totalPrice),
             'status' => $status,
         ]);
     }
@@ -106,6 +109,45 @@ class RevenueAnalyticsServiceTest extends TestCase
         $period = AnalyticsPeriod::custom(Carbon::parse('2026-08-01'), Carbon::parse('2026-08-31'));
 
         $this->assertSame(100.0, $this->revenue->bookingRevenue($owner, $period));
+    }
+
+    public function test_booking_revenue_counts_only_the_amount_actually_paid(): void
+    {
+        $owner = $this->owner();
+        $room = $this->room($owner);
+
+        // Completed but only half paid — revenue should reflect 50, not the 100 billed.
+        $this->booking($owner, $room, '2026-08-10', 100.0, 'completed', amountPaid: 50.0);
+
+        $period = AnalyticsPeriod::custom(Carbon::parse('2026-08-01'), Carbon::parse('2026-08-31'));
+
+        $this->assertSame(50.0, $this->revenue->bookingRevenue($owner, $period));
+    }
+
+    public function test_an_unpaid_completed_booking_contributes_nothing_to_revenue(): void
+    {
+        $owner = $this->owner();
+        $room = $this->room($owner);
+
+        $this->booking($owner, $room, '2026-08-10', 100.0, 'completed', amountPaid: 0.0);
+
+        $period = AnalyticsPeriod::custom(Carbon::parse('2026-08-01'), Carbon::parse('2026-08-31'));
+
+        $this->assertSame(0.0, $this->revenue->bookingRevenue($owner, $period));
+    }
+
+    public function test_partial_payment_does_not_affect_sale_revenue(): void
+    {
+        $owner = $this->owner();
+        $room = $this->room($owner);
+
+        $this->booking($owner, $room, '2026-08-10', 100.0, 'completed', amountPaid: 10.0);
+        $this->sale($owner, '2026-08-10 09:00:00', 20.0);
+
+        $period = AnalyticsPeriod::custom(Carbon::parse('2026-08-01'), Carbon::parse('2026-08-31'));
+
+        $this->assertSame(20.0, $this->revenue->saleRevenue($owner, $period));
+        $this->assertSame(30.0, $this->revenue->totalRevenue($owner, $period));
     }
 
     public function test_sale_revenue_only_counts_completed_sales_in_period(): void
@@ -169,6 +211,7 @@ class RevenueAnalyticsServiceTest extends TestCase
             'owner_id' => $owner->id, 'room_id' => $room->id, 'hotspot_user_id' => $member->id,
             'party_size' => 1, 'booking_date' => '2026-08-10', 'start_time' => '10:00', 'end_time' => '10:30',
             'price_per_hour' => 60, 'total_hours' => 0.5, 'total_price' => 30.0,
+            'amount_paid' => 30.0, 'payment_status' => 'paid',
             'status' => 'completed', 'notes' => 'Auto-created from shared session.',
         ]);
 

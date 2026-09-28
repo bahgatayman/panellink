@@ -51,6 +51,8 @@
                             <th class="px-6 py-3 font-medium">{{ __('app.financials.room') }}</th>
                             <th class="px-6 py-3 font-medium">{{ __('app.financials.origin') }}</th>
                             <th class="px-6 py-3 font-medium">{{ __('app.financials.status') }}</th>
+                            <th class="px-6 py-3 font-medium">{{ __('app.financials.payment_status') }}</th>
+                            <th class="px-6 py-3 font-medium text-right">{{ __('app.financials.amount_paid') }}</th>
                             <th class="px-6 py-3 font-medium text-right">{{ __('app.financials.grand_total') }}</th>
                         </tr>
                     </thead>
@@ -72,6 +74,13 @@
                                         <span class="block text-[11px] text-gray-400 mt-0.5">{{ __('app.financials.not_counted') }}</span>
                                     @endif
                                 </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium
+                                        {{ $booking->payment_status === 'paid' ? 'bg-green-100 text-green-700' : ($booking->payment_status === 'partial' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600') }}">
+                                        {{ $booking->paymentStatusLabel() }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-right text-gray-600">ج.م {{ number_format($booking->amount_paid, 2) }}</td>
                                 <td class="px-6 py-4 text-right font-medium text-gray-900">ج.م {{ number_format($booking->grandTotal(), 2) }}</td>
                             </tr>
                         @endforeach

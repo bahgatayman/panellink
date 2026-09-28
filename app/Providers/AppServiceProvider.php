@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Notification;
 use App\Services\NotificationService;
+use App\Support\ActiveSessionsQuery;
 use App\Support\TenantContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -55,6 +56,14 @@ class AppServiceProvider extends ServiceProvider
             $view->with('navUnreadCount', Notification::forOwner($owner->id)->unread()->count());
             $view->with('navRecentNotifications',
                 Notification::forOwner($owner->id)->latest()->take(6)->get());
+
+            // Active Sessions nav badge — a fresh count on every request, no
+            // cache guard (unlike the notification refresh above): there's no
+            // generation step to throttle here, only a read, so there's
+            // nothing for a stale count to ever desync from.
+            if ($owner->hasFeature('booking')) {
+                $view->with('navActiveSessionsCount', ActiveSessionsQuery::count($owner->id));
+            }
         });
     }
 }

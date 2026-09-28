@@ -47,7 +47,7 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Inter', 'Instrument Sans', 'system-ui', 'sans-serif'],
+                        sans: ['Inter', 'IBM Plex Sans Arabic', 'Instrument Sans', 'system-ui', 'sans-serif'],
                     },
                     colors: {
                         brand,

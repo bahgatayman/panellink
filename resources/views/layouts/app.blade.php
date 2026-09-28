@@ -1,262 +1,200 @@
 <!DOCTYPE html>
 @php $locale = app()->getLocale(); $isRtl = $locale === 'ar'; @endphp
-<html lang="{{ $locale }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}">
+<html lang="{{ $locale }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    {{-- Resolve the theme (light | dark | system) and sidebar state before first paint — no flash. --}}
+    <script>(function(){var r=document.documentElement;try{var p=localStorage.getItem('ls-theme')||'system';var d=p==='dark'||(p==='system'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);r.dataset.theme=d?'dark':'light';r.dataset.themePref=p;if(localStorage.getItem('ls-nav')==='collapsed')r.dataset.nav='collapsed';}catch(e){}})();</script>
+    <meta name="color-scheme" content="light dark">
     <title>Link Space Panel - {{ $owner->business_name ?? __('app.auth.linkspace') }}</title>
     <link rel="icon" type="image/webp" href="/logo.webp">
     @include('partials.theme')
-    @if($isRtl)
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Cairo', sans-serif; }</style>
-    @endif
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    {{-- Owner design system — see public/css/panel.css and resources/views/components/ui. --}}
+    <link rel="stylesheet" href="/css/panel.css?v={{ @filemtime(public_path('css/panel.css')) }}">
+    @php
+        $lsI18n = [
+            'h' => __('app.ui.unit_h'), 'm' => __('app.ui.unit_m'), 's' => __('app.ui.unit_s'),
+            'left' => __('app.ui.time_left'), 'ended' => __('app.ui.time_up'),
+            'dismiss' => __('app.ui.dismiss'),
+            'expand' => __('app.ui.expand_sidebar'), 'collapse' => __('app.ui.collapse_sidebar'),
+        ];
+    @endphp
+    <script>window.LS_I18N = @json($lsI18n);</script>
     <style>
-        /* App shell pinned to the viewport: the sidebar and top bar stay put and
-           only <main> scrolls. min-h-screen was a *minimum*, so tall pages grew
-           the shell and scrolled the whole document, chrome included.
+        /* App shell pinned to the viewport: sidebar and top bar stay put, only <main> scrolls.
            dvh keeps mobile browser bars from adding phantom height over 100vh. */
         html, body { height: 100%; }
-        .app-shell {
-            height: 100vh;
-            height: 100dvh;
-            overflow: hidden;
-        }
+        .app-shell { height: 100vh; height: 100dvh; overflow: hidden; }
     </style>
+    <script src="/js/panel.js?v={{ @filemtime(public_path('js/panel.js')) }}" defer></script>
 </head>
-<body class="bg-[#f8fafc] font-sans antialiased">
-    <div class="app-shell flex flex-col lg:flex-row">
-        <!-- Mobile header -->
-        <div class="lg:hidden shrink-0 flex items-center justify-between bg-brand-900 px-4 py-3">
-            <img src="/logo.webp" alt="Link Space Panel" class="h-7 w-auto brightness-0 invert">
-            <div class="flex items-center gap-2">
-                <button id="menu-toggle" class="text-white p-2 focus:outline-none">
-                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
+<body class="ls-app antialiased">
+@php
+    $currentOwner = $owner;
+    // Owner sessions have no permission grid — every nav item they can
+    // reach via feature entitlement is visible. A staff session only
+    // sees items it's also been granted the matching permission for.
+    $can = fn (string $key) => ! $actingStaff || $actingStaff->hasPermission($key);
 
-        <!-- Sidebar overlay (mobile) -->
-        <div id="sidebar-overlay" class="lg:hidden fixed inset-0 bg-black/50 z-10 hidden" onclick="closeSidebar()"></div>
+    // Grouped navigation. Every item keeps the exact feature + permission gate it
+    // had before; a group label only renders when at least one of its items does.
+    $navGroups = [
+        ['label' => __('app.ui.nav_group.today'), 'items' => [
+            ['show' => true, 'href' => '/dashboard', 'active' => request()->is('dashboard'), 'icon' => 'home', 'label' => __('app.nav.dashboard')],
+            ['show' => $currentOwner->hasFeature('booking') && ($can('shared_sessions.view') || $can('bookings.view')), 'href' => '/active-sessions', 'active' => request()->is('active-sessions*'), 'icon' => 'live', 'label' => __('app.nav.active_sessions'), 'count' => $navActiveSessionsCount ?? 0],
+            ['show' => $currentOwner->hasFeature('booking') && $can('bookings.view'), 'href' => '/bookings/calendar', 'active' => request()->is('bookings*'), 'icon' => 'calendar', 'label' => __('app.nav.bookings')],
+        ]],
+        ['label' => __('app.ui.nav_group.manage'), 'items' => [
+            ['show' => $currentOwner->hasFeature('workspace') && $can('workspaces.view'), 'href' => '/workspaces', 'active' => request()->is('workspaces*'), 'icon' => 'building', 'label' => __('app.nav.workspaces')],
+            ['show' => ($currentOwner->hasFeature('hotspot') || $currentOwner->hasFeature('booking')) && $can('members.view'), 'href' => '/users', 'active' => request()->is('users*'), 'icon' => 'users', 'label' => __('app.nav.users')],
+            ['show' => $currentOwner->hasFeature('sales') && $can('products.view'), 'href' => '/products', 'active' => request()->is('products*'), 'icon' => 'box', 'label' => __('app.nav.products')],
+        ]],
+        ['label' => __('app.ui.nav_group.money'), 'items' => [
+            ['show' => ($currentOwner->hasFeature('booking') || $currentOwner->hasFeature('sales')) && $can('financials.view'), 'href' => '/financials', 'active' => request()->is('financials*'), 'icon' => 'money', 'label' => __('app.nav.financials')],
+        ]],
+        ['label' => __('app.ui.nav_group.network'), 'items' => [
+            ['show' => $currentOwner->hasFeature('hotspot') && $can('hotspot.view_sessions'), 'href' => '/sessions', 'active' => request()->is('sessions*'), 'icon' => 'wifi', 'label' => __('app.nav.wifi_sessions')],
+            ['show' => $currentOwner->hasFeature('hotspot') && $can('hotspot.manage_speed'), 'href' => '/speed-profiles', 'active' => request()->is('speed-profiles*'), 'icon' => 'bolt', 'label' => __('app.nav.speed_profiles')],
+        ]],
+        ['label' => __('app.ui.nav_group.admin'), 'items' => [
+            ['show' => ! $actingStaff, 'href' => '/staff', 'active' => request()->is('staff*'), 'icon' => 'team', 'label' => __('app.nav.staff')],
+            ['show' => $can('settings.view'), 'href' => '/settings', 'active' => request()->is('settings*'), 'icon' => 'gear', 'label' => __('app.nav.settings')],
+        ]],
+    ];
+    $who = $actingStaff->name ?? $owner->name ?? $owner->business_name;
+    $toneFor = fn ($c) => match ($c) { 'red', 'rose' => 'danger', 'yellow', 'amber', 'orange' => 'warning', 'green', 'emerald' => 'success', default => 'info' };
+    $themeOptions = [
+        'light' => ['icon' => 'sun', 'label' => __('app.ui.theme_light')],
+        'dark' => ['icon' => 'moon', 'label' => __('app.ui.theme_dark')],
+        'system' => ['icon' => 'monitor', 'label' => __('app.ui.theme_system')],
+    ];
+@endphp
+    <a href="#main" class="ls-skip">{{ __('app.ui.skip_to_content') }}</a>
+    <div class="app-shell ls-shell">
+        <div id="sidebar-overlay" class="ls-side-scrim"></div>
 
-        <!-- Sidebar -->
-        <aside id="sidebar" class="fixed lg:static inset-y-0 {{ $isRtl ? 'right-0' : 'left-0' }} z-20 w-[260px] bg-gradient-to-b from-brand-900 to-brand-700 text-white flex flex-col shrink-0 transition-transform duration-300 {{ $isRtl ? 'translate-x-full' : '-translate-x-full' }} lg:translate-x-0">
-            <div class="shrink-0 flex items-center justify-center px-6 py-6 border-b border-white/10">
-                <img src="/logo.webp" alt="Link Space Panel" class="h-8 w-auto brightness-0 invert">
+        <aside id="sidebar" class="ls-side" aria-label="{{ __('app.ui.main_navigation') }}">
+            <div class="ls-brand">
+                <a href="/dashboard" class="ls-brand-logo" aria-label="Link Space — {{ __('app.nav.dashboard') }}">
+                    <img src="/logo.webp" alt="Link Space Panel">
+                </a>
+                <button type="button" class="ls-iconbtn ls-collapse" data-ls-nav-toggle aria-controls="sidebar" aria-expanded="true" aria-label="{{ __('app.ui.collapse_sidebar') }}" title="{{ __('app.ui.collapse_sidebar') }}"><x-ui.icon name="sidebar" /></button>
+                <button type="button" class="ls-iconbtn ls-side-close" data-ls-side-close aria-label="{{ __('app.ui.close_menu') }}"><x-ui.icon name="x" /></button>
             </div>
-            {{-- Long menus scroll inside the sidebar so the profile/logout block stays pinned. --}}
-            <nav class="nav-scroll flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-1">
-                @php
-                    $currentOwner = $owner;
-                    // Owner sessions have no permission grid — every nav item they can
-                    // reach via feature entitlement is visible. A staff session only
-                    // sees items it's also been granted the matching permission for.
-                    $can = fn (string $key) => ! $actingStaff || $actingStaff->hasPermission($key);
-                @endphp
-                <a href="/dashboard" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('dashboard') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-                    </svg>
-                    <span>{{ __('app.nav.dashboard') }}</span>
-                </a>
-                @if(($currentOwner->hasFeature('hotspot') || $currentOwner->hasFeature('booking')) && $can('members.view'))
-                    <a href="/users" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('users*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-                        </svg>
-                        <span>{{ __('app.nav.users') }}</span>
-                    </a>
-                @endif
-                @if($currentOwner->hasFeature('hotspot'))
-                    @if($can('hotspot.view_sessions'))
-                    <a href="/sessions" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('sessions*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
-                        </svg>
-                        <span>{{ __('app.nav.active_sessions') }}</span>
-                    </a>
+            <nav class="nav-scroll ls-nav">
+                @foreach ($navGroups as $group)
+                    @php $visible = collect($group['items'])->where('show', true); @endphp
+                    @if ($visible->isNotEmpty())
+                        <div class="ls-nav-label">{{ $group['label'] }}</div>
+                        @foreach ($visible as $item)
+                            <a href="{{ $item['href'] }}" class="ls-nav-item {{ $item['active'] ? 'is-active' : '' }}" title="{{ $item['label'] }}" @if($item['active']) aria-current="page" @endif>
+                                <x-ui.icon :name="$item['icon']" />
+                                <span class="ls-trunc">{{ $item['label'] }}</span>
+                                @if (($item['count'] ?? 0) > 0)<b class="ls-nav-count">{{ $item['count'] }}</b>@endif
+                            </a>
+                        @endforeach
                     @endif
-                    @if($can('hotspot.manage_speed'))
-                    <a href="/speed-profiles" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('speed-profiles*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                        </svg>
-                        <span>{{ __('app.nav.speed_profiles') }}</span>
-                    </a>
-                    @endif
-                @endif
-                @if($currentOwner->hasFeature('workspace') && $can('workspaces.view'))
-                    <a href="/workspaces" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('workspaces*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                        </svg>
-                        <span>{{ __('app.nav.workspaces') }}</span>
-                    </a>
-                @endif
-                @if($currentOwner->hasFeature('booking'))
-                    @if($can('bookings.view'))
-                    <a href="/bookings/calendar" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('bookings*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                        </svg>
-                        <span>{{ __('app.nav.bookings') }}</span>
-                    </a>
-                    @endif
-                    @if($can('shared_sessions.view'))
-                    <a href="/shared-sessions" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('shared-sessions*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-                        </svg>
-                        <span>{{ __('app.nav.shared_sessions') }}</span>
-                    </a>
-                    @endif
-                @endif
-                @if($currentOwner->hasFeature('sales'))
-                    @if($can('products.view'))
-                    <a href="/products" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('products*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                        </svg>
-                        <span>{{ __('app.nav.products') }}</span>
-                    </a>
-                    @endif
-                @endif
-                @if($currentOwner->hasFeature('booking') || $currentOwner->hasFeature('sales'))
-                    @if($can('financials.view'))
-                    <a href="/financials" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('financials*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
-                        </svg>
-                        <span>{{ __('app.nav.financials') }}</span>
-                    </a>
-                    @endif
-                @endif
-                @if(! $actingStaff)
-                <a href="/staff" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('staff*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zM3 7a2 2 0 114 0 2 2 0 01-4 0z"/>
-                    </svg>
-                    <span>{{ __('app.nav.staff') }}</span>
-                </a>
-                @endif
-                @if($can('settings.view'))
-                <a href="/settings" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition {{ request()->is('settings*') ? 'bg-white/10 border-l-4 border-blue-500' : '' }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                    </svg>
-                    <span>{{ __('app.nav.settings') }}</span>
-                </a>
-                @endif
+                @endforeach
             </nav>
-            <div class="shrink-0 px-4 py-4 border-t border-white/10">
-                <a href="/profile" class="flex items-center gap-2 text-sm text-gray-300 hover:text-white transition mb-2 {{ request()->is('profile') ? 'text-blue-400' : '' }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                    </svg>
-                    <span>{{ __('app.nav.my_profile') }}</span>
+            <div class="ls-side-foot">
+                <x-ui.avatar :name="$who" size="sm" />
+                <a href="/profile" class="ls-who" title="{{ __('app.nav.my_profile') }}">
+                    <b class="ls-trunc">{{ $who }}</b>
+                    <span class="ls-trunc">{{ $owner->business_name }}</span>
                 </a>
                 <form method="POST" action="/logout">
                     @csrf
-                    <button type="submit" class="text-xs text-red-400 hover:text-red-300 mt-1">{{ __('app.nav.logout') }}</button>
+                    <button type="submit" class="ls-iconbtn" title="{{ __('app.nav.logout') }}" aria-label="{{ __('app.nav.logout') }}"><x-ui.icon name="logout" /></button>
                 </form>
             </div>
         </aside>
 
-        <!-- Main -->
-        <div class="flex-1 flex flex-col min-w-0 min-h-0">
-            <header class="shrink-0 bg-white shadow-sm px-4 lg:px-6 py-4 flex items-center justify-between">
-                <h1 class="text-lg font-semibold text-gray-800">@yield('page-title', __('app.nav.dashboard'))</h1>
-                <div class="flex items-center gap-3">
-                    <!-- Notification bell -->
-                    <div class="relative" id="notif-wrap">
-                        <button type="button" onclick="toggleNotif()" aria-label="{{ __('app.notif.title') }}"
-                                class="relative p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition focus:outline-none">
-                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                            </svg>
-                            @if(($navUnreadCount ?? 0) > 0)
-                                <span class="absolute top-1 {{ $isRtl ? 'left-1' : 'right-1' }} inline-flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
-                                    {{ $navUnreadCount > 9 ? '9+' : $navUnreadCount }}
-                                </span>
-                            @endif
-                        </button>
+        <div class="ls-sheet">
+            <header class="ls-topbar">
+                <button id="menu-toggle" type="button" class="ls-iconbtn ls-menu-btn" data-ls-side-open aria-controls="sidebar" aria-expanded="false" aria-label="{{ __('app.ui.open_menu') }}"><x-ui.icon name="menu" /></button>
+                <nav class="ls-crumbs" aria-label="{{ __('app.ui.breadcrumb') }}">
+                    <span class="ls-crumb-home ls-trunc" style="max-width:220px">{{ $owner->business_name }}</span>
+                    <span class="ls-crumb-sep" aria-hidden="true">/</span>
+                    <span class="ls-crumb-now ls-trunc" aria-current="page">@yield('page-title', __('app.nav.dashboard'))</span>
+                </nav>
+                <div class="ls-topbar-spacer"></div>
+                <span class="ls-live-pill" aria-hidden="true"><i></i><span id="ls-clock">{{ now()->format('g:i A') }}</span></span>
 
-                        <div id="notif-dropdown"
-                             class="hidden absolute {{ $isRtl ? 'left-0' : 'right-0' }} mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg border border-gray-100 z-30 overflow-hidden">
-                            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                                <span class="text-sm font-semibold text-gray-800">{{ __('app.notif.title') }}</span>
-                                @if(($navUnreadCount ?? 0) > 0)
-                                    <form method="POST" action="{{ route('notifications.read-all') }}">
-                                        @csrf
-                                        <button type="submit" class="text-xs text-blue-600 hover:text-blue-800">{{ __('app.notif.mark_all_read') }}</button>
-                                    </form>
-                                @endif
-                            </div>
-                            <div class="max-h-96 overflow-y-auto divide-y divide-gray-50">
-                                @forelse($navRecentNotifications ?? [] as $n)
-                                    @php $c = $n->levelColor(); @endphp
-                                    <a href="{{ route('notifications.open', $n->id) }}"
-                                       class="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition {{ $n->isRead() ? '' : 'bg-blue-50/40' }}">
-                                        <span class="mt-0.5 shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-{{ $c }}-100 text-{{ $c }}-600">
-                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $n->iconPath() }}"/>
-                                            </svg>
-                                        </span>
-                                        <span class="min-w-0 flex-1">
-                                            <span class="block text-sm font-medium text-gray-800 truncate">{{ $n->title }}</span>
-                                            @if($n->body)
-                                                <span class="block text-xs text-gray-500 line-clamp-2">{{ $n->body }}</span>
-                                            @endif
-                                            <span class="block text-[11px] text-gray-400 mt-0.5">{{ $n->created_at->diffForHumans() }}</span>
-                                        </span>
-                                        @unless($n->isRead())
-                                            <span class="mt-1 shrink-0 w-2 h-2 rounded-full bg-blue-500"></span>
-                                        @endunless
-                                    </a>
-                                @empty
-                                    <div class="px-4 py-8 text-center text-sm text-gray-400">{{ __('app.notif.empty') }}</div>
-                                @endforelse
-                            </div>
-                            <a href="{{ route('notifications.index') }}" class="block px-4 py-3 text-center text-sm font-medium text-blue-600 hover:bg-gray-50 border-t border-gray-100">
-                                {{ __('app.notif.view_all') }}
-                            </a>
+                {{-- Notifications --}}
+                <div class="ls-menu-wrap" id="notif-wrap">
+                    <button type="button" class="ls-iconbtn" data-ls-menu="notif-dropdown" data-ls-menu-focus="none" aria-haspopup="true" aria-expanded="false"
+                            aria-label="{{ __('app.notif.title') }}{{ ($navUnreadCount ?? 0) > 0 ? ' — '.__('app.ui.unread_count', ['count' => $navUnreadCount]) : '' }}">
+                        <x-ui.icon name="bell" />
+                        @if(($navUnreadCount ?? 0) > 0)
+                            <span class="ls-ndot" aria-hidden="true">{{ $navUnreadCount > 9 ? '9+' : $navUnreadCount }}</span>
+                        @endif
+                    </button>
+                    <div id="notif-dropdown" class="ls-pop ls-pop--notif" hidden>
+                        <div class="ls-pop-head">
+                            <span>{{ __('app.notif.title') }}</span>
+                            @if(($navUnreadCount ?? 0) > 0)
+                                <form method="POST" action="{{ route('notifications.read-all') }}">
+                                    @csrf
+                                    <button type="submit" class="ls-link" style="font-size:12.5px">{{ __('app.notif.mark_all_read') }}</button>
+                                </form>
+                            @endif
+                        </div>
+                        <div style="max-height:24rem;overflow-y:auto">
+                            @forelse($navRecentNotifications ?? [] as $n)
+                                <a href="{{ route('notifications.open', $n->id) }}" class="ls-notif {{ $n->isRead() ? '' : 'is-unread' }}">
+                                    <span class="ls-notif-icon ls-notif-icon--{{ $toneFor($n->levelColor()) }}">
+                                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $n->iconPath() }}"/></svg>
+                                    </span>
+                                    <span class="ls-notif-body">
+                                        <b>{{ $n->title }}</b>
+                                        @if($n->body)<span>{{ \Illuminate\Support\Str::limit($n->body, 110) }}</span>@endif
+                                        <small>{{ $n->created_at->diffForHumans() }}</small>
+                                    </span>
+                                    @unless($n->isRead())<span class="ls-notif-dot" role="img" aria-label="{{ __('app.ui.unread') }}"></span>@endunless
+                                </a>
+                            @empty
+                                <div style="padding:32px 16px;text-align:center;font-size:14px;color:var(--color-text-muted)">{{ __('app.notif.empty') }}</div>
+                            @endforelse
+                        </div>
+                        <a href="{{ route('notifications.index') }}" class="ls-pop-foot ls-link">{{ __('app.notif.view_all') }}</a>
+                    </div>
+                </div>
+
+                {{-- Theme: Light / Dark / System --}}
+                <div class="ls-menu-wrap">
+                    <button type="button" class="ls-iconbtn" data-ls-menu="theme-menu" aria-haspopup="true" aria-expanded="false" aria-label="{{ __('app.ui.theme') }}" title="{{ __('app.ui.theme') }}">
+                        <x-ui.icon name="sun" data-ls-theme-icon="light" />
+                        <x-ui.icon name="moon" data-ls-theme-icon="dark" hidden />
+                    </button>
+                    <div id="theme-menu" class="ls-pop" role="menu" aria-label="{{ __('app.ui.theme') }}" hidden>
+                        <div class="ls-menu">
+                            <div class="ls-menu-label" aria-hidden="true">{{ __('app.ui.theme') }}</div>
+                            @foreach ($themeOptions as $key => $opt)
+                                <button type="button" class="ls-menu-item" role="menuitemradio" aria-checked="false" data-ls-theme-option="{{ $key }}">
+                                    <x-ui.icon :name="$opt['icon']" />
+                                    <span>{{ $opt['label'] }}</span>
+                                    <x-ui.icon name="check" class="ls-menu-check" />
+                                </button>
+                            @endforeach
                         </div>
                     </div>
-
-                    <form method="POST" action="{{ route('language.switch', $isRtl ? 'en' : 'ar') }}" class="flex items-center gap-1.5">
-                        @csrf
-                        <button type="submit" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none {{ $isRtl ? 'bg-indigo-600' : 'bg-gray-300' }}" role="switch" aria-checked="{{ $isRtl ? 'true' : 'false' }}">
-                            <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out {{ $isRtl ? 'translate-x-[18px]' : 'translate-x-[3px]' }}"></span>
-                        </button>
-                        <span class="text-xs font-medium {{ $isRtl ? 'text-indigo-600' : 'text-gray-500' }}">{{ $isRtl ? 'AR' : 'EN' }}</span>
-                    </form>
-                    <a href="/profile" class="flex items-center gap-2 min-w-0 group" title="{{ __('app.nav.my_profile') }}">
-                        @if ($owner->logoUrl())
-                            <img src="{{ $owner->logoUrl() }}" alt="{{ $owner->business_name }}"
-                                 class="w-8 h-8 rounded-full object-cover border border-gray-200 shrink-0">
-                        @else
-                            <span class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-blue-400 text-white flex items-center justify-center text-xs font-bold shrink-0">
-                                {{ $owner->initials() }}
-                            </span>
-                        @endif
-                        <span class="text-sm text-gray-500 group-hover:text-gray-700 truncate">{{ $owner->business_name }}</span>
-                    </a>
                 </div>
+
+                <div class="ls-lang" role="group" aria-label="{{ __('app.ui.language') }}">
+                    <form method="POST" action="{{ route('language.switch', 'en') }}">@csrf<button type="submit" class="{{ $isRtl ? '' : 'is-on' }}" lang="en" aria-pressed="{{ $isRtl ? 'false' : 'true' }}">EN</button></form>
+                    <form method="POST" action="{{ route('language.switch', 'ar') }}">@csrf<button type="submit" class="{{ $isRtl ? 'is-on' : '' }}" lang="ar" aria-pressed="{{ $isRtl ? 'true' : 'false' }}">عربي</button></form>
+                </div>
+
             </header>
 
-            <main class="flex-1 min-h-0 overflow-y-auto p-4 lg:p-6">
+            <main id="main" class="ls-main flex-1 min-h-0 overflow-y-auto" tabindex="-1">
                 @if($currentOwner->subscriptionStatus() === 'expiring_soon')
-                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 flex items-center gap-3">
-                        <svg class="w-5 h-5 text-yellow-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                        </svg>
-                        <p class="text-yellow-800 text-sm font-medium">
-                            {{ __('app.msg.subscription_expires_in', ['days' => $currentOwner->daysUntilExpiry()]) }}
-                        </p>
-                    </div>
+                    <x-ui.banner tone="warn">{{ __('app.msg.subscription_expires_in', ['days' => $currentOwner->daysUntilExpiry()]) }}</x-ui.banner>
                 @endif
                 @yield('content')
             </main>
@@ -264,19 +202,16 @@
     </div>
 
     @if (session('permission_denied'))
-        <div id="permission-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="absolute inset-0 bg-gray-900/50" onclick="closePermissionModal()"></div>
-            <div class="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
-                <div class="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
-                    <svg class="w-7 h-7 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                    </svg>
+        <div id="permission-modal" class="ls-overlay is-open" onclick="if (event.target === this) closePermissionModal()">
+            <div class="ls-dialog ls-dialog--narrow" role="alertdialog" aria-modal="true" aria-labelledby="permission-title" aria-describedby="permission-text">
+                <div class="ls-dialog-body" style="padding-top:26px;justify-items:center;text-align:center">
+                    <span class="ls-icon-circle ls-icon-circle--danger"><x-ui.icon name="lock" /></span>
+                    <h3 class="ls-dialog-title" id="permission-title">{{ __('app.error.403_heading') }}</h3>
+                    <p class="ls-muted" id="permission-text" style="margin:0">{{ session('permission_denied') }}</p>
                 </div>
-                <h3 class="text-lg font-bold text-gray-800">{{ __('app.error.403_heading') }}</h3>
-                <p class="text-sm text-gray-500 mt-2">{{ session('permission_denied') }}</p>
-                <button type="button" onclick="closePermissionModal()" class="mt-6 w-full bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-lg px-4 py-2.5 transition">
-                    {{ __('app.common.close') }}
-                </button>
+                <div class="ls-dialog-foot">
+                    <button type="button" id="permission-close" onclick="closePermissionModal()" class="ls-btn ls-btn--primary ls-btn--block">{{ __('app.common.close') }}</button>
+                </div>
             </div>
         </div>
         <script>
@@ -285,30 +220,18 @@
                 if (modal) modal.remove();
             }
             document.addEventListener('keydown', e => { if (e.key === 'Escape') closePermissionModal(); });
+            document.getElementById('permission-close').focus();
         </script>
     @endif
 
     <script>
-    function toggleNotif() {
-        document.getElementById('notif-dropdown').classList.toggle('hidden');
-    }
-    document.addEventListener('click', function (e) {
-        const wrap = document.getElementById('notif-wrap');
-        const dropdown = document.getElementById('notif-dropdown');
-        if (wrap && dropdown && !wrap.contains(e.target)) {
-            dropdown.classList.add('hidden');
-        }
-    });
-    function closeSidebar() {
-        document.getElementById('sidebar').classList.add('{{ $isRtl ? "translate-x-full" : "-translate-x-full" }}');
-        document.getElementById('sidebar-overlay').classList.add('hidden');
-    }
-    document.getElementById('menu-toggle').addEventListener('click', function() {
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.getElementById('sidebar-overlay');
-        sidebar.classList.toggle('{{ $isRtl ? "translate-x-full" : "-translate-x-full" }}');
-        overlay.classList.toggle('hidden');
-    });
+    // Live clock in the top bar, in the business timezone (minute precision is enough).
+    (function () {
+        const el = document.getElementById('ls-clock');
+        if (!el) return;
+        const fmt = () => el.textContent = new Date().toLocaleTimeString(@json($isRtl ? 'ar-EG-u-nu-latn' : 'en-US'), { hour: 'numeric', minute: '2-digit', timeZone: @json(config('app.timezone')) });
+        fmt(); setInterval(fmt, 30000);
+    })();
 
     // Whole-row navigation for any table row marked `class="row-link" data-href="…"`.
     // Each such row still contains a real <a>, so this only adds a convenience

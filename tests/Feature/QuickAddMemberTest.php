@@ -30,7 +30,7 @@ class QuickAddMemberTest extends TestCase
     private function makeOwner(array $features = [], array $overrides = []): Owner
     {
         $owner = Owner::create(array_merge([
-            'name' => 'Owner', 'email' => 'o' . uniqid() . '@t.local', 'password' => 'password',
+            'name' => 'Owner', 'email' => 'o'.uniqid().'@t.local', 'password' => 'password',
             'business_name' => 'Space', 'plan_id' => Plan::first()->id, 'is_active' => true,
             'subscription_starts_at' => now(), 'subscription_expires_at' => now()->addMonth(),
         ], $overrides));
@@ -55,8 +55,8 @@ class QuickAddMemberTest extends TestCase
 
         $this->assertDatabaseHas('hotspot_users', [
             'owner_id' => $owner->id,
-            'phone'    => '01000002',
-            'status'   => 'active',
+            'phone' => '01000002',
+            'status' => 'active',
         ]);
     }
 
@@ -104,7 +104,7 @@ class QuickAddMemberTest extends TestCase
 
     public function test_plan_limit_is_reported_as_a_message_not_a_field_error(): void
     {
-        $plan  = Plan::create([
+        $plan = Plan::create([
             'name' => 'Tiny', 'slug' => 'tiny', 'max_members' => 1,
             'price_per_month' => 0, 'is_active' => true, 'sort_order' => 2,
         ]);
@@ -147,7 +147,7 @@ class QuickAddMemberTest extends TestCase
     {
         $owner = $this->makeOwner(['booking', 'workspace']);
 
-        foreach (['/bookings/create', '/shared-sessions/create'] as $url) {
+        foreach (['/bookings/create', '/active-sessions/create'] as $url) {
             $this->actingAs($owner, 'owner')->get($url)
                 ->assertOk()
                 ->assertSee('id="user-search"', false)

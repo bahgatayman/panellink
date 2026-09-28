@@ -3,6 +3,13 @@
 @section('page-title', __('app.booking.bookings') . ' #' . str_pad($booking->id, 4, '0', STR_PAD_LEFT))
 
 @section('content')
+    @if (session('success'))
+        <div class="mb-4 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm px-4 py-3">{{ session('success') }}</div>
+    @endif
+    @if (session('error'))
+        <div class="mb-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3">{{ session('error') }}</div>
+    @endif
+
     <div class="mb-6 flex items-center justify-between">
         <div>
             <a href="/bookings" class="text-sm text-gray-500 hover:text-gray-700">&larr; {{ __('app.btn.back_to_bookings') }}</a>
@@ -73,6 +80,37 @@
                         <dd class="text-2xl font-bold text-blue-600 mt-1">ج.م {{ number_format($booking->total_price, 2) }}</dd>
                     </div>
                 </dl>
+
+                <div class="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-x-8 gap-y-2 text-sm">
+                    <div>
+                        <span class="text-gray-500">{{ __('app.booking.payment.paid_now') }}</span>
+                        <span class="font-medium text-gray-900 ms-1">ج.م {{ number_format($booking->amount_paid, 2) }}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-500">{{ __('app.booking.payment.remaining') }}</span>
+                        <span class="font-medium text-gray-900 ms-1">ج.م {{ number_format($booking->balanceDue(), 2) }}</span>
+                    </div>
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium
+                        {{ $booking->payment_status === 'paid' ? 'bg-green-100 text-green-700' : ($booking->payment_status === 'partial' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600') }}">
+                        {{ $booking->paymentStatusLabel() }}
+                    </span>
+                </div>
+
+                @if ($booking->balanceDue() > 0 && ! in_array($booking->status, ['cancelled', 'no_show']))
+                    <form method="POST" action="/bookings/{{ $booking->id }}/payment" class="mt-4 pt-4 border-t border-gray-100 flex items-end gap-2">
+                        @csrf
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">{{ __('app.booking.payment.record') }}</label>
+                            <input type="number" name="amount" min="0.01" max="{{ $booking->balanceDue() }}" step="0.01"
+                                   placeholder="{{ number_format($booking->balanceDue(), 2) }}"
+                                   class="w-32 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium">
+                            {{ __('app.booking.payment.record_submit') }}
+                        </button>
+                        @error('amount') <p class="text-xs text-red-600 self-center">{{ $message }}</p> @enderror
+                    </form>
+                @endif
 
                 @if ($booking->notes)
                     <div class="mt-4 pt-4 border-t border-gray-100">

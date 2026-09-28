@@ -96,6 +96,7 @@ class BookingController extends Controller
             'start_time' => 'required|date_format:H:i',
             'end_time' => 'required|date_format:H:i|after:start_time',
             'party_size' => 'nullable|integer|min:1',
+            'amount_paid' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:500',
         ]);
 
@@ -124,8 +125,20 @@ class BookingController extends Controller
             $room->price_per_hour,
         );
 
+        // Shared rooms are billed at checkout (SharedSessionController::
+        // close()) once the actual elapsed time is known — their total here
+        // is only a preview, so no deposit is accepted against it, no
+        // matter what the client submitted. The payment section is already
+        // hidden for shared rooms in the UI; this is the server-side
+        // enforcement of that same rule.
+        $amountPaid = $room->isShared() ? 0.0 : round((float) ($validated['amount_paid'] ?? 0), 2);
+
+        if ($amountPaid > $calc['total_price']) {
+            return back()->withInput()->with('error', __('app.booking.payment.exceeds_total', ['total' => number_format($calc['total_price'], 2)]));
+        }
+
         try {
-            $booking = DB::transaction(function () use ($validated, $ownerId, $room, $hotspotUser, $calc, $availability, $partySize) {
+            $booking = DB::transaction(function () use ($validated, $ownerId, $room, $hotspotUser, $calc, $availability, $partySize, $amountPaid) {
                 // Lock the room row so concurrent store()/update() calls for
                 // this room serialize through here. Genuine row-level locking
                 // on MySQL (production) — compiles to a real `FOR UPDATE`; a
@@ -155,6 +168,8 @@ class BookingController extends Controller
                     'price_per_hour' => $lockedRoom->price_per_hour,
                     'total_hours' => $calc['total_hours'],
                     'total_price' => $calc['total_price'],
+                    'amount_paid' => $amountPaid,
+                    'payment_status' => Booking::derivePaymentStatus($amountPaid, $calc['total_price']),
                     'status' => 'confirmed',
                     'notes' => $validated['notes'] ?? null,
                 ]);
@@ -174,7 +189,8 @@ class BookingController extends Controller
                 'This room is already booked for the selected time slot. Please choose a different time.');
         }
 
-        $this->activityLogger->log('booking.created', $booking, "Booked {$booking->room->name} for {$booking->booking_date->format('M d, Y')}");
+        $paidNote = $amountPaid > 0 ? " (paid {$amountPaid})" : '';
+        $this->activityLogger->log('booking.created', $booking, "Booked {$booking->room->name} for {$booking->booking_date->format('M d, Y')}{$paidNote}");
 
         return redirect("/bookings/{$booking->id}")->with('success', 'Booking confirmed successfully.');
     }
@@ -239,6 +255,7 @@ class BookingController extends Controller
             'start_time' => 'required|date_format:H:i',
             'end_time' => 'required|date_format:H:i|after:start_time',
             'party_size' => 'nullable|integer|min:1',
+            'amount_paid' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:500',
         ]);
 
@@ -259,8 +276,18 @@ class BookingController extends Controller
             $room->price_per_hour,
         );
 
+        // Falls back to whatever was already recorded so editing the time/
+        // room doesn't silently wipe a deposit the request didn't mention —
+        // but it's still re-validated against the *new* total below, since
+        // shortening the booking could make an old deposit exceed it.
+        $amountPaid = $room->isShared() ? 0.0 : round((float) ($validated['amount_paid'] ?? $booking->amount_paid), 2);
+
+        if ($amountPaid > $calc['total_price']) {
+            return back()->withInput()->with('error', __('app.booking.payment.exceeds_total', ['total' => number_format($calc['total_price'], 2)]));
+        }
+
         try {
-            $updated = DB::transaction(function () use ($validated, $room, $booking, $calc, $availability, $id, $partySize) {
+            $updated = DB::transaction(function () use ($validated, $room, $booking, $calc, $availability, $id, $partySize, $amountPaid) {
                 // Same lock + post-write re-verify pattern as store() — see
                 // the comment there for why both layers exist.
                 $lockedRoom = Room::where('id', $room->id)->lockForUpdate()->firstOrFail();
@@ -284,6 +311,8 @@ class BookingController extends Controller
                     'price_per_hour' => $lockedRoom->price_per_hour,
                     'total_hours' => $calc['total_hours'],
                     'total_price' => $calc['total_price'],
+                    'amount_paid' => $amountPaid,
+                    'payment_status' => Booking::derivePaymentStatus($amountPaid, $calc['total_price']),
                     'notes' => $validated['notes'] ?? null,
                 ]);
 
@@ -428,6 +457,10 @@ class BookingController extends Controller
                 }
 
                 $now = now();
+                // Snapshotted from the locked room now, at check-in time — same
+                // reasoning as SharedSessionController::store()'s walk-in path.
+                // Without this, a rate/billing-unit change made after check-in
+                // would silently apply to this session's close-time bill.
                 $newSession = SharedSession::create([
                     'owner_id' => $ownerId,
                     'room_id' => $lockedRoom->id,
@@ -438,6 +471,8 @@ class BookingController extends Controller
                     'opened_at' => $now,
                     'status' => 'open',
                     'booking_id' => $booking->id,
+                    'billing_unit' => $lockedRoom->billing_unit,
+                    'billed_price_per_hour' => $lockedRoom->price_per_hour,
                 ]);
 
                 // Post-write defense-in-depth, same reasoning as store()'s.
@@ -457,7 +492,7 @@ class BookingController extends Controller
 
         $this->activityLogger->log('booking.checked_in', $booking, "Checked in booking #{$booking->id}");
 
-        return redirect()->route('shared-sessions.index')
+        return redirect()->route('active-sessions.index')
             ->with('success', 'Checked in. The session is now open.');
     }
 
@@ -651,10 +686,167 @@ class BookingController extends Controller
     }
 
     /**
-     * Attach a product/service as a line item to this booking's sale.
-     * Routed under feature:booking + feature:sales.
+     * Feeds the room-picker cards on the booking form: for every one of the
+     * owner's rooms, the price at the currently-selected duration plus a
+     * 3-state availability label — in one request instead of the picker
+     * calling checkAvailability() once per room. Delegates to the exact same
+     * BookingService/AvailabilityService/BusinessHoursService calls
+     * checkAvailability() itself uses; no pricing/availability math is
+     * duplicated here. Read-only, no locks — safe to call on every keystroke.
      */
-    public function addItem(Request $request, $id, SalesService $sales): RedirectResponse
+    public function roomOptions(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours): JsonResponse
+    {
+        $owner = TenantContext::user();
+
+        $validated = $request->validate([
+            'booking_date' => 'required|date',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+            'party_size' => 'nullable|integer|min:1',
+            'booking_id' => 'nullable|exists:bookings,id',
+        ]);
+
+        $bookingId = $validated['booking_id'] ?? null;
+        $partySize = (int) ($validated['party_size'] ?? 1);
+
+        // Same for every room at this date/time, so computed once rather
+        // than once per room.
+        $withinHours = $businessHours->isWithinWorkingHours(
+            $owner,
+            $validated['booking_date'],
+            $validated['start_time'],
+            $validated['end_time'],
+        );
+
+        $rooms = Room::where('owner_id', $owner->id)
+            ->where('is_available', true)
+            ->with('workspace')
+            ->orderBy('name')
+            ->get();
+
+        $bookingService = new BookingService;
+
+        $options = $rooms->map(function (Room $room) use ($availability, $validated, $bookingId, $partySize, $withinHours, $bookingService) {
+            $remaining = $availability->availabilityForRange(
+                $room,
+                $validated['booking_date'],
+                $validated['start_time'],
+                $validated['end_time'],
+                $bookingId,
+            );
+
+            // Priced regardless of availability, so an unavailable card can
+            // still show what it would have cost.
+            $calc = $bookingService->calculateBooking(
+                $validated['start_time'],
+                $validated['end_time'],
+                $room->price_per_hour,
+            );
+
+            if (! $withinHours) {
+                $state = 'unavailable';
+                $reason = 'outside_hours';
+            } elseif ($partySize > $remaining) {
+                $state = 'unavailable';
+                $reason = $room->isShared() ? 'no_seats' : 'conflict';
+            } else {
+                // "Booked elsewhere today" — a whole-day overlap scan (00:00–
+                // 23:59), reusing usedCapacity() rather than freeBusyForDay()
+                // since only usedCapacity() can exclude the booking being
+                // edited via $bookingId.
+                $bookedElsewhere = $availability->usedCapacity(
+                    $room, $validated['booking_date'], '00:00', '23:59', $bookingId,
+                ) > 0;
+
+                $state = $bookedElsewhere ? 'partial' : 'free';
+                $reason = null;
+            }
+
+            return [
+                'id' => $room->id,
+                'name' => $room->name,
+                'type' => $room->type,
+                'type_label' => $room->typeLabel(),
+                'capacity' => $room->capacity,
+                'is_shared' => $room->isShared(),
+                'price_per_hour' => (float) $room->price_per_hour,
+                'price_per_hour_display' => $this->formatMoney((float) $room->price_per_hour),
+                'total_hours' => $calc['total_hours'],
+                'total_price' => $calc['total_price'],
+                'total_price_display' => $this->formatMoney($calc['total_price']),
+                'state' => $state,
+                'reason' => $reason,
+            ];
+        });
+
+        return response()->json(['rooms' => $options->values()]);
+    }
+
+    /** Same EN/AR money format as <x-ui.money> (public/js/panel.js's LS.money mirrors it client-side). */
+    private function formatMoney(float $amount): string
+    {
+        $formatted = number_format($amount, 2);
+
+        return app()->getLocale() === 'ar' ? "{$formatted} ج.م" : "EGP {$formatted}";
+    }
+
+    /**
+     * Adds to whatever has already been collected on this booking — never a
+     * replacement value — so a booking that was under-deposited at creation
+     * (or a shared-room booking, which never takes a deposit up front) can
+     * still end up correctly counted once the rest of the cash comes in.
+     * Without this, RevenueAnalyticsService::bookingRevenue() would
+     * permanently under-report any booking that wasn't paid in full at
+     * booking time, since nothing else in the app ever touches amount_paid
+     * again.
+     */
+    public function recordPayment(Request $request, $id): RedirectResponse
+    {
+        $ownerId = TenantContext::id();
+
+        $booking = Booking::where('owner_id', $ownerId)->findOrFail($id);
+
+        if (in_array($booking->status, ['cancelled', 'no_show'], true)) {
+            return back()->with('error', __('app.booking.payment.cannot_record_cancelled'));
+        }
+
+        $validated = $request->validate([
+            'amount' => 'required|numeric|gt:0',
+        ]);
+
+        $amount = round((float) $validated['amount'], 2);
+        $balanceDue = $booking->balanceDue();
+
+        if ($amount > $balanceDue) {
+            return back()->with('error', __('app.booking.payment.exceeds_balance', ['balance' => number_format($balanceDue, 2)]));
+        }
+
+        DB::transaction(function () use ($id, $ownerId, $amount) {
+            $locked = Booking::where('id', $id)->where('owner_id', $ownerId)->lockForUpdate()->firstOrFail();
+            $newPaid = round((float) $locked->amount_paid + $amount, 2);
+
+            $locked->update([
+                'amount_paid' => $newPaid,
+                'payment_status' => Booking::derivePaymentStatus($newPaid, (float) $locked->total_price),
+            ]);
+        });
+
+        $booking->refresh();
+        $this->activityLogger->log('booking.payment_recorded', $booking, "Recorded a payment of {$amount} for booking #{$booking->id}");
+
+        return back()->with('success', __('app.booking.payment.recorded'));
+    }
+
+    /**
+     * Attach a product/service as a line item to this booking's sale.
+     * Routed under feature:booking + feature:sales. Returns JSON when the
+     * caller asks for it (the Active Sessions card's add-product modal, for
+     * an in-progress exclusive-room booking) so one shared JS flow can drive
+     * both this and SharedSessionController::addItem() without a full-page
+     * reload; the standalone booking-detail page keeps its existing
+     * synchronous back() redirect otherwise.
+     */
+    public function addItem(Request $request, $id, SalesService $sales): RedirectResponse|JsonResponse
     {
         $ownerId = TenantContext::id();
 
@@ -668,6 +860,10 @@ class BookingController extends Controller
         // Sale being created later when the session's own tab is
         // transferred at close (Sale has no unique constraint on booking_id).
         if ($booking->room->isShared() && ! in_array($booking->status, ['checked_in', 'completed'])) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'Products can only be added once this reservation is checked in.'], 422);
+            }
+
             return back()->with('error', 'Products can only be added once this reservation is checked in.');
         }
 
@@ -686,17 +882,25 @@ class BookingController extends Controller
 
         $this->activityLogger->log('booking.item_added', $booking, "Added {$validated['quantity']}x {$product->name} to booking #{$booking->id}");
 
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true]);
+        }
+
         return back()->with('success', __('app.sales.item_added'));
     }
 
-    /** Remove a line item from this booking's sale. */
-    public function removeItem($id, $itemId, SalesService $sales): RedirectResponse
+    /** Remove a line item from this booking's sale. See addItem() for the JSON-response rationale. */
+    public function removeItem(Request $request, $id, $itemId, SalesService $sales): RedirectResponse|JsonResponse
     {
         $ownerId = TenantContext::id();
 
         $booking = Booking::where('owner_id', $ownerId)->with(['sale', 'room'])->findOrFail($id);
 
         if ($booking->room->isShared() && ! in_array($booking->status, ['checked_in', 'completed'])) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'Products can only be managed once this reservation is checked in.'], 422);
+            }
+
             return back()->with('error', 'Products can only be managed once this reservation is checked in.');
         }
 
@@ -708,6 +912,10 @@ class BookingController extends Controller
             $sales->removeItem($item);
 
             $this->activityLogger->log('booking.item_removed', $booking, "Removed a line item from booking #{$booking->id}");
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true]);
         }
 
         return back()->with('success', __('app.sales.item_removed'));

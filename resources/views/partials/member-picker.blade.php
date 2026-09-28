@@ -8,52 +8,79 @@
     Params:
       $label        — field label
       $selectedId   — pre-selected member id (optional)
+      $selectedName, $selectedPhone — the pre-selected member's display
+                      fields (optional; without these, a pre-selected id
+                      posts correctly but shows no name/phone until the
+                      operator searches again — needed for edit forms)
       $inputClass   — classes for the search box (each screen has its own shape)
       $resultsClass — extra classes for the dropdown
+      $hideLabel    — visually hide the label (screen-reader only) when the
+                      caller already has its own heading for this field
+                      (e.g. the booking form's "Customer" section title)
+      $searchIcon   — wrap the input in the .ls-search leading-icon pattern;
+                      opt-in (defaults off) so callers passing their own
+                      $inputClass (e.g. shared-sessions/create) keep their
+                      exact current padding instead of an icon overlapping it
 --}}
 @php
-    $label        = $label        ?? __('app.booking.user');
-    $selectedId   = $selectedId   ?? '';
-    $inputClass   = $inputClass   ?? 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm';
-    $resultsClass = $resultsClass ?? '';
+    $label         = $label         ?? __('app.booking.user');
+    $selectedId    = $selectedId    ?? '';
+    $selectedName  = $selectedName  ?? null;
+    $selectedPhone = $selectedPhone ?? null;
+    $inputClass    = $inputClass    ?? 'ls-input';
+    $resultsClass  = $resultsClass  ?? '';
+    $hideLabel     = $hideLabel     ?? false;
+    $searchIcon    = $searchIcon    ?? false;
+    $hasSelection  = $selectedId !== '' && $selectedName;
 @endphp
 
-<label class="block text-sm font-medium text-gray-700 mb-1">{{ $label }}</label>
+<label class="{{ $hideLabel ? 'sr-only' : 'ls-label' }}" for="user-search">{{ $label }}</label>
 
-<input type="text" id="user-search" placeholder="{{ __('app.placeholder.search_name_phone') }}"
-       autocomplete="off" class="{{ $inputClass }}">
+@if ($searchIcon)
+    <div class="ls-search" id="user-search-wrap">
+        <x-ui.icon name="search" />
+        <input type="text" id="user-search" placeholder="{{ __('app.placeholder.search_name_phone') }}"
+               autocomplete="off" class="{{ $inputClass }}">
+    </div>
+@else
+    <input type="text" id="user-search" placeholder="{{ __('app.placeholder.search_name_phone') }}"
+           autocomplete="off" class="{{ $inputClass }}">
+@endif
 <input type="hidden" name="hotspot_user_id" id="selected-user-id" value="{{ old('hotspot_user_id', $selectedId) }}">
 
-<div id="search-results" class="hidden absolute z-10 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 w-full {{ $resultsClass }}"></div>
+<div id="search-results" class="hidden ls-pop ls-picker-pop {{ $resultsClass }}"></div>
 
-<div id="selected-user-display" class="hidden mt-2 flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2">
-    <span class="text-sm font-medium text-blue-800" id="selected-user-name"></span>
-    <span class="text-xs text-blue-600" id="selected-user-phone"></span>
-    <button type="button" onclick="clearUserSelection()" class="ms-auto text-xs text-gray-400 hover:text-red-500">&cross;</button>
+<div id="selected-user-display" class="{{ $hasSelection ? '' : 'hidden' }} ls-picker-selected">
+    <span class="ls-picker-selected-avatar" id="selected-user-avatar" aria-hidden="true">{{ $hasSelection ? mb_strtoupper(mb_substr($selectedName, 0, 1)) : '' }}</span>
+    <span class="ls-picker-selected-info">
+        <span class="ls-picker-selected-name" id="selected-user-name">{{ $selectedName }}</span>
+        <span class="ls-picker-selected-phone ls-num" id="selected-user-phone">{{ $selectedPhone }}</span>
+    </span>
+    <button type="button" onclick="clearUserSelection()" class="ls-picker-clear">
+        {{ __('app.booking.customer_change') }}
+        <x-ui.icon name="arrow-right" />
+    </button>
 </div>
 
 {{-- Quick-add. Inputs carry no `name`, so they never post with the parent form. --}}
-<div id="quick-add" class="hidden mt-2 rounded-lg border border-blue-100 bg-blue-50/60 p-3">
-    <p class="text-xs font-semibold text-gray-700 mb-2">{{ __('app.user.quick_add_title') }}</p>
+<div id="quick-add" class="hidden ls-picker-quickadd">
+    <p class="ls-picker-quickadd-title">{{ __('app.user.quick_add_title') }}</p>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <input type="text" id="quick-add-name" placeholder="{{ __('app.user.name') }}"
-               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <input type="text" id="quick-add-phone" placeholder="{{ __('app.user.phone') }}" inputmode="tel"
-               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <div class="ls-picker-quickadd-grid">
+        <input type="text" id="quick-add-name" placeholder="{{ __('app.user.name') }}" class="ls-input">
+        <input type="text" id="quick-add-phone" placeholder="{{ __('app.user.phone') }}" inputmode="tel" class="ls-input">
     </div>
 
-    <p id="quick-add-error" class="hidden text-xs text-red-600 mt-2"></p>
+    <p id="quick-add-error" class="hidden ls-error" style="margin-top: var(--space-2)"></p>
 
-    <div class="flex items-center gap-2 mt-2.5">
-        <button type="button" id="quick-add-submit"
-                class="bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition text-xs font-medium disabled:opacity-60">
+    <div class="ls-picker-quickadd-actions">
+        <button type="button" id="quick-add-submit" class="ls-btn ls-btn--primary ls-btn--sm">
             {{ __('app.user.add_and_select') }}
         </button>
-        <button type="button" id="quick-add-cancel" class="text-xs text-gray-500 hover:text-gray-700">
+        <button type="button" id="quick-add-cancel" class="ls-link">
             {{ __('app.common.cancel') }}
         </button>
-        <span class="text-xs text-gray-400 ms-auto">{{ __('app.user.quick_add_hint') }}</span>
+        <span class="ls-picker-quickadd-hint">{{ __('app.user.quick_add_hint') }}</span>
     </div>
 </div>
 
@@ -74,14 +101,14 @@
     // and would otherwise break (or inject) markup — an apostrophe was enough.
     function resultRow(user) {
         const row = document.createElement('div');
-        row.className = 'px-4 py-3 hover:bg-gray-50 cursor-pointer border-b last:border-0';
+        row.className = 'ls-picker-row';
 
         const name = document.createElement('p');
-        name.className = 'text-sm font-medium text-gray-900';
+        name.className = 'ls-picker-row-name';
         name.textContent = user.name;
 
         const phone = document.createElement('p');
-        phone.className = 'text-xs text-gray-500';
+        phone.className = 'ls-picker-row-phone ls-num';
         phone.textContent = user.phone;
 
         row.append(name, phone);
@@ -92,7 +119,7 @@
     function addRow(query) {
         const row = document.createElement('button');
         row.type = 'button';
-        row.className = 'w-full text-start px-4 py-3 text-sm font-medium text-blue-600 hover:bg-blue-50 flex items-center gap-2';
+        row.className = 'ls-picker-row ls-picker-add-row';
         row.innerHTML = '<svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>';
 
         const label = document.createElement('span');
@@ -187,7 +214,7 @@
 
                     if (users.length === 0) {
                         const empty = document.createElement('div');
-                        empty.className = 'px-4 py-3 text-sm text-gray-500';
+                        empty.className = 'ls-picker-empty';
                         empty.textContent = @json(__('app.user.no_match'));
                         results.append(empty);
                     } else {
@@ -223,6 +250,7 @@
         document.getElementById('selected-user-id').value          = id;
         document.getElementById('selected-user-name').textContent  = name;
         document.getElementById('selected-user-phone').textContent = phone;
+        document.getElementById('selected-user-avatar').textContent = (name || '?').trim().charAt(0).toUpperCase();
         document.getElementById('selected-user-display').classList.remove('hidden');
         search.value = '';
         results.classList.add('hidden');

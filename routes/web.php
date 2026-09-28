@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActiveSessionController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
@@ -143,10 +144,25 @@ Route::middleware(['auth:owner,staff', 'subscription.active', 'staff.active'])->
 
     // Booking feature routes
     Route::middleware('feature:booking')->group(function () {
-        Route::get('/shared-sessions', [SharedSessionController::class, 'index'])->name('shared-sessions.index')->middleware('permission:shared_sessions.view');
+        // Active Sessions — the live-ops dashboard (was "Shared Sessions", now
+        // also covers in-progress exclusive-room bookings). Either permission
+        // grants visibility; each card's own action buttons are gated by
+        // whichever permission already protects that underlying mutation.
+        Route::get('/active-sessions', [ActiveSessionController::class, 'index'])
+            ->name('active-sessions.index')
+            ->middleware('permission:shared_sessions.view,bookings.view');
+
+        // Old bookmarks/links must never 404 — the walk-in-session create form's
+        // logic is unchanged and stays shared-room-specific (SharedSessionController),
+        // just reachable at a new URL alongside the new dashboard.
+        Route::get('/shared-sessions', fn () => redirect()->route('active-sessions.index'))->name('shared-sessions.index');
+        Route::get('/shared-sessions/create', fn () => redirect()->route('active-sessions.create'))->name('shared-sessions.create');
+
+        Route::get('/active-sessions/create', [SharedSessionController::class, 'create'])
+            ->name('active-sessions.create')
+            ->middleware('permission:shared_sessions.manage');
 
         Route::middleware('permission:shared_sessions.manage')->group(function () {
-            Route::get('/shared-sessions/create', [SharedSessionController::class, 'create'])->name('shared-sessions.create');
             Route::post('/shared-sessions', [SharedSessionController::class, 'store'])->name('shared-sessions.store');
             Route::get('/shared-sessions/{session}/close-preview', [SharedSessionController::class, 'closePreview'])->name('shared-sessions.close-preview');
             Route::post('/shared-sessions/{session}/close', [SharedSessionController::class, 'close'])->name('shared-sessions.close');
@@ -162,6 +178,7 @@ Route::middleware(['auth:owner,staff', 'subscription.active', 'staff.active'])->
             Route::get('/bookings/calendar', [BookingController::class, 'calendar']);
             Route::get('/bookings/availability', [BookingController::class, 'availabilityLookup']);
             Route::get('/bookings/check-availability', [BookingController::class, 'checkAvailability']);
+            Route::get('/bookings/room-options', [BookingController::class, 'roomOptions']);
             Route::get('/bookings', [BookingController::class, 'index']);
         });
         // /bookings/create must be registered before the /bookings/{booking}
@@ -175,6 +192,7 @@ Route::middleware(['auth:owner,staff', 'subscription.active', 'staff.active'])->
             Route::get('/bookings/{booking}/edit', [BookingController::class, 'edit']);
             Route::put('/bookings/{booking}', [BookingController::class, 'update']);
             Route::post('/bookings/{booking}/check-in', [BookingController::class, 'checkIn']);
+            Route::post('/bookings/{booking}/payment', [BookingController::class, 'recordPayment']);
         });
         // Both routes carry the full booking status-machine; the controller
         // enforces the finer edit-vs-cancel distinction per the target status.

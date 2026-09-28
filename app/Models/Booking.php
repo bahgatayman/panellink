@@ -22,6 +22,12 @@ class Booking extends Model
      */
     public const NO_SHOW_GRACE_MINUTES = 30;
 
+    public const PAYMENT_UNPAID = 'unpaid';
+
+    public const PAYMENT_PARTIAL = 'partial';
+
+    public const PAYMENT_PAID = 'paid';
+
     protected $fillable = [
         'owner_id',
         'room_id',
@@ -34,6 +40,8 @@ class Booking extends Model
         'price_per_hour',
         'total_hours',
         'total_price',
+        'amount_paid',
+        'payment_status',
         'status',
         'notes',
     ];
@@ -45,9 +53,63 @@ class Booking extends Model
             'price_per_hour' => 'decimal:2',
             'total_hours' => 'decimal:2',
             'total_price' => 'decimal:2',
+            'amount_paid' => 'decimal:2',
             'party_size' => 'integer',
             'checked_in_party_size' => 'integer',
         ];
+    }
+
+    /**
+     * The single place payment_status is computed from an amount/total pair.
+     * Called explicitly at each write site (store/update/recordPayment) —
+     * this codebase has no model events/observers anywhere, so a derived
+     * value stays a plain static helper rather than a mutator or booted().
+     */
+    public static function derivePaymentStatus(float $paid, float $total): string
+    {
+        $paid = round($paid, 2);
+        $total = round($total, 2);
+
+        if ($paid >= $total) {
+            return self::PAYMENT_PAID;
+        }
+
+        return $paid > 0 ? self::PAYMENT_PARTIAL : self::PAYMENT_UNPAID;
+    }
+
+    /**
+     * What's left to collect on the room charge. Deliberately ignores any
+     * attached Sale (products) — those are already counted separately in
+     * RevenueAnalyticsService::saleRevenue(), so folding them in here would
+     * double-count them against this same balance.
+     */
+    public function balanceDue(): float
+    {
+        return max(0, (float) $this->total_price - (float) $this->amount_paid);
+    }
+
+    public function paymentStatusLabel(): string
+    {
+        return match ($this->payment_status) {
+            self::PAYMENT_PAID => __('app.booking.payment.status_paid'),
+            self::PAYMENT_PARTIAL => __('app.booking.payment.status_partial'),
+            default => __('app.booking.payment.status_unpaid'),
+        };
+    }
+
+    /**
+     * Semantic tone for <x-ui.badge :tone="..."> — the single source of
+     * truth other views should call rather than re-deriving their own
+     * mapping (see statusBadgeClass()'s note above about exactly that
+     * mistake happening with booking status colors).
+     */
+    public function paymentStatusTone(): string
+    {
+        return match ($this->payment_status) {
+            self::PAYMENT_PAID => 'ok',
+            self::PAYMENT_PARTIAL => 'warn',
+            default => 'neutral',
+        };
     }
 
     public function owner(): BelongsTo

@@ -219,7 +219,7 @@ class SharedRoomAdvanceBookingTest extends TestCase
             'party_size' => 2,
         ]);
 
-        $response->assertRedirect(route('shared-sessions.index'));
+        $response->assertRedirect(route('active-sessions.index'));
         $this->assertSame(1, SharedSession::where('room_id', $room->id)->where('status', 'open')->count());
     }
 
@@ -241,7 +241,7 @@ class SharedRoomAdvanceBookingTest extends TestCase
             'party_size' => 4,
         ]);
 
-        $response->assertRedirect(route('shared-sessions.index'));
+        $response->assertRedirect(route('active-sessions.index'));
         $this->assertSame(1, SharedSession::where('room_id', $room->id)->where('status', 'open')->count());
     }
 
@@ -290,7 +290,7 @@ class SharedRoomAdvanceBookingTest extends TestCase
             'party_size' => 4,
         ]);
 
-        $response->assertRedirect(route('shared-sessions.index'));
+        $response->assertRedirect(route('active-sessions.index'));
     }
 
     public function test_a_confirmed_booking_within_grace_still_blocks_a_walk_in(): void
@@ -329,7 +329,7 @@ class SharedRoomAdvanceBookingTest extends TestCase
         $response = $this->actingAs($owner, 'owner')
             ->post("/bookings/{$booking->id}/check-in", ['party_size' => 5]);
 
-        $response->assertRedirect(route('shared-sessions.index'))->assertSessionHas('success');
+        $response->assertRedirect(route('active-sessions.index'))->assertSessionHas('success');
 
         $fresh = $booking->fresh();
         $this->assertSame('checked_in', $fresh->status);
@@ -441,7 +441,7 @@ class SharedRoomAdvanceBookingTest extends TestCase
             'party_size' => 3,
         ]);
 
-        $response->assertRedirect(route('shared-sessions.index'));
+        $response->assertRedirect(route('active-sessions.index'));
     }
 
     public function test_concurrent_check_in_attempts_only_one_succeeds(): void
