@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Link Space Design Directions</title>
+<meta name="description" content="Design playground — five complete visual directions for the Link Space Panel, applied to the same screens. Not production code.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400..700&family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400..700&family=Instrument+Sans:wght@400..700&family=Newsreader:opsz,wght@6..72,400..600&family=Noto+Naskh+Arabic:wght@400..700&family=Plus+Jakarta+Sans:wght@400..800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="playground.css">
+<link rel="stylesheet" href="refined.css">
+</head>
+<body class="pg" data-vp="desktop" data-screen="all">
+
+<div class="pg-bar">
+  <div class="pg-wrap pg-bar-in">
+    <nav class="pg-jump" id="jump" aria-label="Concepts"></nav>
+    <div class="pg-spacer"></div>
+    <label class="pg-ctl">Screen
+      <select class="pg-select" id="screenSel" aria-label="Show one screen across all concepts"></select>
+    </label>
+    <div class="pg-ctl">Viewport
+      <div class="pg-seg" data-pg="vp"><button type="button" class="on" data-v="desktop">Desktop</button><button type="button" data-v="tablet">Tablet</button><button type="button" data-v="mobile">Mobile</button></div>
+    </div>
+    <div class="pg-ctl">Language
+      <div class="pg-seg" data-pg="lang"><button type="button" class="on" data-v="en">English</button><button type="button" data-v="ar">العربية · RTL</button></div>
+    </div>
+  </div>
+</div>
+
+<header class="pg-wrap pg-hero">
+  <div class="pg-eyebrow">Link Space Panel · design playground · not production code</div>
+  <h1>Premium Business Operations — Refined</h1>
+  <p>The direction you chose, refined: Stripe-level clarity, a friendlier voice, faster everyday actions and quiet, satisfying feedback. It covers ten screens — including the new Customers and full Checkout — plus its design system, motion and voice guidelines. Every frame is interactive: resolve the attention list, quick-add products, check a session out, pick booking times, open any row.</p>
+  <p>Use the bar above to compare one screen across all concepts, switch to tablet or mobile widths (layouts are designed per size, not just scaled down), or flip everything to Arabic RTL.</p>
+  <ul class="pg-rules">
+    <li>Same screens, same data, five systems</li>
+    <li>Timers are live (demo clock starts at 1:05 PM)</li>
+    <li>Each concept opens with its design system and closes with “why it works”</li>
+    <li>Nothing here touches the running application</li>
+  </ul>
+  <div class="pg-featured-wrap" id="featured"></div>
+  <div class="pg-sub-label">The original five directions, kept for reference</div>
+  <div class="pg-choices" id="choices"></div>
+</header>
+
+<main class="pg-wrap" id="concepts"></main>
+
+<footer class="pg-wrap pg-foot">
+  Link Space design playground · resources/design-playground/ · standalone HTML/CSS/JS, no build step, not referenced by Laravel or Vite.
+</footer>
+
+<script src="playground.js"></script>
+<script src="refined.js"></script>
+</body>
+</html>
