@@ -3,79 +3,104 @@
 @section('page-title', __('app.section.staff'))
 
 @section('content')
-    <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">{{ __('app.section.staff') }}</h1>
-        <a href="/staff/create" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium shadow-sm">
-            {{ __('app.staff.add_staff') }}
-        </a>
-    </div>
+    {{--
+        Staff as people cards: who they are → what they can do (role +
+        permission count) → whether they're active and when they last signed in
+        → Edit / Activity / Disable. Search + status filters are server-side so
+        they work across pages. Same routes and forms as before.
+    --}}
+    <x-ui.page-header :title="__('app.section.staff')" :count="$counts['all']" :subtitle="__('app.staff.subtitle')">
+        <x-slot:actions>
+            <x-ui.button variant="primary" icon="plus" href="/staff/create">{{ __('app.staff.add_staff') }}</x-ui.button>
+        </x-slot:actions>
+    </x-ui.page-header>
 
-    @if (session('success'))
-        <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4">{{ session('success') }}</div>
+    <x-ui.flash />
+
+    @if ($counts['all'] > 0)
+        <div class="ls-toolbar">
+            <nav class="ls-chips" aria-label="{{ __('app.table.th.status') }}">
+                @foreach (['all' => null, 'active' => 'active', 'disabled' => 'disabled'] as $key => $value)
+                    @php $isOn = $status === $value; @endphp
+                    <a href="{{ request()->fullUrlWithQuery(['status' => $value, 'page' => null]) }}"
+                       class="ls-chip {{ $isOn ? 'is-active' : '' }}" @if ($isOn) aria-current="page" @endif>
+                        {{ __('app.staff.filter_'.$key) }} <span class="ls-chip-count">{{ $counts[$key] }}</span>
+                    </a>
+                @endforeach
+            </nav>
+            <span class="ls-toolbar-spacer"></span>
+            <form method="GET" action="/staff" class="ls-search ls-staff-search" role="search">
+                @if ($status)<input type="hidden" name="status" value="{{ $status }}">@endif
+                <x-ui.icon name="search" />
+                <input type="search" name="search" value="{{ $search }}" class="ls-input" placeholder="{{ __('app.staff.search') }}" aria-label="{{ __('app.staff.search') }}" autocomplete="off">
+            </form>
+        </div>
     @endif
 
-    <form method="GET" action="/staff" class="mb-6">
-        <div class="flex gap-2 max-w-md">
-            <input type="text" name="search" value="{{ $search }}" placeholder="{{ __('app.placeholder.search_name_phone') }}"
-                   class="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-            <button type="submit" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition text-sm">
-                {{ __('app.common.search') }}
-            </button>
-            @if ($search)
-                <a href="/staff" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition text-sm">
-                    {{ __('app.common.clear') }}
-                </a>
-            @endif
-        </div>
-    </form>
-
     @if ($staff->count() > 0)
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
-            <table class="w-full text-sm text-left">
-                <thead class="bg-gray-50 text-gray-500 uppercase text-xs tracking-wider">
-                    <tr>
-                        <th class="px-4 py-3">{{ __('app.staff.name') }}</th>
-                        <th class="px-4 py-3">{{ __('app.staff.email') }}</th>
-                        <th class="px-4 py-3">{{ __('app.staff.role') }}</th>
-                        <th class="px-4 py-3">{{ __('app.table.th.status') }}</th>
-                        <th class="px-4 py-3">{{ __('app.staff.last_login') }}</th>
-                        <th class="px-4 py-3">{{ __('app.table.th.actions') }}</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y">
-                    @foreach ($staff as $member)
-                        <tr class="hover:bg-gray-50 transition">
-                            <td class="px-4 py-3 font-medium text-gray-900">
-                                <a href="/staff/{{ $member->id }}/edit" class="hover:text-blue-600">{{ $member->name }}</a>
-                            </td>
-                            <td class="px-4 py-3 text-gray-500">{{ $member->email }}</td>
-                            <td class="px-4 py-3 text-gray-500">{{ $member->role ? __('app.role.'.$member->role->key) : __('app.staff.no_role') }}</td>
-                            <td class="px-4 py-3">
-                                @if ($member->is_active)
-                                    <span class="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">{{ __('app.status.active') }}</span>
-                                @else
-                                    <span class="bg-red-100 text-red-700 px-2 py-1 rounded-full text-xs font-medium">{{ __('app.status.inactive') }}</span>
-                                @endif
-                            </td>
-                            <td class="px-4 py-3 text-gray-500">
-                                {{ $member->last_login_at?->format('M d, Y H:i') ?? __('app.staff.never_logged_in') }}
-                            </td>
-                            <td class="px-4 py-3 flex gap-3">
-                                <a href="/staff/{{ $member->id }}/edit" class="text-blue-600 hover:underline text-sm font-medium">{{ __('app.common.edit') }}</a>
-                                <a href="/staff/{{ $member->id }}/activity" class="text-gray-600 hover:underline text-sm font-medium">{{ __('app.staff.view_activity') }}</a>
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
+        <div class="ls-staff-grid">
+            @foreach ($staff as $member)
+                @php
+                    $roleLabel = $member->role ? __('app.role.'.$member->role->key) : __('app.staff.custom_permissions');
+                @endphp
+                <article class="ls-staff {{ $member->is_active ? '' : 'is-disabled' }}" aria-labelledby="staff-{{ $member->id }}-name">
+                    <div class="ls-staff-head">
+                        <x-ui.avatar :name="$member->name" />
+                        <div class="ls-staff-who">
+                            <a href="/staff/{{ $member->id }}/edit" class="ls-staff-name ls-trunc" id="staff-{{ $member->id }}-name">{{ $member->name }}</a>
+                            <bdi dir="ltr" class="ls-staff-email ls-trunc" title="{{ $member->email }}">{{ $member->email }}</bdi>
+                        </div>
+                        @if ($member->is_active)
+                            <span class="ls-status"><span class="ls-dot"></span>{{ __('app.status.active') }}</span>
+                        @else
+                            <x-ui.badge tone="neutral" :dot="false">{{ __('app.staff.disabled') }}</x-ui.badge>
+                        @endif
+                    </div>
+
+                    <dl class="ls-staff-facts">
+                        <div>
+                            <dt><x-ui.icon name="lock" /><span class="ls-sr">{{ __('app.staff.role') }}</span></dt>
+                            <dd>
+                                <span class="ls-staff-role {{ $member->role ? '' : 'is-custom' }}">{{ $roleLabel }}</span>
+                                <span class="ls-faint">· {{ trans_choice('app.staff.permissions_count', $member->permissions_count, ['count' => $member->permissions_count]) }}</span>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt><x-ui.icon name="clock" /><span class="ls-sr">{{ __('app.staff.last_login') }}</span></dt>
+                            <dd class="{{ $member->last_login_at ? '' : 'ls-faint' }}"
+                                @if ($member->last_login_at) title="{{ $member->last_login_at->format('M d, Y H:i') }}" @endif>
+                                {{ $member->last_login_at ? __('app.staff.last_seen', ['time' => $member->last_login_at->diffForHumans()]) : __('app.staff.never_logged_in') }}
+                            </dd>
+                        </div>
+                    </dl>
+
+                    <div class="ls-staff-foot">
+                        <x-ui.button size="sm" href="/staff/{{ $member->id }}/edit">{{ __('app.common.edit') }}</x-ui.button>
+                        <x-ui.button variant="ghost" size="sm" href="/staff/{{ $member->id }}/activity">{{ __('app.staff.view_activity') }}</x-ui.button>
+                        <form method="POST" action="/staff/{{ $member->id }}/toggle-status" class="ls-staff-toggle"
+                              @if ($member->is_active) onsubmit="return confirm(@js(__('app.staff.confirm_disable')))" @endif>
+                            @csrf
+                            <x-ui.button type="submit" :variant="$member->is_active ? 'danger-quiet' : 'tonal'" size="sm">
+                                {{ $member->is_active ? __('app.staff.disable') : __('app.staff.enable') }}
+                            </x-ui.button>
+                        </form>
+                    </div>
+                </article>
+            @endforeach
         </div>
 
-        <div class="mt-4">
-            {{ $staff->withQueryString()->links() }}
+        <div class="mt-6">{{ $staff->withQueryString()->links() }}</div>
+    @elseif ($search || $status)
+        <div class="ls-card">
+            <x-ui.empty-state illustration="search" :title="$search ? __('app.staff.no_match', ['q' => $search]) : __('app.staff.no_staff')" :text="__('app.staff.no_match_hint')">
+                <x-ui.button href="/staff">{{ __('app.staff.clear_search') }}</x-ui.button>
+            </x-ui.empty-state>
         </div>
     @else
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-            <p class="text-gray-500 text-lg">{{ __('app.staff.no_staff') }}</p>
+        <div class="ls-card">
+            <x-ui.empty-state illustration="people" :title="__('app.staff.no_staff')" :text="__('app.staff.empty_hint')">
+                <x-ui.button variant="primary" icon="plus" href="/staff/create">{{ __('app.staff.add_staff') }}</x-ui.button>
+            </x-ui.empty-state>
         </div>
     @endif
 @endsection

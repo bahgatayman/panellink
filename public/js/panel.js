@@ -239,6 +239,25 @@
     }
   });
 
+  /* ------------------------------------------ password show / hide */
+  // <x-ui.password>: toggles its input between hidden and visible, keeping
+  // focus and cursor in place; always re-hidden on submit.
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-ls-reveal]');
+    if (!btn) return;
+    const input = document.getElementById(btn.dataset.lsReveal);
+    if (!input) return;
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+    const label = show ? btn.dataset.labelHide : btn.dataset.labelShow;
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+  });
+  document.addEventListener('submit', (e) => {
+    e.target.querySelectorAll('[data-ls-reveal][aria-pressed="true"]').forEach((btn) => btn.click());
+  }, true);
+
   /* ------------------------------------------------------ busy buttons */
   LS.busy = (btn, on = true) => {
     if (!btn) return;

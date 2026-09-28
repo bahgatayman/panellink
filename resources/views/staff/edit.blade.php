@@ -39,10 +39,10 @@
                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('app.staff.password') }}</label>
-                    <input type="password" name="password" minlength="8"
-                           class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <p class="text-xs text-gray-500 mt-1">{{ __('app.staff.password_hint') }}</p>
+                    <label for="staff-password" class="block text-sm font-medium text-gray-700 mb-1">{{ __('app.staff.password') }}</label>
+                    <x-ui.password name="password" id="staff-password" minlength="8" aria-describedby="staff-password-hint"
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <p class="text-xs text-gray-500 mt-1" id="staff-password-hint">{{ __('app.staff.password_hint') }}</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('app.staff.role') }}</label>
@@ -56,6 +56,7 @@
                             </option>
                         @endforeach
                     </select>
+                    <p class="text-xs text-gray-500 mt-1">{{ __('app.staff.role_hint') }}</p>
                 </div>
             </div>
 
@@ -104,12 +105,47 @@
     <form id="reset-permissions-form" method="POST" action="/staff/{{ $staff->id }}/reset-permissions" class="hidden"></form>
 
     <script>
-        document.getElementById('role-select').addEventListener('change', function () {
-            const selected = this.options[this.selectedIndex];
-            const keys = (selected.dataset.permissionKeys || '').split(',').filter(Boolean);
-            document.querySelectorAll('#permission-grid input[type="checkbox"]').forEach(function (box) {
-                box.checked = keys.includes(box.dataset.permissionKey);
+        (function () {
+            const grid = document.getElementById('permission-grid');
+
+            function refreshGroup(group) {
+                const items = [...group.querySelectorAll('[data-permission-item]')];
+                const checked = items.filter(box => box.checked).length;
+                const toggle = group.querySelector('[data-group-toggle]');
+                toggle.checked = checked > 0 && checked === items.length;
+                toggle.indeterminate = checked > 0 && checked < items.length;
+                group.querySelector('[data-group-count]').textContent = `${checked}/${items.length}`;
+            }
+
+            function refreshAllGroups() {
+                grid.querySelectorAll('[data-permission-group]').forEach(refreshGroup);
+            }
+
+            grid.addEventListener('change', function (e) {
+                if (e.target.matches('[data-group-toggle]')) {
+                    const ids = (e.target.dataset.groupIds || '').split(',').filter(Boolean);
+                    ids.forEach(id => {
+                        const box = grid.querySelector(`[data-permission-item][value="${id}"]`);
+                        if (box) box.checked = e.target.checked;
+                    });
+                    refreshAllGroups();
+                    return;
+                }
+                if (e.target.matches('[data-permission-item]')) {
+                    refreshGroup(e.target.closest('[data-permission-group]'));
+                }
             });
-        });
+
+            document.getElementById('role-select').addEventListener('change', function () {
+                const selected = this.options[this.selectedIndex];
+                const keys = (selected.dataset.permissionKeys || '').split(',').filter(Boolean);
+                grid.querySelectorAll('[data-permission-item]').forEach(function (box) {
+                    box.checked = keys.includes(box.dataset.permissionKey);
+                });
+                refreshAllGroups();
+            });
+
+            refreshAllGroups();
+        })();
     </script>
 @endsection

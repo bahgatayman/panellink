@@ -20,20 +20,31 @@ class StaffController extends Controller
     public function index(Request $request): View
     {
         $search = $request->get('search');
+        $status = in_array($request->get('status'), ['active', 'disabled'], true) ? $request->get('status') : null;
+        $ownerId = TenantContext::id();
 
-        $staff = Staff::where('owner_id', TenantContext::id())
+        $staff = Staff::where('owner_id', $ownerId)
             ->with('role')
+            ->withCount('permissions')
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%");
                 });
             })
+            ->when($status, fn ($q) => $q->where('is_active', $status === 'active'))
             ->latest()
             ->paginate(15)
             ->withQueryString();
 
-        return view('staff.index', compact('staff', 'search'));
+        // Filter chip counts (whole team, not just this page).
+        $counts = [
+            'all' => Staff::where('owner_id', $ownerId)->count(),
+            'active' => Staff::where('owner_id', $ownerId)->where('is_active', true)->count(),
+        ];
+        $counts['disabled'] = $counts['all'] - $counts['active'];
+
+        return view('staff.index', compact('staff', 'search', 'status', 'counts'));
     }
 
     public function create(): View

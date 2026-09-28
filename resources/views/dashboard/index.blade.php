@@ -23,13 +23,14 @@
          Needs Attention always renders here regardless of feature mix (a
          hotspot-only owner still needs to see subscription alerts), so this
          grid is never conditionally hidden as a whole. --}}
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 lg:gap-6 mb-8">
+    {{-- Sized by the space it actually has (container queries in panel.css), not the viewport: 2 → 3 → 6 columns, Revenue leads at double width. --}}
+    <div class="ls-kpis-wrap mb-8"><div class="ls-kpis ls-kpis--5">
         @if ($showRevenue)
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
+            <div class="ls-kpi-hero bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
                 <div class="flex items-center justify-between">
                     <div class="min-w-0">
                         <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.dashboard.revenue_today') }}</p>
-                        <p class="text-2xl lg:text-3xl font-bold text-green-600 mt-1">ج.م {{ number_format($revenueToday, 2) }}</p>
+                        <p class="text-2xl lg:text-3xl font-bold text-green-600 mt-1 whitespace-nowrap">ج.م {{ number_format($revenueToday, 2) }}</p>
                         <p class="text-xs text-gray-400 mt-1 truncate">{{ __('app.dashboard.revenue_this_month') }}: ج.م {{ number_format($revenueThisMonth, 2) }}</p>
                         @if ($revenueComparison['changePercent'] !== null)
                             @php $up = $revenueComparison['change'] >= 0; @endphp
@@ -38,7 +39,7 @@
                             </p>
                         @endif
                     </div>
-                    <div class="w-10 h-10 lg:w-12 lg:h-12 bg-green-50 rounded-xl flex items-center justify-center shrink-0">
+                    <div class="ls-kpi-icon w-10 h-10 lg:w-12 lg:h-12 bg-green-50 rounded-xl flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5 lg:w-6 lg:h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
@@ -54,7 +55,7 @@
                         <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.label.today_bookings') }}</p>
                         <p class="text-2xl lg:text-3xl font-bold text-gray-900 mt-1">{{ $todayBookings }}</p>
                     </div>
-                    <div class="w-10 h-10 lg:w-12 lg:h-12 bg-orange-50 rounded-xl flex items-center justify-center shrink-0">
+                    <div class="ls-kpi-icon w-10 h-10 lg:w-12 lg:h-12 bg-orange-50 rounded-xl flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5 lg:w-6 lg:h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                         </svg>
@@ -71,7 +72,7 @@
                         <p class="text-2xl lg:text-3xl font-bold text-brand-600 mt-1">{{ $occupancy['percent'] }}%</p>
                         <p class="text-xs text-gray-400 mt-1">{{ __('app.dashboard.seats_occupied', ['occupied' => $occupancy['occupied'], 'capacity' => $occupancy['capacity']]) }}</p>
                     </div>
-                    <div class="w-10 h-10 lg:w-12 lg:h-12 bg-brand-50 rounded-xl flex items-center justify-center shrink-0">
+                    <div class="ls-kpi-icon w-10 h-10 lg:w-12 lg:h-12 bg-brand-50 rounded-xl flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5 lg:w-6 lg:h-6 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
                         </svg>
@@ -85,7 +86,7 @@
                         <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.label.available_rooms') }}</p>
                         <p class="text-2xl lg:text-3xl font-bold text-green-600 mt-1">{{ $availableRoomsNow }}</p>
                     </div>
-                    <div class="w-10 h-10 lg:w-12 lg:h-12 bg-green-50 rounded-xl flex items-center justify-center shrink-0">
+                    <div class="ls-kpi-icon w-10 h-10 lg:w-12 lg:h-12 bg-green-50 rounded-xl flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5 lg:w-6 lg:h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                         </svg>
@@ -100,14 +101,14 @@
                     <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.dashboard.needs_attention') }}</p>
                     <p class="text-2xl lg:text-3xl font-bold {{ $needsAttentionCount > 0 ? 'text-red-600' : 'text-gray-900' }} mt-1">{{ $needsAttentionCount }}</p>
                 </div>
-                <div class="w-10 h-10 lg:w-12 lg:h-12 {{ $needsAttentionCount > 0 ? 'bg-red-50' : 'bg-gray-50' }} rounded-xl flex items-center justify-center shrink-0">
+                <div class="ls-kpi-icon w-10 h-10 lg:w-12 lg:h-12 {{ $needsAttentionCount > 0 ? 'bg-red-50' : 'bg-gray-50' }} rounded-xl flex items-center justify-center shrink-0">
                     <svg class="w-5 h-5 lg:w-6 lg:h-6 {{ $needsAttentionCount > 0 ? 'text-red-600' : 'text-gray-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                     </svg>
                 </div>
             </div>
         </a>
-    </div>
+    </div></div>
 
     {{-- ================= Period selector — drives trend/utilization/peak-hours/status/new-customers ================= --}}
     @if ($showRevenue || $owner->hasFeature('booking'))
@@ -215,14 +216,14 @@
     @endif
 
     @if ($owner->hasFeature('hotspot'))
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
+    <div class="ls-kpis-wrap mb-8"><div class="ls-kpis ls-kpis--4">
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.label.total_users') }}</p>
                     <p class="text-2xl lg:text-3xl font-bold text-gray-900 mt-1">{{ $totalUsers }}</p>
                 </div>
-                <div class="w-10 h-10 lg:w-12 lg:h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                <div class="ls-kpi-icon w-10 h-10 lg:w-12 lg:h-12 bg-blue-50 rounded-xl flex items-center justify-center">
                     <svg class="w-5 h-5 lg:w-6 lg:h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                     </svg>
@@ -236,7 +237,7 @@
                     <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.label.active_users') }}</p>
                     <p class="text-2xl lg:text-3xl font-bold text-gray-900 mt-1">{{ $activeUsers }}</p>
                 </div>
-                <div class="w-10 h-10 lg:w-12 lg:h-12 bg-green-50 rounded-xl flex items-center justify-center">
+                <div class="ls-kpi-icon w-10 h-10 lg:w-12 lg:h-12 bg-green-50 rounded-xl flex items-center justify-center">
                     <svg class="w-5 h-5 lg:w-6 lg:h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
@@ -251,7 +252,7 @@
                     <p class="text-2xl lg:text-3xl font-bold text-gray-900 mt-1">{{ $activeSessions }}</p>
                     <p class="text-xs text-gray-400 mt-1">Live from MikroTik</p>
                 </div>
-                <div class="w-10 h-10 lg:w-12 lg:h-12 bg-purple-50 rounded-xl flex items-center justify-center">
+                <div class="ls-kpi-icon w-10 h-10 lg:w-12 lg:h-12 bg-purple-50 rounded-xl flex items-center justify-center">
                     <svg class="w-5 h-5 lg:w-6 lg:h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
                     </svg>
@@ -265,14 +266,14 @@
                     <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.section.speed_profiles') }}</p>
                     <p class="text-2xl lg:text-3xl font-bold text-gray-900 mt-1">{{ $totalProfiles }}</p>
                 </div>
-                <div class="w-10 h-10 lg:w-12 lg:h-12 bg-orange-50 rounded-xl flex items-center justify-center">
+                <div class="ls-kpi-icon w-10 h-10 lg:w-12 lg:h-12 bg-orange-50 rounded-xl flex items-center justify-center">
                     <svg class="w-5 h-5 lg:w-6 lg:h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                     </svg>
                 </div>
             </div>
         </div>
-    </div>
+    </div></div>
 
     <h2 class="text-lg font-semibold text-gray-700 mb-4">{{ __('app.label.quick_links') }}</h2>
     <div class="flex flex-col sm:flex-row flex-wrap gap-3 lg:gap-4 mb-8">
@@ -324,12 +325,12 @@
         <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 lg:p-6 mb-6">
             <h3 class="font-semibold text-gray-900 mb-4">{{ __('app.dashboard.room_utilization_details') }}</h3>
             <div class="overflow-x-auto">
-                <table class="w-full min-w-[36rem] text-sm">
+                <table class="w-full text-sm">
                     <thead>
                         <tr class="text-left text-gray-500 border-b">
                             <th class="pb-3">{{ __('app.table.th.room') }}</th>
-                            <th class="pb-3">{{ __('app.dashboard.hours_booked') }}</th>
-                            <th class="pb-3">{{ __('app.dashboard.bookings') }}</th>
+                            <th class="pb-3 hidden sm:table-cell">{{ __('app.dashboard.hours_booked') }}</th>
+                            <th class="pb-3 hidden sm:table-cell">{{ __('app.dashboard.bookings') }}</th>
                             @if ($canViewRevenue)
                                 <th class="pb-3">{{ __('app.financial.revenue') }}</th>
                             @endif
@@ -339,11 +340,14 @@
                     <tbody>
                         @forelse ($roomUtilization as $row)
                             <tr class="border-b last:border-0">
-                                <td class="py-3 font-medium text-gray-900">{{ $row['room_name'] }}</td>
-                                <td class="py-3">{{ $row['hours_booked'] }}</td>
-                                <td class="py-3">{{ $row['bookings_count'] }}</td>
+                                <td class="py-3 pe-3 font-medium text-gray-900">
+                                    {{ $row['room_name'] }}
+                                    <span class="block sm:hidden text-xs font-normal text-gray-500">{{ $row['hours_booked'] }}{{ __('app.ui.unit_h') }} · {{ $row['bookings_count'] }} {{ __('app.dashboard.bookings') }}</span>
+                                </td>
+                                <td class="py-3 hidden sm:table-cell">{{ $row['hours_booked'] }}</td>
+                                <td class="py-3 hidden sm:table-cell">{{ $row['bookings_count'] }}</td>
                                 @if ($canViewRevenue)
-                                    <td class="py-3">ج.م {{ number_format($row['revenue'], 2) }}</td>
+                                    <td class="py-3 pe-3 whitespace-nowrap">ج.م {{ number_format($row['revenue'], 2) }}</td>
                                 @endif
                                 <td class="py-3">{{ $row['utilization_percent'] !== null ? $row['utilization_percent'].'%' : '—' }}</td>
                             </tr>

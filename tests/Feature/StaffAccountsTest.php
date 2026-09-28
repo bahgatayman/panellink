@@ -453,6 +453,45 @@ class StaffAccountsTest extends TestCase
         $this->actingAs($owner, 'owner')->get("/staff/{$staff->id}/edit")->assertOk()->assertSee($staff->email);
     }
 
+    /**
+     * Regression test for a reported bug: the create/edit permissions grid
+     * only ever renders the rows present in the `permissions` table, and on
+     * an environment where only `php artisan migrate` had ever run (no
+     * `db:seed`), that table held just the 2 `financials.*` rows inserted
+     * directly by a migration — every other permission only ever existed
+     * via PermissionSeeder. See database/migrations/
+     * 2026_09_29_000001_seed_full_permission_catalog.php, which now makes
+     * the full catalog migration-only too. This test asserts every group
+     * and every permission actually renders, not just that the page is 200.
+     */
+    public function test_all_permission_groups_and_permissions_render_on_create_and_edit(): void
+    {
+        $owner = $this->owner();
+        $staff = $this->staff($owner);
+
+        $permissions = Permission::where('is_active', true)->get();
+        $groups = $permissions->pluck('group')->unique();
+
+        $this->assertSame(25, $permissions->count(), 'the permission catalog itself should have 25 rows');
+        $this->assertSame(10, $groups->count(), 'the permission catalog itself should have 10 groups');
+
+        foreach ([
+            '/staff/create' => $this->actingAs($owner, 'owner')->get('/staff/create'),
+            "/staff/{$staff->id}/edit" => $this->actingAs($owner, 'owner')->get("/staff/{$staff->id}/edit"),
+        ] as $url => $response) {
+            $response->assertOk();
+
+            foreach ($groups as $group) {
+                $response->assertSee(__('app.permission_group.'.$group));
+            }
+
+            foreach ($permissions as $permission) {
+                $response->assertSee('value="'.$permission->id.'"', false);
+                $response->assertSee(__('app.permission.'.$permission->key));
+            }
+        }
+    }
+
     public function test_owner_can_create_edit_and_disable_a_staff_member_end_to_end(): void
     {
         $owner = $this->owner();

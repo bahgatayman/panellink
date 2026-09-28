@@ -450,6 +450,18 @@ html[dir="rtl"] .ls-select[dir="ltr"] { background-position: calc(100% - 18px) 5
 .ls-search.has-value .ls-kbd { display: none; }
 .ls-kbd { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 5px; border: 1px solid var(--color-border); background: var(--color-surface); font: var(--fw-medium) 11px var(--ls-font-mono); color: var(--color-text-muted); }
 
+/* Password with show/hide (x-ui.password) — works with ls-input or legacy input classes. */
+.ls-password { position: relative; }
+.ls-password > input { padding-inline-end: 44px !important; }
+.ls-password-toggle { position: absolute; inset-inline-end: 4px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border: 0; border-radius: var(--ls-r-ctl); background: transparent; color: var(--color-text-muted); display: grid; place-items: center; cursor: pointer; transition: background var(--ls-t-fast) var(--ls-ease), color var(--ls-t-fast) var(--ls-ease); }
+.ls-password-toggle:hover { background: var(--color-hover); color: var(--color-text); }
+.ls-password-toggle svg { width: 18px; height: 18px; }
+.ls-password-toggle .ls-password-eye-off, .ls-password-toggle[aria-pressed="true"] .ls-password-eye { display: none; }
+.ls-password-toggle[aria-pressed="true"] .ls-password-eye-off { display: block; }
+.ls-password-toggle[aria-pressed="true"] { color: var(--color-primary-text); }
+/* Legacy Edge/IE's built-in reveal button would double up with ours. */
+.ls-password > input::-ms-reveal { display: none; }
+
 /* Filter chips — text-first; only the selected one gets a (soft) fill. */
 .ls-chips { display: flex; gap: var(--space-1); flex-wrap: wrap; }
 .ls-chip {
@@ -654,6 +666,58 @@ html[dir="rtl"] .ls-qa { font-family: var(--ls-font-ar); }
 .ls-session-foot { display: flex; gap: var(--space-2); align-items: center; margin-top: auto; padding-top: var(--space-1); }
 .ls-session-foot .ls-btn--tonal, .ls-session-foot .ls-btn--primary { flex: 1; min-width: 0; }
 .ls-session-foot .ls-btn span { overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- 10-. Dashboard KPI grids (dashboard/index) ----------
+   Sized by the width the grid actually gets (the sidebar eats ~240px, so
+   viewport breakpoints put five cards in ~170px each on a laptop). The lead
+   card (.ls-kpi-hero, Revenue) spans two columns so five cards never leave
+   an orphan: narrow 2 cols (hero full row) → 3 cols → one row of 6 units. */
+.ls-kpis-wrap { container-type: inline-size; }
+.ls-kpis { display: grid; gap: var(--space-3); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ls-kpis > * { min-width: 0; }
+.ls-kpis > .ls-kpi-hero { grid-column: span 2; }
+@container (max-width: 519px) {
+  .ls-kpis > * { padding: var(--space-4) !important; }
+  .ls-kpis .ls-kpi-icon { display: none !important; }   /* numbers get the room on phones */
+}
+@container (min-width: 520px) {
+  .ls-kpis { gap: var(--space-4); }
+  .ls-kpis--5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container (min-width: 760px) {
+  .ls-kpis { gap: var(--space-5); }
+  .ls-kpis--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+/* One row only once each small card gets ≥ ~230px (a 1440px screen stays at 3 columns). */
+@container (min-width: 1300px) {
+  .ls-kpis--5 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
+/* ---------- 10a-. Staff cards (staff/index) ---------- */
+.ls-staff-search { width: 280px; max-width: 100%; }
+.ls-staff-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: var(--space-4); }
+.ls-staff { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; padding: var(--space-5); background: linear-gradient(180deg, var(--color-card-glow), transparent 80px), var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--ls-r-card); transition: border-color var(--ls-t-fast) var(--ls-ease), box-shadow var(--ls-t-med) var(--ls-ease); }
+.ls-staff:hover { border-color: var(--color-border-hover); box-shadow: var(--shadow-hover); }
+.ls-staff-head { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.ls-staff-who { flex: 1; min-width: 0; display: grid; }
+.ls-staff-name { font-size: 15px; font-weight: var(--fw-strong); color: var(--color-text); text-decoration: none; line-height: 1.35; border-radius: var(--ls-r-sm); }
+.ls-staff-name:hover { color: var(--color-primary-text); }
+.ls-staff-email { font-size: 13px; color: var(--color-text-muted); text-align: left; }
+html[dir="rtl"] .ls-staff-email { text-align: right; } /* the address stays LTR, but lines up with the RTL column */
+.ls-staff-facts { display: grid; gap: var(--space-2); margin: 0; font-size: 13.5px; }
+.ls-staff-facts > div { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.ls-staff-facts dt { display: flex; color: var(--color-text-muted); flex: none; }
+.ls-staff-facts dt svg { width: 15px; height: 15px; }
+.ls-staff-facts dd { margin: 0; min-width: 0; color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ls-staff-role { font-weight: var(--fw-medium); color: var(--color-text); }
+.ls-staff-role.is-custom { color: var(--color-violet); }
+.ls-staff-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); padding-top: var(--space-3); margin-top: auto; border-top: 1px solid var(--color-border-subtle); }
+.ls-staff-foot form { margin: 0; }
+.ls-staff-toggle { margin-inline-start: auto; }
+.ls-staff.is-disabled { background: var(--color-surface-subtle); }
+.ls-staff.is-disabled .ls-avatar { filter: grayscale(1); opacity: .6; }
+.ls-staff.is-disabled .ls-staff-name { color: var(--color-text-secondary); }
+@media (max-width: 640px) { .ls-staff-grid { grid-template-columns: 1fr; gap: var(--space-3); } .ls-staff { padding: var(--space-4); } .ls-staff-search { width: 100%; } }
 
 /* ---------- 10a. Product cards (sales/products/index) ---------- */
 .ls-product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: var(--space-4); }
@@ -1129,3 +1193,20 @@ html[dir="rtl"] .ls-picker-clear svg { transform: scaleX(-1); }
 @media (min-width: 640px) { .ls-picker-quickadd-grid { grid-template-columns: 1fr 1fr; } }
 .ls-picker-quickadd-actions { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
 .ls-picker-quickadd-hint { font-size: 12px; color: var(--color-text-muted); margin-inline-start: auto; }
+
+/* ---------- 16. Staff permissions grid ---------- */
+.ls-permission-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-3); align-items: start; }
+.ls-permission-group { border: 1px solid var(--color-border); border-radius: var(--ls-r-card); background: var(--color-surface); overflow: hidden; }
+.ls-permission-group-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border-subtle); background: var(--color-surface-subtle); }
+.ls-permission-group-title { font-size: 13px; font-weight: var(--fw-strong); color: var(--color-text); display: inline-flex; align-items: baseline; gap: 6px; }
+.ls-permission-group-count { font-size: 11.5px; font-weight: var(--fw-regular); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.ls-permission-group-all { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--color-text-secondary); cursor: pointer; white-space: nowrap; }
+.ls-permission-group-all input { accent-color: var(--color-accent); width: 14px; height: 14px; cursor: pointer; }
+.ls-permission-items { display: grid; gap: 2px; padding: var(--space-2); }
+.ls-permission-item { display: flex; align-items: center; gap: var(--space-2); min-height: 36px; padding: 0 var(--space-2); border-radius: var(--ls-r-ctl); font-size: 13.5px; color: var(--color-text-secondary); cursor: pointer; transition: background var(--ls-t-fast) var(--ls-ease), color var(--ls-t-fast) var(--ls-ease); }
+.ls-permission-item:hover { background: var(--color-hover); color: var(--color-text); }
+.ls-permission-item input { accent-color: var(--color-accent); width: 15px; height: 15px; flex: none; cursor: pointer; }
+@media (pointer: coarse) {
+  .ls-permission-item { min-height: 44px; }
+  .ls-permission-group-all input { width: 18px; height: 18px; }
+}
