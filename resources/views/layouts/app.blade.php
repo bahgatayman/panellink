@@ -56,6 +56,8 @@
         ]],
         ['label' => __('app.ui.nav_group.money'), 'items' => [
             ['show' => ($currentOwner->hasFeature('booking') || $currentOwner->hasFeature('sales')) && $can('financials.view'), 'href' => '/financials', 'active' => request()->is('financials*'), 'icon' => 'money', 'label' => __('app.nav.financials')],
+            ['show' => ($currentOwner->hasFeature('booking') || $currentOwner->hasFeature('sales')) && $can('expenses.view'), 'href' => '/expenses', 'active' => request()->is('expenses*'), 'icon' => 'receipt', 'label' => __('app.nav.expenses')],
+            ['show' => ($currentOwner->hasFeature('booking') || $currentOwner->hasFeature('sales')) && $can('coupons.view'), 'href' => '/coupons', 'active' => request()->is('coupons*'), 'icon' => 'tag', 'label' => __('app.nav.coupons')],
         ]],
         ['label' => __('app.ui.nav_group.network'), 'items' => [
             ['show' => $currentOwner->hasFeature('hotspot') && $can('hotspot.view_sessions'), 'href' => '/sessions', 'active' => request()->is('sessions*'), 'icon' => 'wifi', 'label' => __('app.nav.wifi_sessions')],

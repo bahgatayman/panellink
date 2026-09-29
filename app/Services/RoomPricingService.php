@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\Booking;
 use App\Models\Owner;
 use App\Models\Room;
+use App\Models\RoomPlan;
 use App\Models\SharedSession;
 use App\Support\Money;
 use App\Support\Pricing\PriceQuote;
@@ -34,6 +36,11 @@ use Carbon\Carbon;
  *     whole calendar day when hours aren't configured — so it also acts as the
  *     day's price cap. Longer than every option (no Full Day): the longest
  *     option plus the extra time at that option's own per-minute rate.
+ *
+ * Custom Plans (RoomPlan) sit beside the room's rules: a fixed price for
+ * exactly N people over the plan's own duration (quotePlan/planWindow). A
+ * checked-in plan reservation bills the plan price plus any time beyond it at
+ * the room's standard pricing (quoteSession).
  */
 class RoomPricingService
 {
@@ -72,20 +79,134 @@ class RoomPricingService
      */
     public function quoteSession(SharedSession $session, Carbon $closedAt): PriceQuote
     {
+        if ($plan = $session->plan_snapshot) {
+            return $this->quotePlanSession($session, $plan, $closedAt);
+        }
+
+        return $this->standardSessionQuote($session, $session->opened_at, $closedAt);
+    }
+
+    /** The session's standard (non-plan) bill for the time between $from and $to. */
+    private function standardSessionQuote(SharedSession $session, Carbon $from, Carbon $closedAt): PriceQuote
+    {
         if (! $session->pricing_snapshot) {
             $unit = $session->billing_unit ?? 'minute';
             $rate = (float) ($session->billed_price_per_hour ?? $session->room->price_per_hour);
-            $billed = $this->billing->calculate($session->opened_at, $closedAt, $unit, $rate);
+            $billed = $this->billing->calculate($from, $closedAt, $unit, $rate);
 
             return new PriceQuote(PricingRules::HOURLY, $billed['total_price'], $billed['total_minutes'],
                 $billed['billed_minutes'], $rate, null, $unit === 'minute' ? $rate : null);
         }
 
         $rules = PricingRules::fromStored($session->pricing_snapshot['model'] ?? null, $session->pricing_snapshot['rules'] ?? null);
-        $minutes = round($session->opened_at->diffInSeconds($closedAt) / 60, 2);
+        $minutes = round($from->diffInSeconds($closedAt) / 60, 2);
         $date = $session->session_date?->format('Y-m-d') ?? $session->opened_at->format('Y-m-d');
 
         return $this->quoteRules($rules, max(1, (int) $session->party_size), $minutes, $this->fullDayMinutes($session->room->owner, $date));
+    }
+
+    /**
+     * Plan price for the plan's time, then the room's standard pricing for only
+     * the minutes beyond it (never re-charging the plan's own time).
+     */
+    private function quotePlanSession(SharedSession $session, array $plan, Carbon $closedAt): PriceQuote
+    {
+        $used = round($session->opened_at->diffInSeconds($closedAt) / 60, 2);
+        $planMinutes = (float) $plan['minutes'];
+        $price = (float) $plan['price'];
+
+        if ($used <= $planMinutes) {
+            return new PriceQuote('plan', round($price, 2), $used, $planMinutes, round($price / max(1, $planMinutes / 60), 2), $plan['note'], null);
+        }
+
+        $extra = $this->standardSessionQuote($session, $session->opened_at->copy()->addSeconds((int) round($planMinutes * 60)), $closedAt);
+        $total = round($price + $extra->totalPrice, 2);
+
+        return new PriceQuote('plan', $total, $used, $planMinutes + $extra->billedMinutes,
+            round($total / max(1 / 60, $used / 60), 2),
+            __('app.plans.note_overtime', ['plan' => $plan['note'], 'extra' => PricingRules::minutesLabel((int) ceil($used - $planMinutes))]),
+            null);
+    }
+
+    /**
+     * The window a plan books when it starts at $start on $date: start + the
+     * plan's minutes, or that date's working-hours window for a Full Day plan
+     * (the whole rest of the day when hours aren't configured). Null when the
+     * plan doesn't fit in the day from that start.
+     *
+     * @return array{start: string, end: string, minutes: int}|null
+     */
+    public function planWindow(Room $room, RoomPlan $plan, string $date, string $start): ?array
+    {
+        if ($plan->is_full_day) {
+            $window = $this->businessHours->fullDayWindow($room->owner, $date);
+            if ($window) {
+                $end = $window['end'] === '24:00' ? '23:59' : $window['end'];
+
+                return ['start' => $window['start'], 'end' => $end, 'minutes' => $this->toMinutes($end) - $this->toMinutes($window['start'])];
+            }
+            $start = substr($start, 0, 5);
+
+            return ['start' => $start, 'end' => '23:59', 'minutes' => 1439 - $this->toMinutes($start)];
+        }
+
+        $startMin = $this->toMinutes(substr($start, 0, 5));
+        $endMin = $startMin + (int) $plan->duration_minutes;
+        if ($endMin > 1440) {
+            return null;
+        }
+        $endMin = min($endMin, 1439); // a plan ending exactly at midnight books up to 23:59
+
+        return ['start' => substr($start, 0, 5), 'end' => sprintf('%02d:%02d', intdiv($endMin, 60), $endMin % 60), 'minutes' => $endMin - $startMin];
+    }
+
+    /**
+     * A Custom Plan's fixed price for a booking. The plan is for exactly its
+     * people count; it decides the duration (planWindow). Throws when the plan
+     * doesn't belong to the room, the people count differs, or it can't fit.
+     */
+    public function quotePlan(Room $room, RoomPlan $plan, int $people, string $date, string $start): PriceQuote
+    {
+        if ((int) $plan->room_id !== (int) $room->id) {
+            throw new \InvalidArgumentException('plan_room');
+        }
+        if ($people !== (int) $plan->people) {
+            throw new \InvalidArgumentException('plan_people');
+        }
+        $window = $this->planWindow($room, $plan, $date, $start);
+        if (! $window || $window['minutes'] <= 0) {
+            throw new \InvalidArgumentException('plan_window');
+        }
+
+        $price = round((float) $plan->price, 2);
+
+        return new PriceQuote('plan', $price, (float) $window['minutes'], (float) $window['minutes'],
+            round($price / ($window['minutes'] / 60), 2), $plan->note(), null);
+    }
+
+    /**
+     * Frozen onto the shared session when a plan reservation is checked in:
+     * taken from the booking itself (what was actually sold), so a later edit
+     * or deletion of the plan can't change the session's bill.
+     */
+    public function planSnapshotFor(Booking $booking): ?array
+    {
+        if (! $booking->room_plan_id) {
+            return null;
+        }
+
+        return [
+            'note' => $booking->pricing_note,
+            'minutes' => $this->toMinutes(substr((string) $booking->end_time, 0, 5)) - $this->toMinutes(substr((string) $booking->start_time, 0, 5)),
+            'price' => (float) $booking->total_price,
+        ];
+    }
+
+    private function toMinutes(string $hm): int
+    {
+        [$h, $m] = array_map('intval', explode(':', $hm));
+
+        return $h * 60 + $m;
     }
 
     /** What a session opened now must freeze; null keeps the legacy hourly path. */

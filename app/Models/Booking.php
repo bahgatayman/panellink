@@ -31,6 +31,8 @@ class Booking extends Model
     protected $fillable = [
         'owner_id',
         'room_id',
+        'room_plan_id',
+        'coupon_id',
         'hotspot_user_id',
         'party_size',
         'guest_count',
@@ -41,6 +43,7 @@ class Booking extends Model
         'price_per_hour',
         'total_hours',
         'total_price',
+        'discount_total',
         'pricing_note',
         'amount_paid',
         'payment_status',
@@ -55,6 +58,7 @@ class Booking extends Model
             'price_per_hour' => 'decimal:2',
             'total_hours' => 'decimal:2',
             'total_price' => 'decimal:2',
+            'discount_total' => 'decimal:2',
             'amount_paid' => 'decimal:2',
             'party_size' => 'integer',
             'guest_count' => 'integer',
@@ -81,14 +85,25 @@ class Booking extends Model
     }
 
     /**
-     * What's left to collect on the room charge. Deliberately ignores any
-     * attached Sale (products) — those are already counted separately in
-     * RevenueAnalyticsService::saleRevenue(), so folding them in here would
-     * double-count them against this same balance.
+     * total_price stays the gross room charge exactly as RoomPricingService
+     * returned it — never rewritten. discount_total is a coupon's room-side
+     * discount on top of it (0 when no coupon is attached). This is what
+     * payment/balance math means by "the room charge" from here on.
+     */
+    public function netRoomCharge(): float
+    {
+        return max(0, (float) $this->total_price - (float) $this->discount_total);
+    }
+
+    /**
+     * What's left to collect on the (net-of-coupon) room charge. Deliberately
+     * ignores any attached Sale (products) — those are already counted
+     * separately in RevenueAnalyticsService::saleRevenue(), so folding them in
+     * here would double-count them against this same balance.
      */
     public function balanceDue(): float
     {
-        return max(0, (float) $this->total_price - (float) $this->amount_paid);
+        return max(0, $this->netRoomCharge() - (float) $this->amount_paid);
     }
 
     public function paymentStatusLabel(): string
@@ -120,6 +135,23 @@ class Booking extends Model
         return $this->belongsTo(Owner::class);
     }
 
+    /** The Custom Plan this booking was sold on, if any (null once the plan is deleted). */
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(RoomPlan::class, 'room_plan_id');
+    }
+
+    public function coupon(): BelongsTo
+    {
+        return $this->belongsTo(Coupon::class);
+    }
+
+    /** The redemption history row for this booking's coupon, if it was ever completed with one. */
+    public function couponUsage(): HasOne
+    {
+        return $this->hasOne(CouponUsage::class);
+    }
+
     public function room(): BelongsTo
     {
         return $this->belongsTo(Room::class);
@@ -146,10 +178,10 @@ class Booking extends Model
         return $this->hasOne(SharedSession::class);
     }
 
-    /** Room charge plus any attached product sales. */
+    /** Net (post-coupon) room charge plus any attached product sales (already net of their own discount). */
     public function grandTotal(): float
     {
-        return (float) $this->total_price + (float) ($this->sale?->total ?? 0);
+        return $this->netRoomCharge() + (float) ($this->sale?->total ?? 0);
     }
 
     public function statusColor(): string

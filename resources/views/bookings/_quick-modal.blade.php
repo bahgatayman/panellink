@@ -44,6 +44,14 @@
         'error' => __('app.quick_booking.error'),
         'sessionLost' => __('app.quick_booking.session_lost'),
         'arrow' => ' → ',
+        'standard' => __('app.plans.standard'),
+        'forPeople1' => trans_choice('app.plans.for_people', 1, ['count' => 1]),
+        'forPeopleN' => trans_choice('app.plans.for_people', 2, ['count' => ':count']),
+        'planBooked' => __('app.plans.booked_then'),
+        'planNoFit' => __('app.plans.no_fit'),
+        'planClosed' => __('app.quick_booking.closed'),
+        'plans1' => trans_choice('app.plans.count', 1, ['count' => 1]),
+        'plansN' => trans_choice('app.plans.count', 2, ['count' => ':count']),
     ];
     $qbCanAddMember = ! ($actingStaff ?? null) || $actingStaff->hasPermission('members.create');
 @endphp
@@ -141,6 +149,12 @@
             <div class="ls-qb-rooms" id="qb-rooms" role="radiogroup" aria-labelledby="qb-room-label"></div>
         </section>
 
+        {{-- 4 · Pricing — only when the chosen room has Custom Plans. --}}
+        <section class="ls-qb-step" id="qb-pricing" aria-labelledby="qb-pricing-label" hidden>
+            <h4 class="ls-qb-label" id="qb-pricing-label"><span class="ls-qb-n" aria-hidden="true">4</span>{{ __('app.plans.pricing') }}</h4>
+            <div class="ls-plan-pick" id="qb-plans" role="radiogroup" aria-labelledby="qb-pricing-label"></div>
+        </section>
+
         {{-- Optional extras stay folded away. --}}
         <details class="ls-qb-more">
             <summary>{{ __('app.quick_booking.more') }}</summary>
@@ -182,7 +196,7 @@
     const $ = (id) => document.getElementById(id);
     const fill = (s, map) => Object.entries(map).reduce((o, [k, v]) => o.split(':' + k).join(v), s);
 
-    const S = { user: null, date: '', start: '', minutes: 60, end: '', people: 1, roomId: null, preferRoom: null, rooms: [], fullDay: null, token: 0 };
+    const S = { user: null, date: '', start: '', minutes: 60, end: '', people: 1, roomId: null, planId: null, preferRoom: null, rooms: [], fullDay: null, token: 0 };
 
     // ---------- helpers ----------
     const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -308,10 +322,12 @@
     document.querySelectorAll('[data-qb-day]').forEach((b) => b.addEventListener('click', () => setDate(dayOffset(+b.dataset.qbDay))));
     dateInput.addEventListener('change', () => { if (dateInput.value) setDate(dateInput.value); });
 
+    // A chosen plan follows a new start (it keeps deciding the duration).
     startSel.addEventListener('change', () => { S.start = startSel.value; if (S.minutes === 'fullday') S.minutes = 60; refreshWhen(); schedule(); });
     endSel.addEventListener('change', () => { S.end = endSel.value; refreshWhen(); schedule(); });
     document.querySelectorAll('[data-qb-minutes]').forEach((b) => b.addEventListener('click', () => {
         const v = b.dataset.qbMinutes;
+        S.planId = null; // picking a length by hand means standard pricing
         if (v === 'custom') { S.minutes = 'custom'; S.end = toHm(Math.min(toMin(SLOT_KEYS[SLOT_KEYS.length - 1]), (endMinutes() ?? toMin(S.start) + 60))); }
         else if (v === 'fullday') { S.minutes = 'fullday'; S.start = S.fullDay.start; startSel.value = S.start; }
         else S.minutes = +v;
@@ -407,13 +423,73 @@
                 <span class="ls-qb-room-main"><b class="ls-trunc"></b><span class="ls-qb-room-meta ls-trunc"></span></span>
                 <span class="ls-qb-room-price"><b class="ls-num"></b><small></small></span>`;
             el.querySelector('b.ls-trunc').textContent = r.name;
-            el.querySelector('.ls-qb-room-meta').textContent = `${r.type_label} · ${(r.capacity === 1 ? T.seat1 : fill(T.seatsN, { count: r.capacity }))}`;
+            const planCount = (r.plans || []).length;
+            el.querySelector('.ls-qb-room-meta').textContent = `${r.type_label} · ${(r.capacity === 1 ? T.seat1 : fill(T.seatsN, { count: r.capacity }))}`
+                + (planCount ? ` · ${planCount === 1 ? T.plans1 : fill(T.plansN, { count: planCount })}` : '');
             el.querySelector('.ls-qb-room-price b').textContent = off ? '' : r.total_price_display;
             el.querySelector('.ls-qb-room-price small').textContent = off ? (r.reason === 'no_seats' ? T.noSeats : T.bookedThen) : (r.price_note || '');
-            el.querySelector('input').addEventListener('change', () => { S.roomId = String(r.id); renderRooms(); });
+            el.querySelector('input').addEventListener('change', () => {
+                S.roomId = String(r.id); S.planId = null; renderRooms();
+                // Bring the plan choice into view when this room has plans.
+                if (!$('qb-pricing').hidden) $('qb-pricing').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            });
             box.appendChild(el);
         });
+        renderPlans();
         update();
+    }
+
+    // ---------- 4 · pricing: standard vs the room's Custom Plans ----------
+    function planWhy(p) {
+        if (!p.fits_people) return p.people === 1 ? T.forPeople1 : fill(T.forPeopleN, { count: p.people });
+        if (p.state === 'booked') return T.planBooked;
+        if (p.state === 'no_fit') return T.planNoFit;
+        if (p.state === 'outside_hours') return T.planClosed;
+        return '';
+    }
+    function currentPlan() {
+        const room = currentRoom();
+        return room && S.planId ? (room.plans || []).find((p) => String(p.id) === S.planId) || null : null;
+    }
+    function renderPlans() {
+        const room = currentRoom();
+        const plans = room ? room.plans || [] : [];
+        $('qb-pricing').hidden = !plans.length;
+        const box = $('qb-plans');
+        box.innerHTML = '';
+        if (!plans.length) { S.planId = null; return; }
+
+        // A chosen plan that no longer fits (people/time changed) falls back to standard.
+        const chosen = currentPlan();
+        if (chosen && planWhy(chosen)) S.planId = null;
+        // …and one that still fits keeps deciding the window.
+        const keep = currentPlan();
+        if (keep && (keep.start_time !== S.start || toHm(endMinutes() || 0) !== keep.end_time)) {
+            S.start = keep.start_time; startSel.value = S.start; S.minutes = 'custom'; S.end = keep.end_time; refreshWhen();
+        }
+
+        const opt = (id, title, sub, price, why) => {
+            const off = !!why;
+            const on = String(S.planId || '') === String(id || '');
+            const el = document.createElement('label');
+            el.className = 'ls-plan-opt' + (on ? ' is-selected' : '') + (off ? ' is-off' : '');
+            el.innerHTML = '<input type="radio" name="qb-plan"><span class="ls-plan-opt-main"><b></b><small></small></span><span class="ls-plan-opt-price"></span>';
+            const input = el.querySelector('input');
+            input.value = id || ''; input.checked = on; input.disabled = off;
+            el.querySelector('b').textContent = title;
+            el.querySelector('small').textContent = sub;
+            if (why) { const w = document.createElement('span'); w.className = 'ls-plan-why'; w.textContent = why; el.querySelector('.ls-plan-opt-main').appendChild(w); }
+            el.querySelector('.ls-plan-opt-price').textContent = price;
+            input.addEventListener('change', () => {
+                S.planId = id ? String(id) : null;
+                const p = currentPlan();
+                if (p) { S.start = p.start_time; startSel.value = S.start; S.minutes = 'custom'; S.end = p.end_time; refreshWhen(); schedule(); }
+                renderPlans(); update();
+            });
+            box.appendChild(el);
+        };
+        opt(null, T.standard, room.price_note || '', room.total_price_display, '');
+        plans.forEach((p) => opt(p.id, p.name, `${p.people_label} · ${p.duration_label}`, p.price_display, planWhy(p)));
     }
 
     // ---------- price + CTA (the one summary) ----------
@@ -421,17 +497,24 @@
     function currentRoom() { return S.rooms.find((r) => String(r.id) === S.roomId) || null; }
     function update() {
         const room = currentRoom();
+        const plan = currentPlan();
         const missing = !S.user ? T.needCustomer : !endMinutes() ? T.needTime : !room ? T.needRoom : '';
-        $('qb-total').textContent = room ? room.total_price_display : '—';
-        $('qb-hint').textContent = missing || (room && room.price_note) || '';
+        $('qb-total').textContent = plan ? plan.price_display : room ? room.total_price_display : '—';
+        // The chosen room's row shows what will actually be charged (one price on screen, not two).
+        const selRow = document.querySelector('.ls-qb-room.is-selected');
+        if (selRow && room) {
+            selRow.querySelector('.ls-qb-room-price b').textContent = plan ? plan.price_display : room.total_price_display;
+            selRow.querySelector('.ls-qb-room-price small').textContent = plan ? plan.name : (room.price_note || '');
+        }
+        $('qb-hint').textContent = missing || (plan ? plan.note : room && room.price_note) || '';
         submit.disabled = !!missing;
-        submit.textContent = room ? fill(T.cta, { total: room.total_price_display }) : T.ctaIdle;
+        submit.textContent = room ? fill(T.cta, { total: plan ? plan.price_display : room.total_price_display }) : T.ctaIdle;
         const paid = $('qb-paid');
-        if (room) paid.max = room.total_price;
+        if (room) paid.max = plan ? plan.price : room.total_price;
     }
     document.querySelectorAll('[data-qb-paid]').forEach((b) => b.addEventListener('click', () => {
-        const room = currentRoom();
-        $('qb-paid').value = b.dataset.qbPaid === 'full' && room ? room.total_price : '';
+        const room = currentRoom(), plan = currentPlan();
+        $('qb-paid').value = b.dataset.qbPaid === 'full' && room ? (plan ? plan.price : room.total_price) : '';
     }));
 
     $('qb-form').addEventListener('submit', (e) => {
@@ -446,6 +529,7 @@
         body.append('end_time', toHm(endMinutes()));
         body.append('room_id', room.id);
         body.append('guest_count', S.people);
+        if (currentPlan()) body.append('room_plan_id', S.planId);
         if ($('qb-paid').value) body.append('amount_paid', $('qb-paid').value);
         if ($('qb-notes').value.trim()) body.append('notes', $('qb-notes').value.trim());
         LS.busy(submit);
@@ -475,7 +559,7 @@
         document.querySelector('.ls-qb-more').open = false;
         if ($('qb-newcust')) $('qb-newcust').hidden = true;
         $('qb-picked-name').textContent = ''; $('qb-picked-phone').textContent = '';
-        S.user = null; S.roomId = null; S.rooms = []; S.people = 1; peopleInput.value = 1;
+        S.user = null; S.roomId = null; S.planId = null; S.rooms = []; S.people = 1; peopleInput.value = 1;
         S.preferRoom = prefill.room_id || null;
         $('qb-picked').hidden = true; $('qb-find').hidden = false; search.value = '';
 

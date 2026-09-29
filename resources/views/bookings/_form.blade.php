@@ -29,6 +29,13 @@
     // People the booking is priced for (RoomPricingService). Exclusive rooms
     // keep party_size = 1 for availability; the headcount travels as guest_count.
     $initialGuests = (int) ($isEdit ? old('guest_count', $booking->guest_count ?? $booking->party_size ?? 1) : old('guest_count', 1));
+    $initialPlanId = (string) ($isEdit ? old('room_plan_id', $booking->room_plan_id) : old('room_plan_id', ''));
+    $planI18n = [
+        'standard' => __('app.plans.standard'),
+        'forPeople1' => trans_choice('app.plans.for_people', 1, ['count' => 1]),
+        'forPeopleN' => trans_choice('app.plans.for_people', 2, ['count' => ':count']),
+        'booked' => __('app.plans.booked_then'), 'noFit' => __('app.plans.no_fit'), 'closed' => __('app.booking.outside_working_hours'),
+    ];
     $actionUrl = $isEdit ? "/bookings/{$booking->id}" : '/bookings';
 
     // Spelled out ("30 min", "1.5 hr") rather than the compact "1h 30m"
@@ -156,6 +163,13 @@
                     @endforeach
                 </div>
                 @error('room_id') <span class="ls-error"><x-ui.icon name="alert" />{{ $message }}</span> @enderror
+
+                {{-- Standard pricing vs the selected room's Custom Plans (only when it has any). --}}
+                <div class="ls-field" id="plan-choice" hidden style="margin-top: var(--space-4)">
+                    <span class="ls-label" id="plan-choice-label">{{ __('app.plans.pricing') }}</span>
+                    <div class="ls-plan-pick" id="plan-options" role="radiogroup" aria-labelledby="plan-choice-label"></div>
+                </div>
+                <input type="hidden" name="room_plan_id" id="room_plan_id" value="{{ $initialPlanId }}">
             </div>
         </div>
 
@@ -214,6 +228,10 @@
     let lastRoomOptions = [];
     let fullDayWindow = null; // {start, end} of the date's business day, from room-options
     const guestInput = document.getElementById('guest_count');
+    const planInput = document.getElementById('room_plan_id');
+    const planChoice = document.getElementById('plan-choice');
+    const planOptionsBox = document.getElementById('plan-options');
+    const PT = @json($planI18n);
 
     function addMinutes(hm, mins) {
         const [h, m] = hm.split(':').map(Number);
@@ -417,9 +435,81 @@
     }
 
     roomGrid.addEventListener('change', () => {
+        planInput.value = ''; // plans belong to one room
         updateRoomSelectedClasses();
+        renderPlanChoice();
         updateSummaryAndPayment();
     });
+
+    // Picking a length or an end time by hand means standard pricing.
+    durationChips.forEach(chip => chip.addEventListener('click', () => { if (planInput.value) { planInput.value = ''; renderPlanChoice(); updateSummaryAndPayment(); } }, true));
+    endGrid.addEventListener('click', () => { if (planInput.value) { planInput.value = ''; renderPlanChoice(); updateSummaryAndPayment(); } }, true);
+
+    // --- Custom Plans ---
+    function rawRoomOption() {
+        const id = selectedRoomId();
+        return id ? lastRoomOptions.find(o => String(o.id) === String(id)) : null;
+    }
+    function currentPlan() {
+        const opt = rawRoomOption();
+        return opt && planInput.value ? (opt.plans || []).find(p => String(p.id) === String(planInput.value)) || null : null;
+    }
+    function planWhy(p) {
+        if (!p.fits_people) return p.people === 1 ? PT.forPeople1 : PT.forPeopleN.replace(':count', p.people);
+        if (p.state === 'booked') return PT.booked;
+        if (p.state === 'no_fit') return PT.noFit;
+        if (p.state === 'outside_hours') return PT.closed;
+        return '';
+    }
+    function applyPlanWindow(p) {
+        durationMinutes = null;
+        if (startHidden.value !== p.start_time) {
+            startHidden.value = p.start_time;
+            startText.textContent = startOptions[p.start_time] ?? p.start_time;
+            startText.classList.remove('is-placeholder');
+            setChecked(startGrid, p.start_time);
+            refreshStepperState();
+        }
+        setEnd(p.end_time);
+        customEndField.style.display = '';
+        refreshDurationChips();
+        refreshReservationReadouts();
+    }
+    function renderPlanChoice() {
+        const opt = rawRoomOption();
+        const plans = opt ? opt.plans || [] : [];
+        planChoice.hidden = !plans.length;
+        planOptionsBox.innerHTML = '';
+        if (!plans.length) { planInput.value = ''; return; }
+
+        const chosen = currentPlan();
+        if (chosen && planWhy(chosen)) planInput.value = '';
+        const keep = currentPlan();
+        if (keep && (keep.start_time !== startHidden.value || keep.end_time !== endHidden.value)) { applyPlanWindow(keep); fetchRoomOptions(); }
+
+        const add = (id, title, sub, price, why) => {
+            const on = String(planInput.value || '') === String(id || '');
+            const el = document.createElement('label');
+            el.className = 'ls-plan-opt' + (on ? ' is-selected' : '') + (why ? ' is-off' : '');
+            el.innerHTML = '<input type="radio" name="plan-choice"><span class="ls-plan-opt-main"><b></b><small></small></span><span class="ls-plan-opt-price"></span>';
+            const input = el.querySelector('input');
+            input.checked = on; input.disabled = !!why;
+            el.querySelector('b').textContent = title;
+            el.querySelector('small').textContent = sub;
+            if (why) { const w = document.createElement('span'); w.className = 'ls-plan-why'; w.textContent = why; el.querySelector('.ls-plan-opt-main').appendChild(w); }
+            el.querySelector('.ls-plan-opt-price').textContent = price;
+            input.addEventListener('change', () => {
+                planInput.value = id || '';
+                const p = currentPlan();
+                if (p) { applyPlanWindow(p); fetchRoomOptions(); }
+                renderPlanChoice();
+                updateSummaryAndPayment();
+            });
+            planOptionsBox.appendChild(el);
+        };
+        add(null, PT.standard, opt.price_note || '', opt.total_price_display, '');
+        plans.forEach(p => add(p.id, p.name, p.people_label + ' · ' + p.duration_label, p.price_display, planWhy(p)));
+    }
     updateRoomSelectedClasses();
 
     // --- Room availability/pricing (replaces the old checkAvailability() call) ---
@@ -459,14 +549,18 @@
                     const card = roomGrid.querySelector(`[data-room-card][data-room-id="${opt.id}"]`);
                     if (card) applyRoomOption(card, opt, durationText);
                 });
+                renderPlanChoice();
                 updateSummaryAndPayment();
             })
             .catch(() => {});
     }
 
+    // The option the summary/payment use: a chosen Custom Plan's fixed price
+    // replaces the standard quote (both come from the server's room-options).
     function currentRoomOption() {
-        const id = selectedRoomId();
-        return id ? lastRoomOptions.find(o => String(o.id) === String(id)) : null;
+        const opt = rawRoomOption();
+        const plan = currentPlan();
+        return opt && plan ? { ...opt, total_price: plan.price, total_price_display: plan.price_display, price_note: plan.note } : opt;
     }
 
     // --- Payment ---
@@ -493,6 +587,11 @@
 
     function updateSummaryAndPayment() {
         const opt = currentRoomOption();
+        // The selected room card shows what will actually be charged (plan price when a plan is chosen).
+        const selCard = roomGrid.querySelector('[data-room-card].is-selected');
+        if (selCard && opt && selCard.dataset.shared !== 'true') {
+            selCard.querySelector('[data-room-price] .ls-room-card-price-value').textContent = opt.total_price_display;
+        }
         const total = opt ? opt.total_price : 0;
         const isShared = opt ? opt.is_shared : false;
 

@@ -7,13 +7,17 @@ use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\SharedSession;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Sales math + line-item management. Totals are always computed server-side
- * from the persisted line items — never trusted from the client.
+ * from the persisted line items — never trusted from the client. Stock for
+ * tracked products moves through InventoryService in the same transaction.
  */
 class SalesService
 {
+    public function __construct(private InventoryService $inventory) {}
+
     /** The sale attached to a booking, creating it on first use. */
     public function saleForBooking(Booking $booking): Sale
     {
@@ -63,25 +67,36 @@ class SalesService
     {
         $quantity = max(1, $quantity);
 
-        $item = $sale->items()->create([
-            'product_id' => $product->id,
-            'name' => $product->name,
-            'unit_price' => $product->price,
-            'quantity' => $quantity,
-            'line_total' => round((float) $product->price * $quantity, 2),
-        ]);
+        // One transaction: if the product's stock can't cover the quantity,
+        // InventoryService throws InsufficientStockException and the line is
+        // never written. unit_cost freezes today's purchase price so later
+        // cost changes never rewrite this sale's profit.
+        return DB::transaction(function () use ($sale, $product, $quantity) {
+            $item = $sale->items()->create([
+                'product_id' => $product->id,
+                'name' => $product->name,
+                'unit_price' => $product->price,
+                'unit_cost' => $product->purchase_price,
+                'quantity' => $quantity,
+                'line_total' => round((float) $product->price * $quantity, 2),
+            ]);
 
-        $this->recalculate($sale);
+            $this->inventory->take($product, $quantity, $item);
+            $this->recalculate($sale);
 
-        return $item;
+            return $item;
+        });
     }
 
-    /** Remove a line item and recompute totals. */
+    /** Remove a line item (its units go back in stock) and recompute totals. */
     public function removeItem(SaleItem $item): void
     {
-        $sale = $item->sale;
-        $item->delete();
-        $this->recalculate($sale);
+        DB::transaction(function () use ($item) {
+            $sale = $item->sale;
+            $this->inventory->giveBack($item);
+            $item->delete();
+            $this->recalculate($sale);
+        });
     }
 
     /** Recompute subtotal/total from the line items and persist. */

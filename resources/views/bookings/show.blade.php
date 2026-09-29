@@ -74,7 +74,7 @@
                     <div>
                         @if ($booking->pricing_note)
                             <dt class="text-gray-500">{{ __('app.pricing.applied') }}</dt>
-                            <dd class="text-gray-900 font-medium mt-1">{{ $booking->pricing_note }}</dd>
+                            <dd class="text-gray-900 font-medium mt-1">{{ $booking->pricing_note }}@if ($booking->room_plan_id)<span class="ls-plan-tag">{{ __('app.plans.badge') }}</span>@endif</dd>
                         @else
                             <dt class="text-gray-500">{{ __('app.workspace.price_per_hour') }}</dt>
                             <dd class="text-gray-900 font-medium mt-1">ج.م {{ number_format($booking->price_per_hour, 2) }}</dd>
@@ -82,7 +82,12 @@
                     </div>
                     <div class="md:col-span-2">
                         <dt class="text-gray-500">{{ __('app.booking.total') }}</dt>
-                        <dd class="text-2xl font-bold text-blue-600 mt-1">ج.م {{ number_format($booking->total_price, 2) }}</dd>
+                        <dd class="text-2xl font-bold text-blue-600 mt-1">ج.م {{ number_format($booking->netRoomCharge(), 2) }}</dd>
+                        @if ($booking->coupon_id && $booking->discount_total > 0)
+                            <dd class="text-xs text-gray-400 mt-0.5">
+                                {{ __('app.coupons.checkout.original_amount', ['amount' => number_format($booking->total_price, 2)]) }}
+                            </dd>
+                        @endif
                     </div>
                 </dl>
 
@@ -186,7 +191,7 @@
                     <div class="mt-5 pt-4 border-t border-gray-200 space-y-1 text-sm">
                         <div class="flex justify-between text-gray-500">
                             <span>{{ __('app.sales.room_charge') }}</span>
-                            <span>ج.م {{ number_format($booking->total_price, 2) }}</span>
+                            <span>ج.م {{ number_format($booking->netRoomCharge(), 2) }}</span>
                         </div>
                         <div class="flex justify-between text-gray-500">
                             <span>{{ __('app.sales.items') }}</span>

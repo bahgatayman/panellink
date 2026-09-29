@@ -64,7 +64,7 @@ class BookingAnalyticsService
             ->whereIn('status', ['completed', 'checked_in', 'confirmed'])
             ->whereDate('booking_date', '>=', $period->startDate())
             ->whereDate('booking_date', '<=', $period->endDate())
-            ->selectRaw('room_id, SUM(total_hours) as hours, SUM(total_price) as revenue, COUNT(*) as bookings')
+            ->selectRaw('room_id, SUM(total_hours) as hours, SUM(total_price - discount_total) as revenue, COUNT(*) as bookings')
             ->groupBy('room_id')
             ->get()
             ->keyBy('room_id');

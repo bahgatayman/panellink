@@ -12,7 +12,7 @@ class SharedSession extends Model
         'owner_id', 'room_id', 'hotspot_user_id', 'party_size',
         'session_date', 'start_time',
         'opened_at', 'closed_at', 'total_minutes', 'total_price',
-        'status', 'booking_id', 'billing_unit', 'billed_price_per_hour', 'pricing_snapshot',
+        'status', 'booking_id', 'billing_unit', 'billed_price_per_hour', 'pricing_snapshot', 'plan_snapshot',
     ];
 
     protected $casts = [
@@ -23,6 +23,7 @@ class SharedSession extends Model
         'total_price' => 'decimal:2',
         'billed_price_per_hour' => 'decimal:2',
         'pricing_snapshot' => 'array',
+        'plan_snapshot' => 'array',
         'party_size' => 'integer',
     ];
 

@@ -102,6 +102,21 @@ class Owner extends Authenticatable
         return $this->hasMany(StaffActivityLog::class);
     }
 
+    public function expenseCategories(): HasMany
+    {
+        return $this->hasMany(ExpenseCategory::class);
+    }
+
+    public function expenses(): HasMany
+    {
+        return $this->hasMany(Expense::class);
+    }
+
+    public function coupons(): HasMany
+    {
+        return $this->hasMany(Coupon::class);
+    }
+
     public function plan(): BelongsTo
     {
         return $this->belongsTo(Plan::class);

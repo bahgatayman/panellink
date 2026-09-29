@@ -43,6 +43,18 @@ class PermissionSeeder extends Seeder
             ['key' => 'financials.view', 'name' => 'View Financials', 'group' => 'financials'],
             ['key' => 'financials.export', 'name' => 'Export Financial Reports', 'group' => 'financials'],
 
+            ['key' => 'expenses.view', 'name' => 'View Expenses', 'group' => 'expenses'],
+            ['key' => 'expenses.create', 'name' => 'Add Expenses', 'group' => 'expenses'],
+            ['key' => 'expenses.edit', 'name' => 'Edit Expenses', 'group' => 'expenses'],
+            ['key' => 'expenses.delete', 'name' => 'Delete Expenses', 'group' => 'expenses'],
+            ['key' => 'expenses.manage_categories', 'name' => 'Manage Expense Categories', 'group' => 'expenses'],
+
+            ['key' => 'coupons.view', 'name' => 'View Coupons', 'group' => 'coupons'],
+            ['key' => 'coupons.create', 'name' => 'Create Coupons', 'group' => 'coupons'],
+            ['key' => 'coupons.edit', 'name' => 'Edit Coupons', 'group' => 'coupons'],
+            ['key' => 'coupons.delete', 'name' => 'Delete Coupons', 'group' => 'coupons'],
+            ['key' => 'coupons.apply', 'name' => 'Apply Coupons at Checkout', 'group' => 'coupons'],
+
             ['key' => 'settings.view', 'name' => 'View Settings', 'group' => 'settings'],
             ['key' => 'settings.manage', 'name' => 'Manage Settings', 'group' => 'settings'],
 

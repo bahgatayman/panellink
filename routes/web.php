@@ -17,8 +17,11 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\BookingController;
+use App\Http\Controllers\CouponController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DemoRequestController;
+use App\Http\Controllers\ExpenseCategoryController;
+use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\FinancialController as OwnerFinancialController;
 use App\Http\Controllers\HotspotUserController;
 use App\Http\Controllers\LanguageController;
@@ -206,6 +209,12 @@ Route::middleware(['auth:owner,staff', 'subscription.active', 'staff.active'])->
             Route::post('/bookings/{booking}/items', [BookingController::class, 'addItem'])->name('bookings.items.add');
             Route::delete('/bookings/{booking}/items/{item}', [BookingController::class, 'removeItem'])->name('bookings.items.remove');
         });
+
+        // Attaching a coupon to a still-editable booking needs both grants.
+        Route::middleware(['permission:bookings.edit', 'permission:coupons.apply'])->group(function () {
+            Route::post('/bookings/{booking}/coupon', [BookingController::class, 'applyCoupon'])->name('bookings.coupon.apply');
+            Route::delete('/bookings/{booking}/coupon', [BookingController::class, 'removeCoupon'])->name('bookings.coupon.remove');
+        });
     });
 
     // Sales feature routes (product catalog + sales history)
@@ -219,7 +228,12 @@ Route::middleware(['auth:owner,staff', 'subscription.active', 'staff.active'])->
             Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
             Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
             Route::post('/products/{product}/toggle', [ProductController::class, 'toggleActive'])->name('products.toggle');
+            // Inventory: restock / reduce-with-reason (InventoryService).
+            Route::post('/products/{product}/stock', [ProductController::class, 'adjustStock'])->name('products.stock');
         });
+
+        // After /products/create so "create" is never read as a product id.
+        Route::get('/products/{product}', [ProductController::class, 'show'])->name('products.show')->middleware('permission:products.view');
     });
 
     // Financials — replaces the old Sales section with a unified view of
@@ -231,6 +245,36 @@ Route::middleware(['auth:owner,staff', 'subscription.active', 'staff.active'])->
         Route::get('/financials/transactions', [OwnerFinancialController::class, 'transactions'])->name('financials.transactions')->middleware('permission:financials.view');
         Route::get('/financials/transactions/{booking}', [OwnerFinancialController::class, 'show'])->name('financials.transactions.show')->middleware('permission:financials.view');
         Route::get('/financials/export', [OwnerFinancialController::class, 'export'])->name('financials.export')->middleware('permission:financials.export');
+
+        // Expenses — additive layer alongside Revenue; Net = Revenue - Expenses.
+        Route::get('/expenses', [ExpenseController::class, 'index'])->name('expenses.index')->middleware('permission:expenses.view');
+        Route::middleware('permission:expenses.create')->group(function () {
+            Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
+        });
+        Route::middleware('permission:expenses.edit')->group(function () {
+            Route::get('/expenses/{id}/edit', [ExpenseController::class, 'edit'])->name('expenses.edit');
+            Route::put('/expenses/{id}', [ExpenseController::class, 'update'])->name('expenses.update');
+        });
+        Route::delete('/expenses/{id}', [ExpenseController::class, 'destroy'])->name('expenses.destroy')->middleware('permission:expenses.delete');
+
+        Route::middleware('permission:expenses.manage_categories')->group(function () {
+            Route::post('/expense-categories', [ExpenseCategoryController::class, 'store'])->name('expense-categories.store');
+            Route::put('/expense-categories/{id}', [ExpenseCategoryController::class, 'update'])->name('expense-categories.update');
+            Route::delete('/expense-categories/{id}', [ExpenseCategoryController::class, 'destroy'])->name('expense-categories.destroy');
+        });
+
+        // Coupons — discount codes for rooms and/or products & services.
+        Route::get('/coupons', [CouponController::class, 'index'])->name('coupons.index')->middleware('permission:coupons.view');
+        Route::middleware('permission:coupons.create')->group(function () {
+            Route::get('/coupons/create', [CouponController::class, 'create'])->name('coupons.create');
+            Route::post('/coupons', [CouponController::class, 'store'])->name('coupons.store');
+        });
+        Route::middleware('permission:coupons.edit')->group(function () {
+            Route::get('/coupons/{id}/edit', [CouponController::class, 'edit'])->name('coupons.edit');
+            Route::put('/coupons/{id}', [CouponController::class, 'update'])->name('coupons.update');
+            Route::post('/coupons/{id}/toggle', [CouponController::class, 'toggleActive'])->name('coupons.toggle');
+        });
+        Route::delete('/coupons/{id}', [CouponController::class, 'destroy'])->name('coupons.destroy')->middleware('permission:coupons.delete');
     });
 
     // Retired — permanent redirects into Financials so old /sales links

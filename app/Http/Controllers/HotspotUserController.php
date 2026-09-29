@@ -206,6 +206,7 @@ class HotspotUserController extends Controller
             $stats = [
                 'bookings' => $user->bookings()->where('status', '!=', 'cancelled')->count(),
                 'spent' => (float) $user->bookings()->where('status', 'completed')->sum('total_price')
+                            - (float) $user->bookings()->where('status', 'completed')->sum('discount_total')
                             + (float) $user->sales()->where('status', 'completed')->sum('total'),
                 'minutes' => (float) $user->sharedSessions()->where('status', 'closed')->sum('total_minutes'),
                 'last' => $user->bookings()

@@ -44,7 +44,7 @@
     } else {
         $unit = null;
         $rate = (float) $model->price_per_hour;
-        $roomCharge = (float) $model->total_price;
+        $roomCharge = $model->netRoomCharge();
         $endsAt = $model->endsAt();
         $endingSoon = now()->diffInMinutes($endsAt, false) <= 15;
     }

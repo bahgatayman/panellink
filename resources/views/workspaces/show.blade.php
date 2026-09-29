@@ -3,7 +3,7 @@
 @section('page-title', $workspace->name)
 
 @php
-    $rooms          = $workspace->rooms;
+    $rooms          = $workspace->rooms->loadCount('plans');
     $availableRooms = $rooms->where('is_available', true)->count();
     $totalCapacity  = (int) $rooms->sum('capacity');
     // Each room's starting price (its hourly rate, or its lowest rule price);
@@ -212,6 +212,9 @@
                                         @else
                                             {{ $room->pricingSummary() }}
                                             <span class="text-xs font-normal text-gray-400">· {{ __('app.pricing.models.'.$room->pricing_model.'.title') }}</span>
+                                        @endif
+                                        @if ($room->plans_count)
+                                            <span class="ls-plan-tag">{{ trans_choice('app.plans.count', $room->plans_count, ['count' => $room->plans_count]) }}</span>
                                         @endif
                                     </span>
                                 </div>

@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\SharedSession;
 use App\Models\StaffActivityLog;
 use App\Services\AnalyticsPeriod;
+use App\Services\ExpenseAnalyticsService;
 use App\Services\RevenueAnalyticsService;
 use App\Support\TenantContext;
 use App\Support\TransactionsQuery;
@@ -23,12 +24,18 @@ class FinancialController extends Controller
 
     private const SOURCES = ['all', 'direct_booking', 'shared_session', 'with_products'];
 
-    public function __construct(private RevenueAnalyticsService $revenueAnalytics) {}
+    public function __construct(
+        private RevenueAnalyticsService $revenueAnalytics,
+        private ExpenseAnalyticsService $expenseAnalytics,
+    ) {}
 
     public function index(Request $request): View
     {
         $owner = TenantContext::user();
         [$period, $periodKey, $customStart, $customEnd] = $this->resolvePeriod($request);
+
+        $staff = auth('staff')->user();
+        $canViewExpenses = ! $staff || $staff->hasPermission('expenses.view');
 
         return view('financials.index', [
             'owner' => $owner,
@@ -36,6 +43,7 @@ class FinancialController extends Controller
             'periodKey' => $periodKey,
             'customStart' => $customStart,
             'customEnd' => $customEnd,
+            'canViewExpenses' => $canViewExpenses,
             'revenueToday' => $this->revenueAnalytics->totalRevenue($owner, AnalyticsPeriod::today()),
             'revenueThisWeek' => $this->revenueAnalytics->totalRevenue($owner, AnalyticsPeriod::thisWeek()),
             'revenueThisMonth' => $this->revenueAnalytics->totalRevenue($owner, AnalyticsPeriod::thisMonth()),
@@ -47,6 +55,8 @@ class FinancialController extends Controller
             'byRoom' => $this->revenueAnalytics->revenueByRoom($owner, $period),
             'byRoomType' => $this->revenueAnalytics->revenueByRoomType($owner, $period),
             'byProduct' => $this->revenueAnalytics->revenueByProduct($owner, $period),
+            'totalExpenses' => $this->expenseAnalytics->totalExpenses($owner, $period),
+            'netTotal' => $this->revenueAnalytics->totalRevenue($owner, $period) - $this->expenseAnalytics->totalExpenses($owner, $period),
         ]);
     }
 

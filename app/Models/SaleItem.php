@@ -15,6 +15,7 @@ class SaleItem extends Model
         'product_id',
         'name',
         'unit_price',
+        'unit_cost',
         'quantity',
         'line_total',
     ];
@@ -23,6 +24,7 @@ class SaleItem extends Model
     {
         return [
             'unit_price' => 'decimal:2',
+            'unit_cost' => 'decimal:2',
             'quantity' => 'integer',
             'line_total' => 'decimal:2',
         ];
@@ -36,5 +38,19 @@ class SaleItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /** Cost of this line at the moment of sale (null when sold before costs were recorded). */
+    public function lineCost(): ?float
+    {
+        return $this->unit_cost === null ? null : round((float) $this->unit_cost * $this->quantity, 2);
+    }
+
+    /** Gross profit of this line from its own snapshot, never the product's current cost. */
+    public function lineProfit(): ?float
+    {
+        $cost = $this->lineCost();
+
+        return $cost === null ? null : round((float) $this->line_total - $cost, 2);
     }
 }

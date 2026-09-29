@@ -51,6 +51,12 @@
                     <span class="text-gray-600">{{ __('app.financials.room_charge') }} ({{ $booking->pricing_note ?: $booking->total_hours.'h × ج.م '.number_format($booking->price_per_hour, 2) }})</span>
                     <span class="font-medium text-gray-900">ج.م {{ number_format($booking->total_price, 2) }}</span>
                 </div>
+                @if ($booking->coupon_id && $booking->discount_total > 0)
+                    <div class="flex items-center justify-between text-sm mt-1 text-red-600">
+                        <span>{{ __('app.coupons.checkout.coupon_line', ['code' => $booking->coupon?->code]) }}</span>
+                        <span>&minus;ج.م {{ number_format($booking->discount_total, 2) }}</span>
+                    </div>
+                @endif
             </div>
 
             @if ($booking->sale && $booking->sale->status === 'completed' && $booking->sale->items->isNotEmpty())

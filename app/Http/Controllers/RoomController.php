@@ -6,10 +6,12 @@ use App\Models\Room;
 use App\Models\Workspace;
 use App\Services\ActivityLogger;
 use App\Services\AvailabilityService;
+use App\Support\Pricing\PlanInput;
 use App\Support\Pricing\PricingRules;
 use App\Support\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -62,6 +64,50 @@ class RoomController extends Controller
         return $data;
     }
 
+    /**
+     * The room form's Custom Plans, validated (PlanInput). Null when the
+     * request doesn't carry the field at all, so a client that never sends
+     * plans (API, older form) leaves a room's plans untouched.
+     */
+    private function validatedPlans(Request $request, array $data): ?array
+    {
+        if (! $request->has('plans')) {
+            return null;
+        }
+        [$plans, $errors] = PlanInput::parse($request->input('plans'), $data['type'], (int) $data['capacity']);
+        if ($errors) {
+            throw ValidationException::withMessages(['plans' => $errors]);
+        }
+
+        return $plans;
+    }
+
+    /**
+     * Make the room's plans match the submitted list: update the ones it kept
+     * (matched by id, scoped to this room), create new ones, delete the rest.
+     * Past bookings keep their price — room_plan_id is nulled on delete.
+     */
+    private function syncPlans(Room $room, array $plans): void
+    {
+        $existing = $room->plans()->get()->keyBy('id');
+        $kept = [];
+
+        foreach ($plans as $i => $p) {
+            $attrs = [
+                'name' => $p['name'], 'people' => $p['people'], 'duration_minutes' => $p['duration_minutes'],
+                'is_full_day' => $p['is_full_day'], 'price' => $p['price'], 'sort_order' => $i,
+            ];
+            if ($p['id'] && $existing->has($p['id'])) {
+                $existing[$p['id']]->update($attrs);
+                $kept[] = $p['id'];
+            } else {
+                $kept[] = $room->plans()->create($attrs + ['owner_id' => $room->owner_id])->id;
+            }
+        }
+
+        $room->plans()->whereNotIn('id', $kept)->delete();
+    }
+
     public function create(int $workspaceId): View
     {
         $workspace = $this->getWorkspace($workspaceId);
@@ -87,6 +133,7 @@ class RoomController extends Controller
             'billing_unit' => 'nullable|in:minute,half_hour,hour',
             'pricing_model' => 'nullable|in:'.implode(',', PricingRules::MODELS),
             'pricing_rules' => 'nullable|string|max:20000',
+            'plans' => 'nullable|string|max:20000',
             'description' => 'nullable|string|max:1000',
         ]);
 
@@ -95,11 +142,20 @@ class RoomController extends Controller
         // billing-unit field isn't even shown for.
         $data['billing_unit'] = $data['type'] === 'shared' ? ($data['billing_unit'] ?? 'minute') : 'minute';
         $data = $this->withPricing($data);
+        $plans = $this->validatedPlans($request, $data);
+        unset($data['plans']);
 
-        $room = Room::create(array_merge($data, [
-            'workspace_id' => $workspace->id,
-            'owner_id' => TenantContext::id(),
-        ]));
+        $room = DB::transaction(function () use ($data, $workspace, $plans) {
+            $room = Room::create(array_merge($data, [
+                'workspace_id' => $workspace->id,
+                'owner_id' => TenantContext::id(),
+            ]));
+            if ($plans !== null) {
+                $this->syncPlans($room, $plans);
+            }
+
+            return $room;
+        });
 
         $this->activityLogger->log('room.created', $room, "Added room {$room->name} to {$workspace->name}");
 
@@ -130,11 +186,14 @@ class RoomController extends Controller
             'billing_unit' => 'nullable|in:minute,half_hour,hour',
             'pricing_model' => 'nullable|in:'.implode(',', PricingRules::MODELS),
             'pricing_rules' => 'nullable|string|max:20000',
+            'plans' => 'nullable|string|max:20000',
             'description' => 'nullable|string|max:1000',
         ]);
 
         $data['billing_unit'] = $data['type'] === 'shared' ? ($data['billing_unit'] ?? 'minute') : 'minute';
         $data = $this->withPricing($data, $room);
+        $plans = $this->validatedPlans($request, $data);
+        unset($data['plans']);
 
         // A type flip mid-occupancy is a bigger semantic break than a
         // capacity number changing, so it's blocked outright rather than
@@ -159,7 +218,12 @@ class RoomController extends Controller
                 __('app.workspace.capacity_below_committed_usage', ['count' => $committedUsage]));
         }
 
-        $room->update($data);
+        DB::transaction(function () use ($room, $data, $plans) {
+            $room->update($data);
+            if ($plans !== null) {
+                $this->syncPlans($room, $plans);
+            }
+        });
 
         $this->activityLogger->log('room.updated', $room, "Updated room {$room->name}");
 

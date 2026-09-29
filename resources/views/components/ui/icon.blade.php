@@ -39,6 +39,7 @@
         'eye' => '<path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z"/><circle cx="12" cy="12" r="3"/>',
         'eye-off' => '<path d="M10.6 5.1A10 10 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-2.6 3.5M6.7 6.7C3.9 8.5 2.5 12 2.5 12S6 19 12 19a9.6 9.6 0 0 0 5.3-1.7M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/>',
         'lock' => '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+        'tag' => '<path d="M12.5 3.5h6a1 1 0 0 1 1 1v6a1 1 0 0 1-.3.7l-9 9a1 1 0 0 1-1.4 0l-6.7-6.7a1 1 0 0 1 0-1.4l9-9a1 1 0 0 1 .7-.3zM17 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/>',
     ];
 @endphp
 <svg {{ $attributes->merge(['class' => 'ls-icon']) }} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{!! $paths[$name] ?? '' !!}</svg>

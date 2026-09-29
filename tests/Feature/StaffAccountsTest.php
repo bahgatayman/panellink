@@ -472,8 +472,8 @@ class StaffAccountsTest extends TestCase
         $permissions = Permission::where('is_active', true)->get();
         $groups = $permissions->pluck('group')->unique();
 
-        $this->assertSame(25, $permissions->count(), 'the permission catalog itself should have 25 rows');
-        $this->assertSame(10, $groups->count(), 'the permission catalog itself should have 10 groups');
+        $this->assertSame(35, $permissions->count(), 'the permission catalog itself should have 35 rows');
+        $this->assertSame(12, $groups->count(), 'the permission catalog itself should have 12 groups');
 
         foreach ([
             '/staff/create' => $this->actingAs($owner, 'owner')->get('/staff/create'),
@@ -502,7 +502,7 @@ class StaffAccountsTest extends TestCase
      */
     public function test_all_system_roles_exist_with_their_full_permission_bundles(): void
     {
-        $expectedCounts = ['receptionist' => 9, 'staff' => 11, 'manager' => 19];
+        $expectedCounts = ['receptionist' => 10, 'staff' => 12, 'manager' => 29];
 
         $roles = Role::whereNull('owner_id')->get()->keyBy('key');
 

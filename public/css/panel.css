@@ -857,6 +857,88 @@ html[dir="rtl"] .ls-token--add { font-family: var(--ls-font-ar); }
 .ls-price-input { min-width: 96px; min-height: 36px; text-align: end; font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) { .ls-pricing-models { grid-template-columns: 1fr; } }
 
+/* ---------- 10d. Custom Plans editor (room form) + plan picker (booking) ---------- */
+.ls-plans { display: grid; gap: var(--space-3); padding-top: var(--space-5); border-top: 1px solid var(--color-border-subtle); }
+.ls-plans-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.ls-plans-head .ls-btn svg { width: 14px; height: 14px; }
+.ls-plans-cols, .ls-plan-row { display: grid; grid-template-columns: minmax(0, 1.6fr) 84px minmax(0, 1.4fr) minmax(0, 1.1fr) 34px; gap: var(--space-2); align-items: center; }
+.ls-plans-cols { font-size: 12px; font-weight: var(--fw-medium); color: var(--color-text-muted); padding-inline: 2px; }
+.ls-plans-list { display: grid; gap: var(--space-2); }
+.ls-plan-field { display: grid; gap: 4px; min-width: 0; }
+.ls-plan-label { display: none; font-size: 12px; color: var(--color-text-muted); font-weight: var(--fw-medium); }
+.ls-plan-dur { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.ls-plan-dur .ls-input { width: 72px; flex: none; }
+.ls-plan-dur .ls-input:disabled { opacity: .45; }
+.ls-plan-fullday { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-text-secondary); white-space: nowrap; cursor: pointer; }
+.ls-plan-fullday input { accent-color: var(--color-primary); width: 16px; height: 16px; }
+.ls-plan-row .ls-input-affix .ls-input { padding-inline-start: 44px; }
+.ls-plans-empty { margin: 0; }
+@media (max-width: 640px) {
+  .ls-plans-cols { display: none !important; }
+  .ls-plan-row { grid-template-columns: 1fr 1fr; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--ls-r-ctl); position: relative; }
+  .ls-plan-row > :first-child { grid-column: 1 / -1; padding-inline-end: 40px; }
+  .ls-plan-label { display: block; }
+  .ls-plan-remove { position: absolute; top: var(--space-2); inset-inline-end: var(--space-2); }
+}
+/* Booking: Standard pricing vs Custom Plans */
+.ls-plan-pick { display: grid; gap: var(--space-2); }
+.ls-plan-opt { position: relative; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border); border-radius: var(--ls-r-ctl); background: var(--color-surface); cursor: pointer; transition: border-color var(--ls-t-fast) var(--ls-ease), background var(--ls-t-fast) var(--ls-ease); }
+.ls-plan-opt:hover { border-color: var(--color-border-hover); }
+.ls-plan-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.ls-plan-opt:has(input:focus-visible) { box-shadow: 0 0 0 3px var(--color-focus-ring); }
+.ls-plan-opt.is-selected { border-color: var(--color-accent); background: var(--color-surface-brand); box-shadow: inset 0 0 0 1px var(--color-accent); }
+.ls-plan-opt-main { flex: 1; min-width: 0; display: grid; }
+.ls-plan-opt-main b { font-size: 14px; font-weight: var(--fw-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ls-plan-opt-main small { font-size: 12.5px; color: var(--color-text-muted); }
+.ls-plan-opt-price { font-weight: var(--fw-figure); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ls-plan-opt.is-selected .ls-plan-opt-price { color: var(--color-primary-text); }
+.ls-plan-opt.is-off { cursor: not-allowed; background: var(--color-surface-subtle); border-style: dashed; }
+.ls-plan-opt.is-off .ls-plan-opt-main b, .ls-plan-opt.is-off .ls-plan-opt-price { color: var(--color-text-secondary); }
+.ls-plan-opt .ls-plan-why { font-size: 12px; color: var(--color-warning); font-weight: var(--fw-medium); }
+.ls-plan-tag { display: inline-flex; align-items: center; padding: 0 6px; min-height: 18px; margin-inline-start: 6px; border-radius: var(--ls-r-sm); background: var(--color-violet-soft); color: var(--color-violet); font-size: 11px; font-weight: var(--fw-strong); vertical-align: 1px; }
+
+/* ---------- 10e. Inventory (product form, cards, details) ---------- */
+.ls-inv-group { border: 0; margin: 0; padding: var(--space-4) 0 0; border-top: 1px solid var(--color-border-subtle); display: grid; gap: var(--space-3); min-width: 0; }
+.ls-inv-group[hidden] { display: none; }
+.ls-inv-group .ls-field { align-content: start; } /* side-by-side fields keep their inputs level */
+.ls-inv-legend { font-size: 15px; font-weight: var(--fw-strong); color: var(--color-text); padding: 0; margin-bottom: var(--space-2); }
+.ls-inv-preview { display: flex; gap: var(--space-6); flex-wrap: wrap; padding: var(--space-3) var(--space-4); border-radius: var(--ls-r-ctl); background: var(--color-surface-brand); }
+.ls-inv-preview > div { display: grid; gap: 2px; }
+.ls-inv-preview span { font-size: 12.5px; color: var(--color-text-muted); }
+.ls-inv-preview b { font-size: 17px; font-weight: var(--fw-figure); color: var(--color-revenue); }
+.ls-inv-preview b.is-negative, .ls-num.is-negative { color: var(--color-danger); }
+.ls-inv-switch { display: flex; align-items: flex-start; gap: var(--space-3); cursor: pointer; }
+.ls-inv-switch input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--color-primary); flex: none; }
+.ls-inv-switch span { display: grid; }
+.ls-inv-switch b { font-weight: var(--fw-medium); font-size: 14px; }
+.ls-inv-switch small { font-size: 12.5px; color: var(--color-text-muted); }
+.ls-inv-locked { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: var(--ls-ctl-h); padding: 0 var(--space-3); border: 1px dashed var(--color-border-strong); border-radius: var(--ls-r-ctl); }
+.ls-inv-locked b { font-size: 16px; }
+/* Product cards */
+.ls-inv-facts { display: grid; gap: 4px; margin: calc(var(--space-2) * -1) 0 0; font-size: 13px; }
+.ls-inv-facts > div { display: flex; justify-content: space-between; gap: var(--space-3); }
+.ls-inv-facts dt { color: var(--color-text-muted); }
+.ls-inv-facts dd { margin: 0; color: var(--color-text-secondary); font-weight: var(--fw-medium); }
+.ls-inv-facts dd.is-profit { color: var(--color-revenue); }
+.ls-inv-stock.is-low { color: var(--color-warning); }
+.ls-inv-stock.is-out { color: var(--color-danger); }
+.ls-product.is-out { border-color: color-mix(in srgb, var(--color-danger) 30%, var(--color-border)); }
+a.ls-product-name { display: block; text-decoration: none; border-radius: var(--ls-r-sm); }
+a.ls-product-name:hover { color: var(--color-primary-text); }
+/* Details page */
+.ls-strip-value.is-danger { color: var(--color-danger); }
+.ls-inv-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-5); }
+.ls-inv-profit { color: var(--color-revenue); font-weight: var(--fw-medium); }
+.ls-inv-change { display: inline-block; min-width: 44px; font-weight: var(--fw-strong); font-variant-numeric: tabular-nums; }
+.ls-inv-change.is-in { color: var(--color-success); }
+.ls-inv-change.is-out { color: var(--color-danger); }
+.ls-inv-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: var(--ls-r-ctl); background: var(--color-surface-subtle); }
+.ls-inv-seg label { position: relative; }
+.ls-inv-seg input { position: absolute; opacity: 0; pointer-events: none; }
+.ls-inv-seg span { display: grid; place-items: center; min-height: 38px; border-radius: var(--ls-r-sm); font-weight: var(--fw-medium); color: var(--color-text-secondary); cursor: pointer; }
+.ls-inv-seg input:checked + span { background: var(--color-surface); color: var(--color-text); box-shadow: 0 1px 2px rgba(0, 0, 0, .08), 0 0 0 1px var(--color-border); }
+.ls-inv-seg input:focus-visible + span { box-shadow: 0 0 0 3px var(--color-focus-ring); }
+
 /* ---------- 11. Legacy bridge (unmigrated Tailwind views inside the shell) ---------- */
 .ls-main .border-gray-100 { border-color: var(--color-border); }
 .ls-main .rounded-2xl.shadow-sm, .ls-main .rounded-xl.shadow-sm { box-shadow: none; }

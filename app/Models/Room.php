@@ -7,6 +7,7 @@ use App\Support\Pricing\PricingRules;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Lang;
 
@@ -59,9 +60,20 @@ class Room extends Model
         return $this->belongsTo(Owner::class);
     }
 
+    /** Custom Plans (fixed-price packages), in the owner's order. */
+    public function plans(): HasMany
+    {
+        return $this->hasMany(RoomPlan::class)->orderBy('sort_order')->orderBy('id');
+    }
+
     public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class);
+    }
+
+    public function coupons(): BelongsToMany
+    {
+        return $this->belongsToMany(Coupon::class, 'coupon_rooms')->withTimestamps();
     }
 
     public function hasConflict(string $date, string $startTime, string $endTime, ?int $excludeBookingId = null): bool

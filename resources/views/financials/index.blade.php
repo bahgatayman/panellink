@@ -6,6 +6,11 @@
     <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 class="text-2xl font-bold text-gray-900">{{ __('app.financials.title') }}</h1>
         <div class="flex items-center gap-2">
+            @if ($canViewExpenses)
+                <a href="{{ route('expenses.index') }}" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition">
+                    {{ __('app.nav.expenses') }}
+                </a>
+            @endif
             <a href="{{ route('financials.transactions') }}" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition">
                 {{ __('app.financials.view_transactions') }}
             </a>
@@ -56,6 +61,21 @@
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
             <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.financials.average_booking_value') }}</p>
             <p class="text-2xl lg:text-3xl font-bold text-gray-900 mt-1">ج.م {{ number_format($averageBookingValue ?? 0, 2) }}</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6 mb-6">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
+            <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.financials.net.revenue') }}</p>
+            <p class="text-2xl lg:text-3xl font-bold text-green-600 mt-1">ج.م {{ number_format($comparison['current'], 2) }}</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
+            <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.financials.net.expenses') }}</p>
+            <p class="text-2xl lg:text-3xl font-bold text-red-600 mt-1">ج.م {{ number_format($totalExpenses, 2) }}</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 lg:p-6">
+            <p class="text-xs lg:text-sm font-medium text-gray-500">{{ __('app.financials.net.net') }}</p>
+            <p class="text-2xl lg:text-3xl font-bold {{ $netTotal >= 0 ? 'text-green-600' : 'text-red-600' }} mt-1">ج.م {{ number_format($netTotal, 2) }}</p>
         </div>
     </div>
 

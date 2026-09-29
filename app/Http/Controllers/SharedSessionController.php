@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\CouponRejectedException;
+use App\Exceptions\CouponUsageLimitExceededException;
+use App\Exceptions\InsufficientStockException;
 use App\Exceptions\SharedSessionCapacityExceededException;
 use App\Models\Booking;
 use App\Models\HotspotUser;
@@ -12,6 +15,7 @@ use App\Models\SharedSession;
 use App\Services\ActivityLogger;
 use App\Services\AvailabilityService;
 use App\Services\BusinessHoursService;
+use App\Services\CouponService;
 use App\Services\RoomPricingService;
 use App\Services\SalesService;
 use App\Support\TenantContext;
@@ -148,7 +152,7 @@ class SharedSessionController extends Controller
             ->with('success', "Session opened for {$user->name} in {$roomName}.");
     }
 
-    public function closePreview(int $sessionId): JsonResponse
+    public function closePreview(int $sessionId, Request $request, CouponService $coupons): JsonResponse
     {
         $session = SharedSession::where('id', $sessionId)
             ->where('owner_id', TenantContext::id())
@@ -169,7 +173,24 @@ class SharedSessionController extends Controller
             : null;
 
         $itemsTotal = (float) ($session->sale?->total ?? 0);
-        $grandTotal = round($quote->totalPrice + $itemsTotal, 2);
+        $subtotal = round($quote->totalPrice + $itemsTotal, 2);
+        $grandTotal = $subtotal;
+
+        // Preview-only: evaluate() never writes anything. close() re-runs the
+        // exact same evaluate() call inside its own transaction, so the two
+        // can never disagree on what will actually be charged.
+        $couponPayload = null;
+        $couponError = null;
+        if ($request->filled('coupon_code')) {
+            try {
+                $coupon = $coupons->find(TenantContext::id(), $request->input('coupon_code'));
+                $breakdown = $coupons->evaluate($coupon, $coupons->cartForSession($session, $quote), $session->hotspot_user_id);
+                $couponPayload = $breakdown->toArray();
+                $grandTotal = $breakdown->total();
+            } catch (CouponRejectedException $e) {
+                $couponError = $e->getMessage();
+            }
+        }
 
         return response()->json([
             'session_id' => $session->id,
@@ -189,7 +210,10 @@ class SharedSessionController extends Controller
             'total_price_raw' => $quote->totalPrice,
             'items' => $this->itemsPayload($session),
             'items_total' => number_format($itemsTotal, 2),
+            'subtotal' => number_format($subtotal, 2),
             'grand_total' => number_format($grandTotal, 2),
+            'coupon' => $couponPayload,
+            'coupon_error' => $couponError,
         ]);
     }
 
@@ -213,8 +237,20 @@ class SharedSessionController extends Controller
             ->where('owner_id', $ownerId)
             ->firstOrFail();
 
-        $sale = $sales->saleForSharedSession($session);
-        $sales->addItem($sale, $product, (int) $validated['quantity']);
+        if (! $product->is_active) {
+            return response()->json(['success' => false, 'message' => __('app.inventory.errors.inactive', ['name' => $product->name])], 422);
+        }
+
+        // Stock is checked and taken server-side inside the same transaction
+        // (InventoryService); a shortfall rolls the whole add back.
+        try {
+            DB::transaction(function () use ($sales, $session, $product, $validated) {
+                $sale = $sales->saleForSharedSession($session);
+                $sales->addItem($sale, $product, (int) $validated['quantity']);
+            });
+        } catch (InsufficientStockException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
 
         $this->activityLogger->log('shared_session.item_added', $session, "Added {$validated['quantity']}x {$product->name} to session #{$session->id}");
 
@@ -284,77 +320,104 @@ class SharedSessionController extends Controller
      * UPDATE statement is atomic on both — unlike lockForUpdate(), which SQLite
      * does not honor.
      */
-    public function close(int $sessionId, SalesService $sales): JsonResponse
+    public function close(Request $request, int $sessionId, SalesService $sales, CouponService $coupons): JsonResponse
     {
         $ownerId = TenantContext::id();
         $closedAt = now();
+        $couponCode = $request->input('coupon_code');
 
-        return DB::transaction(function () use ($sessionId, $ownerId, $closedAt, $sales) {
-            $claimed = SharedSession::where('id', $sessionId)
-                ->where('owner_id', $ownerId)
-                ->where('status', 'open')
-                ->update(['status' => 'closed', 'closed_at' => $closedAt]);
+        if ($couponCode) {
+            $staff = auth('staff')->user();
+            if ($staff && ! $staff->hasPermission('coupons.apply')) {
+                return response()->json(['success' => false, 'message' => __('app.msg.permission_denied')], 403);
+            }
+        }
 
-            if ($claimed === 0) {
+        try {
+            return DB::transaction(function () use ($sessionId, $ownerId, $closedAt, $sales, $coupons, $couponCode) {
+                $claimed = SharedSession::where('id', $sessionId)
+                    ->where('owner_id', $ownerId)
+                    ->where('status', 'open')
+                    ->update(['status' => 'closed', 'closed_at' => $closedAt]);
+
+                if ($claimed === 0) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => __('app.session.already_closed'),
+                    ], 409);
+                }
+
+                $session = SharedSession::where('id', $sessionId)
+                    ->where('owner_id', $ownerId)
+                    ->with(['room', 'hotspotUser', 'sale'])
+                    ->firstOrFail();
+
+                // Same service (and the same snapshotted pricing) as
+                // closePreview() — the two must never disagree on what a session
+                // is about to cost.
+                $quote = $this->pricing->quoteSession($session, $closedAt);
+                $totalHours = $quote->billedHours();
+
+                $booking = Booking::create([
+                    'owner_id' => $ownerId,
+                    'room_id' => $session->room_id,
+                    'hotspot_user_id' => $session->hotspot_user_id,
+                    'party_size' => $session->party_size,
+                    'booking_date' => $session->session_date,
+                    'start_time' => $session->start_time,
+                    'end_time' => $closedAt->format('H:i'),
+                    'price_per_hour' => $quote->ratePerHour,
+                    'total_hours' => $totalHours,
+                    'total_price' => $quote->totalPrice,
+                    'pricing_note' => $quote->note,
+                    // A closed shared/walk-in session is cash collected at the
+                    // register right now — always fully paid (net of any
+                    // coupon discount, applied below). Without this, the
+                    // Financials revenue switch to amount_paid would silently
+                    // zero out every walk-in session's revenue.
+                    'amount_paid' => $quote->totalPrice,
+                    'payment_status' => Booking::PAYMENT_PAID,
+                    'status' => 'completed',
+                    'notes' => 'Auto-created from shared session.',
+                ]);
+
+                $session->update([
+                    'total_minutes' => $quote->totalMinutes,
+                    'total_price' => $quote->totalPrice,
+                    'booking_id' => $booking->id,
+                ]);
+
+                // Move the running tab (if any) onto the booking, keeping its line items.
+                if ($session->sale) {
+                    $sales->transferToBooking($session->sale, $booking);
+                }
+
+                // A coupon rejection here throws and rolls back the whole
+                // transaction — the session re-opens (the atomic claim above
+                // is undone too), and no Booking or usage row is left behind.
+                if ($couponCode) {
+                    $coupon = $coupons->find($ownerId, $couponCode);
+                    $booking->update(['coupon_id' => $coupon->id]);
+                    $coupons->redeemForBooking($booking->fresh(['sale.items']));
+                    $booking->refresh();
+                    $booking->update([
+                        'amount_paid' => $booking->netRoomCharge(),
+                        'payment_status' => Booking::PAYMENT_PAID,
+                    ]);
+                }
+
+                $grandTotal = $booking->fresh('sale')->grandTotal();
+
+                $this->activityLogger->log('shared_session.closed', $session, "Closed session #{$session->id}, total ج.م ".number_format($grandTotal, 2));
+
                 return response()->json([
-                    'success' => false,
-                    'message' => __('app.session.already_closed'),
-                ], 409);
-            }
-
-            $session = SharedSession::where('id', $sessionId)
-                ->where('owner_id', $ownerId)
-                ->with(['room', 'hotspotUser', 'sale'])
-                ->firstOrFail();
-
-            // Same service (and the same snapshotted pricing) as
-            // closePreview() — the two must never disagree on what a session
-            // is about to cost.
-            $quote = $this->pricing->quoteSession($session, $closedAt);
-            $totalHours = $quote->billedHours();
-
-            $booking = Booking::create([
-                'owner_id' => $ownerId,
-                'room_id' => $session->room_id,
-                'hotspot_user_id' => $session->hotspot_user_id,
-                'party_size' => $session->party_size,
-                'booking_date' => $session->session_date,
-                'start_time' => $session->start_time,
-                'end_time' => $closedAt->format('H:i'),
-                'price_per_hour' => $quote->ratePerHour,
-                'total_hours' => $totalHours,
-                'total_price' => $quote->totalPrice,
-                'pricing_note' => $quote->note,
-                // A closed shared/walk-in session is cash collected at the
-                // register right now — always fully paid. Without this, the
-                // Financials revenue switch to amount_paid would silently
-                // zero out every walk-in session's revenue.
-                'amount_paid' => $quote->totalPrice,
-                'payment_status' => Booking::PAYMENT_PAID,
-                'status' => 'completed',
-                'notes' => 'Auto-created from shared session.',
-            ]);
-
-            $session->update([
-                'total_minutes' => $quote->totalMinutes,
-                'total_price' => $quote->totalPrice,
-                'booking_id' => $booking->id,
-            ]);
-
-            // Move the running tab (if any) onto the booking, keeping its line items.
-            if ($session->sale) {
-                $sales->transferToBooking($session->sale, $booking);
-            }
-
-            $grandTotal = $quote->totalPrice + (float) ($session->sale?->total ?? 0);
-
-            $this->activityLogger->log('shared_session.closed', $session, "Closed session #{$session->id}, total ج.م ".number_format($grandTotal, 2));
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Session closed. Total: ج.م '.number_format($grandTotal, 2),
-                'booking_id' => $booking->id,
-            ]);
-        });
+                    'success' => true,
+                    'message' => 'Session closed. Total: ج.م '.number_format($grandTotal, 2),
+                    'booking_id' => $booking->id,
+                ]);
+            });
+        } catch (CouponRejectedException|CouponUsageLimitExceededException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
     }
 }
