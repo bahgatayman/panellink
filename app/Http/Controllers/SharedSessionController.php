@@ -4,10 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\CouponRejectedException;
 use App\Exceptions\CouponUsageLimitExceededException;
+use App\Exceptions\InsufficientPackageBalanceException;
 use App\Exceptions\InsufficientStockException;
 use App\Exceptions\SharedSessionCapacityExceededException;
 use App\Models\Booking;
 use App\Models\HotspotUser;
+use App\Models\MemberPackage;
+use App\Models\PackageUsage;
 use App\Models\Product;
 use App\Models\Room;
 use App\Models\SaleItem;
@@ -16,10 +19,13 @@ use App\Services\ActivityLogger;
 use App\Services\AvailabilityService;
 use App\Services\BusinessHoursService;
 use App\Services\CouponService;
+use App\Services\HourPackageService;
 use App\Services\RoomPricingService;
 use App\Services\SalesService;
+use App\Support\Duration;
 use App\Support\TenantContext;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,7 +52,7 @@ class SharedSessionController extends Controller
         return view('active-sessions.create', compact('sharedRooms'));
     }
 
-    public function store(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours): RedirectResponse
+    public function store(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours, HourPackageService $packages): RedirectResponse
     {
         $request->validate([
             'room_id' => 'required|exists:rooms,id',
@@ -54,6 +60,8 @@ class SharedSessionController extends Controller
             'session_date' => 'required|date',
             'start_time' => 'required|date_format:H:i',
             'party_size' => 'nullable|integer|min:1',
+            'member_package_id' => 'nullable|integer',
+            'room_pricing_profile_id' => 'nullable|integer',
         ]);
 
         $owner = TenantContext::user();
@@ -68,6 +76,33 @@ class SharedSessionController extends Controller
             ->where('owner_id', $ownerId)
             ->firstOrFail();
 
+        // Optional hour package: chosen now, drawn at close by the actual
+        // elapsed time. Covers the member's own seat only (party size 1).
+        // Optional pricing profile: the session bills per hour at its rate
+        // (billing unit + grace buffer still from the room).
+        $profile = null;
+        if ($request->filled('room_pricing_profile_id')) {
+            $profileRoom = Room::where('id', $request->room_id)->where('owner_id', $ownerId)->firstOrFail();
+            try {
+                $profile = $this->pricing->resolveProfile($profileRoom, (int) $request->input('room_pricing_profile_id'));
+            } catch (ModelNotFoundException) {
+                return back()->withInput()->with('error', __('app.pricing_profiles.errors.not_available'));
+            }
+        }
+
+        $packageId = null;
+        if ($request->filled('member_package_id')) {
+            $package = MemberPackage::where('owner_id', $ownerId)
+                ->where('hotspot_user_id', $user->id)
+                ->whereKey($request->input('member_package_id'))
+                ->firstOrFail();
+            $packageRoom = Room::where('id', $request->room_id)->where('owner_id', $ownerId)->firstOrFail();
+            if ($reason = $packages->eligibility($package, $packageRoom, $request->session_date, 1, $partySize)) {
+                return back()->withInput()->with('error', __('app.packages.reasons.'.$reason));
+            }
+            $packageId = $package->id;
+        }
+
         // The capacity check and the insert must happen atomically: two staff
         // opening large parties into the room's last few free seats at the same
         // moment must not both pass the check and jointly overbook it.
@@ -77,7 +112,7 @@ class SharedSessionController extends Controller
         // rely on alone, mirroring BookingController::store()'s identical
         // defense-in-depth pattern.
         try {
-            [$roomName, $error] = DB::transaction(function () use ($request, $ownerId, $user, $partySize, $availability) {
+            [$roomName, $error] = DB::transaction(function () use ($request, $ownerId, $user, $partySize, $availability, $packageId, $profile) {
                 $room = Room::where('id', $request->room_id)
                     ->where('owner_id', $ownerId)
                     ->where('type', 'shared')
@@ -124,8 +159,12 @@ class SharedSessionController extends Controller
                     'opened_at' => $openedAt,
                     'status' => 'open',
                     'billing_unit' => $room->billing_unit,
-                    'billed_price_per_hour' => $room->price_per_hour,
-                    'pricing_snapshot' => $this->pricing->snapshotFor($room),
+                    'billing_buffer_minutes' => (int) $room->billing_buffer_minutes,
+                    'billed_price_per_hour' => $profile ? $profile->price_per_hour : $room->price_per_hour,
+                    'pricing_snapshot' => $this->pricing->snapshotFor($room, $profile),
+                    'room_pricing_profile_id' => $profile?->id,
+                    'pricing_profile_name' => $profile?->name,
+                    'member_package_id' => $packageId,
                 ]);
 
                 if ($availability->usedCapacityNow($room) > $room->effectiveCapacity()) {
@@ -152,12 +191,12 @@ class SharedSessionController extends Controller
             ->with('success', "Session opened for {$user->name} in {$roomName}.");
     }
 
-    public function closePreview(int $sessionId, Request $request, CouponService $coupons): JsonResponse
+    public function closePreview(int $sessionId, Request $request, CouponService $coupons, HourPackageService $packages): JsonResponse
     {
         $session = SharedSession::where('id', $sessionId)
             ->where('owner_id', TenantContext::id())
             ->where('status', 'open')
-            ->with(['room', 'hotspotUser', 'sale.items'])
+            ->with(['room', 'hotspotUser', 'sale.items', 'memberPackage'])
             ->firstOrFail();
 
         $closedAt = now();
@@ -179,9 +218,29 @@ class SharedSessionController extends Controller
         // Preview-only: evaluate() never writes anything. close() re-runs the
         // exact same evaluate() call inside its own transaction, so the two
         // can never disagree on what will actually be charged.
+        // Hour package chosen at open: covers the room time when it still can,
+        // otherwise the session falls back to normal billing (same rule as close()).
+        $packagePayload = null;
+        if ($pkg = $session->memberPackage) {
+            $minutes = $this->packageMinutes($quote->totalMinutes);
+            $covers = $packages->eligibility($pkg, $session->room, $session->session_date, $minutes, $session->party_size) === null;
+            $packagePayload = [
+                'name' => $pkg->name,
+                'hours' => Duration::label($minutes),
+                'remaining' => $pkg->remainingLabel(),
+                'covers' => $covers,
+                'message' => $covers
+                    ? __('app.packages.session_covered', ['name' => $pkg->name, 'hours' => Duration::label($minutes)])
+                    : __('app.packages.session_fallback', ['remaining' => $pkg->remainingLabel()]),
+            ];
+            if ($covers) {
+                $grandTotal = round($itemsTotal, 2);
+            }
+        }
+
         $couponPayload = null;
         $couponError = null;
-        if ($request->filled('coupon_code')) {
+        if ($request->filled('coupon_code') && ! ($packagePayload['covers'] ?? false)) {
             try {
                 $coupon = $coupons->find(TenantContext::id(), $request->input('coupon_code'));
                 $breakdown = $coupons->evaluate($coupon, $coupons->cartForSession($session, $quote), $session->hotspot_user_id);
@@ -214,7 +273,14 @@ class SharedSessionController extends Controller
             'grand_total' => number_format($grandTotal, 2),
             'coupon' => $couponPayload,
             'coupon_error' => $couponError,
+            'package' => $packagePayload,
         ]);
+    }
+
+    /** Minutes a session draws from a package: its actual elapsed time, rounded up (min 1). */
+    private function packageMinutes(float $totalMinutes): int
+    {
+        return max(1, (int) ceil($totalMinutes - 0.0001));
     }
 
     /** Add a product to the session's running tab. Routed under feature:booking + feature:sales. */
@@ -320,7 +386,7 @@ class SharedSessionController extends Controller
      * UPDATE statement is atomic on both — unlike lockForUpdate(), which SQLite
      * does not honor.
      */
-    public function close(Request $request, int $sessionId, SalesService $sales, CouponService $coupons): JsonResponse
+    public function close(Request $request, int $sessionId, SalesService $sales, CouponService $coupons, HourPackageService $packages): JsonResponse
     {
         $ownerId = TenantContext::id();
         $closedAt = now();
@@ -334,7 +400,7 @@ class SharedSessionController extends Controller
         }
 
         try {
-            return DB::transaction(function () use ($sessionId, $ownerId, $closedAt, $sales, $coupons, $couponCode) {
+            return DB::transaction(function () use ($sessionId, $ownerId, $closedAt, $sales, $coupons, $couponCode, $packages) {
                 $claimed = SharedSession::where('id', $sessionId)
                     ->where('owner_id', $ownerId)
                     ->where('status', 'open')
@@ -361,6 +427,8 @@ class SharedSessionController extends Controller
                 $booking = Booking::create([
                     'owner_id' => $ownerId,
                     'room_id' => $session->room_id,
+                    'room_pricing_profile_id' => $session->room_pricing_profile_id,
+                    'pricing_profile_name' => $session->pricing_profile_name,
                     'hotspot_user_id' => $session->hotspot_user_id,
                     'party_size' => $session->party_size,
                     'booking_date' => $session->session_date,
@@ -392,10 +460,44 @@ class SharedSessionController extends Controller
                     $sales->transferToBooking($session->sale, $booking);
                 }
 
+                // Hour package chosen at open: draw the actual elapsed minutes.
+                // Not enough left (or no longer valid) → normal billing as above.
+                $coveredByPackage = false;
+                $pkg = $session->member_package_id
+                    ? MemberPackage::where('owner_id', $ownerId)->find($session->member_package_id)
+                    : null;
+                if ($pkg) {
+                    $minutes = $this->packageMinutes($quote->totalMinutes);
+                    $covered = null;
+                    if ($packages->eligibility($pkg, $session->room, $session->session_date, $minutes, $session->party_size) === null) {
+                        try {
+                            $covered = $packages->consume($pkg, $minutes, PackageUsage::SESSION_USAGE, $booking, $session);
+                        } catch (InsufficientPackageBalanceException) {
+                            $covered = null; // the guarded UPDATE wrote nothing — safe to fall back
+                        }
+                    }
+
+                    if ($covered) {
+                        $coveredByPackage = true;
+                        $value = (float) $covered->value;
+                        $booking->update([
+                            'payment_method' => Booking::METHOD_PACKAGE,
+                            'member_package_id' => $pkg->id,
+                            'total_price' => $value,
+                            'amount_paid' => $value,
+                            'payment_status' => Booking::PAYMENT_PAID,
+                            'pricing_note' => __('app.packages.covered_note', ['name' => $pkg->name, 'hours' => Duration::label($minutes)]),
+                        ]);
+                        $session->update(['total_price' => $value]);
+                    } else {
+                        $booking->update(['notes' => $booking->notes.' '.__('app.packages.session_fallback', ['remaining' => $pkg->fresh()->remainingLabel()])]);
+                    }
+                }
+
                 // A coupon rejection here throws and rolls back the whole
                 // transaction — the session re-opens (the atomic claim above
                 // is undone too), and no Booking or usage row is left behind.
-                if ($couponCode) {
+                if ($couponCode && ! $coveredByPackage) {
                     $coupon = $coupons->find($ownerId, $couponCode);
                     $booking->update(['coupon_id' => $coupon->id]);
                     $coupons->redeemForBooking($booking->fresh(['sale.items']));

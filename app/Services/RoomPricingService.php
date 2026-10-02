@@ -6,6 +6,7 @@ use App\Models\Booking;
 use App\Models\Owner;
 use App\Models\Room;
 use App\Models\RoomPlan;
+use App\Models\RoomPricingProfile;
 use App\Models\SharedSession;
 use App\Support\Money;
 use App\Support\Pricing\PriceQuote;
@@ -37,6 +38,13 @@ use Carbon\Carbon;
  *     day's price cap. Longer than every option (no Full Day): the longest
  *     option plus the extra time at that option's own per-minute rate.
  *
+ * Pricing Profiles (RoomPricingProfile) are optional owner-named hourly rates
+ * ("Photography — 700/hr"). A booking/session priced with one is plain hourly
+ * at that rate — through the same BookingService / SharedSessionBillingService
+ * formulas (billing unit + grace buffer still apply) — instead of the room's
+ * default pricing. Precedence per booking: Custom Plan · Pricing Profile ·
+ * room default — exactly one applies, never combined.
+ *
  * Custom Plans (RoomPlan) sit beside the room's rules: a fixed price for
  * exactly N people over the plan's own duration (quotePlan/planWindow). A
  * checked-in plan reservation bills the plan price plus any time beyond it at
@@ -50,9 +58,18 @@ class RoomPricingService
         private BusinessHoursService $businessHours,
     ) {}
 
-    /** Price a reservation of $room for $people between $start and $end on $date. */
-    public function quoteBooking(Room $room, int $people, string $date, string $start, string $end): PriceQuote
+    /** Price a reservation of $room for $people between $start and $end on $date (optionally at a pricing profile's rate). */
+    public function quoteBooking(Room $room, int $people, string $date, string $start, string $end, ?RoomPricingProfile $profile = null): PriceQuote
     {
+        if ($profile) {
+            $rate = (float) $profile->price_per_hour;
+            $calc = $this->bookings->calculateBooking($start, $end, $rate);
+            $minutes = $calc['total_hours'] * 60;
+
+            return new PriceQuote(PricingRules::HOURLY, $calc['total_price'], $minutes, $minutes, $rate,
+                $profile->name.' · '.$profile->rateLabel(), $rate);
+        }
+
         $rules = $room->pricingRules();
 
         if ($rules->isHourly()) {
@@ -86,16 +103,44 @@ class RoomPricingService
         return $this->standardSessionQuote($session, $session->opened_at, $closedAt);
     }
 
+    /**
+     * When this session's running bill next goes up — for block billing
+     * (half-hour/hour, with its snapshotted grace buffer), so Active Sessions
+     * can say "Next hour in 4 min". Null when the price isn't block-based
+     * (per-minute, rule-based packages) or a Custom Plan still covers the time.
+     */
+    public function nextSessionChargeAt(SharedSession $session, Carbon $now): ?Carbon
+    {
+        $from = $session->opened_at;
+        if ($plan = $session->plan_snapshot) {
+            $from = $session->opened_at->copy()->addSeconds((int) round((float) $plan['minutes'] * 60));
+            if ($now->lte($from)) {
+                return null;
+            }
+        }
+
+        if ($session->pricing_snapshot) {
+            return null;
+        }
+
+        return $this->billing->nextChargeAt($from, $now, $session->billing_unit ?? 'minute', (int) ($session->billing_buffer_minutes ?? 0));
+    }
+
     /** The session's standard (non-plan) bill for the time between $from and $to. */
     private function standardSessionQuote(SharedSession $session, Carbon $from, Carbon $closedAt): PriceQuote
     {
         if (! $session->pricing_snapshot) {
             $unit = $session->billing_unit ?? 'minute';
             $rate = (float) ($session->billed_price_per_hour ?? $session->room->price_per_hour);
-            $billed = $this->billing->calculate($from, $closedAt, $unit, $rate);
+            $billed = $this->billing->calculate($from, $closedAt, $unit, $rate, (int) ($session->billing_buffer_minutes ?? 0));
+
+            // Priced with a profile: say so ("Photography · EGP 15.00/hr").
+            $note = $session->pricing_profile_name
+                ? $session->pricing_profile_name.' · '.Money::format($rate).__('app.common.slash_hr')
+                : null;
 
             return new PriceQuote(PricingRules::HOURLY, $billed['total_price'], $billed['total_minutes'],
-                $billed['billed_minutes'], $rate, null, $unit === 'minute' ? $rate : null);
+                $billed['billed_minutes'], $rate, $note, $unit === 'minute' ? $rate : null);
         }
 
         $rules = PricingRules::fromStored($session->pricing_snapshot['model'] ?? null, $session->pricing_snapshot['rules'] ?? null);
@@ -209,9 +254,31 @@ class RoomPricingService
         return $h * 60 + $m;
     }
 
-    /** What a session opened now must freeze; null keeps the legacy hourly path. */
-    public function snapshotFor(Room $room): ?array
+    /**
+     * A room's pricing profile, owner + room scoped (404 otherwise). Only an
+     * active one may be newly chosen — except $keepId, the profile a booking
+     * already holds, so editing it after the profile was deactivated still works.
+     */
+    public function resolveProfile(Room $room, ?int $profileId, ?int $keepId = null): ?RoomPricingProfile
     {
+        if (! $profileId) {
+            return null;
+        }
+
+        return RoomPricingProfile::where('owner_id', $room->owner_id)
+            ->where('room_id', $room->id)
+            ->whereKey($profileId)
+            ->when($profileId !== $keepId, fn ($q) => $q->where('is_active', true))
+            ->firstOrFail();
+    }
+
+    /** What a session opened now must freeze; null keeps the legacy hourly path (always, when priced by a profile). */
+    public function snapshotFor(Room $room, ?RoomPricingProfile $profile = null): ?array
+    {
+        if ($profile) {
+            return null;
+        }
+
         $rules = $room->pricingRules();
 
         return $rules->isHourly() ? null : ['model' => $rules->model, 'rules' => $rules->toArray()];

@@ -52,6 +52,7 @@
         ['label' => __('app.ui.nav_group.manage'), 'items' => [
             ['show' => $currentOwner->hasFeature('workspace') && $can('workspaces.view'), 'href' => '/workspaces', 'active' => request()->is('workspaces*'), 'icon' => 'building', 'label' => __('app.nav.workspaces')],
             ['show' => ($currentOwner->hasFeature('hotspot') || $currentOwner->hasFeature('booking')) && $can('members.view'), 'href' => '/users', 'active' => request()->is('users*'), 'icon' => 'users', 'label' => __('app.nav.users')],
+            ['show' => $currentOwner->hasFeature('booking') && $can('packages.view'), 'href' => '/packages', 'active' => request()->is('packages*'), 'icon' => 'clock', 'label' => __('app.nav.packages')],
             ['show' => $currentOwner->hasFeature('sales') && $can('products.view'), 'href' => '/products', 'active' => request()->is('products*'), 'icon' => 'box', 'label' => __('app.nav.products')],
         ]],
         ['label' => __('app.ui.nav_group.money'), 'items' => [

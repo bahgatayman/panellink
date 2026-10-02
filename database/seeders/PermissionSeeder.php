@@ -33,6 +33,7 @@ class PermissionSeeder extends Seeder
             ['key' => 'bookings.create', 'name' => 'Create Bookings', 'group' => 'bookings'],
             ['key' => 'bookings.edit', 'name' => 'Edit Bookings', 'group' => 'bookings'],
             ['key' => 'bookings.cancel', 'name' => 'Cancel Bookings', 'group' => 'bookings'],
+            ['key' => 'bookings.delete', 'name' => 'Delete Bookings', 'group' => 'bookings'],
 
             ['key' => 'products.view', 'name' => 'View Products', 'group' => 'products_sales'],
             ['key' => 'products.manage', 'name' => 'Manage Products', 'group' => 'products_sales'],
@@ -54,6 +55,10 @@ class PermissionSeeder extends Seeder
             ['key' => 'coupons.edit', 'name' => 'Edit Coupons', 'group' => 'coupons'],
             ['key' => 'coupons.delete', 'name' => 'Delete Coupons', 'group' => 'coupons'],
             ['key' => 'coupons.apply', 'name' => 'Apply Coupons at Checkout', 'group' => 'coupons'],
+
+            ['key' => 'packages.view', 'name' => 'View Hour Packages', 'group' => 'packages'],
+            ['key' => 'packages.manage', 'name' => 'Manage Hour Package Templates', 'group' => 'packages'],
+            ['key' => 'packages.assign', 'name' => 'Assign & Cancel Member Packages', 'group' => 'packages'],
 
             ['key' => 'settings.view', 'name' => 'View Settings', 'group' => 'settings'],
             ['key' => 'settings.manage', 'name' => 'Manage Settings', 'group' => 'settings'],

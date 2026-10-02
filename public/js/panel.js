@@ -270,6 +270,17 @@
   /* ------------------------------------------------------ live values */
   function tick() {
     const now = Date.now();
+    // Navbar clock (#ls-clock) is server-rendered once at page load, so it
+    // otherwise goes stale the moment a tab is left open — keep it ticking
+    // with the browser's own clock, same "g:i A" shape as the PHP default.
+    const clock = document.getElementById('ls-clock');
+    if (clock) {
+      const d = new Date(now);
+      let h = d.getHours();
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      clock.textContent = `${h}:${String(d.getMinutes()).padStart(2, '0')} ${ampm}`;
+    }
     document.querySelectorAll('[data-ls-since]').forEach((el) => {
       const secs = (now - Date.parse(el.dataset.lsSince)) / 1000;
       if (el.dataset.lsRate !== undefined) {
@@ -284,6 +295,18 @@
       const left = (Date.parse(el.dataset.lsUntil) - now) / 60000;
       el.textContent = left > 0 ? T.left.replace(':d', LS.duration(left)) : T.ended;
       el.classList.toggle('is-soon', left <= 15);
+    });
+    // Countdown to a server-computed instant (e.g. a shared session's next
+    // billable hour). When it passes, the page refreshes once so the new
+    // amount comes from the server — never computed here.
+    document.querySelectorAll('[data-ls-countdown]').forEach((el) => {
+      const left = (Date.parse(el.dataset.lsCountdown) - now) / 60000;
+      if (left > 0) { el.textContent = el.dataset.lsTemplate.replace(':d', LS.duration(Math.max(1, Math.ceil(left)))); return; }
+      el.textContent = el.dataset.lsDone || '';
+      if (!LS._countdownReload && !document.querySelector('.ls-overlay.is-open') && !(document.activeElement && document.activeElement.matches('input, textarea, select'))) {
+        LS._countdownReload = true;
+        setTimeout(() => location.reload(), 1500);
+      }
     });
     document.querySelectorAll('[data-ls-progress-from]').forEach((el) => {
       const a = Date.parse(el.dataset.lsProgressFrom), b = Date.parse(el.dataset.lsProgressTo);

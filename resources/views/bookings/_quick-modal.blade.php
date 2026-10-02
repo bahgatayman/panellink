@@ -52,6 +52,12 @@
         'planClosed' => __('app.quick_booking.closed'),
         'plans1' => trans_choice('app.plans.count', 1, ['count' => 1]),
         'plansN' => trans_choice('app.plans.count', 2, ['count' => ':count']),
+        'defaultLabel' => __('app.pricing_profiles.default_label'),
+        'pkgNeeds' => __('app.packages.needs'),
+        'pkgExpires' => __('app.packages.expires_short'),
+        'pkgLeft' => __('app.packages.left'),
+        'pkgCovered' => __('app.packages.covered_total'),
+        'pkgCta' => __('app.packages.cta_covered'),
     ];
     $qbCanAddMember = ! ($actingStaff ?? null) || $actingStaff->hasPermission('members.create');
 @endphp
@@ -155,11 +161,24 @@
             <div class="ls-plan-pick" id="qb-plans" role="radiogroup" aria-labelledby="qb-pricing-label"></div>
         </section>
 
+        {{-- 5 · Payment — only when the customer has hour packages. --}}
+        <section class="ls-qb-step" id="qb-pkg" aria-labelledby="qb-pkg-label" hidden>
+            <h4 class="ls-qb-label" id="qb-pkg-label"><span class="ls-qb-n" aria-hidden="true" id="qb-pkg-n">5</span>{{ __('app.packages.pay_title') }}</h4>
+            <div class="ls-pkg-pay">
+                <div class="ls-inv-seg" role="radiogroup" aria-labelledby="qb-pkg-label">
+                    <label><input type="radio" name="qb-pay-mode" value="normal" data-qb-pay-mode checked><span>{{ __('app.packages.pay_normal') }}</span></label>
+                    <label><input type="radio" name="qb-pay-mode" value="package" data-qb-pay-mode><span>{{ __('app.packages.pay_package') }}</span></label>
+                </div>
+                <p class="ls-hint" id="qb-pkg-needs" hidden></p>
+                <div class="ls-pkg-options" id="qb-pkg-options" role="radiogroup" aria-label="{{ __('app.packages.pick_package') }}" hidden></div>
+            </div>
+        </section>
+
         {{-- Optional extras stay folded away. --}}
         <details class="ls-qb-more">
             <summary>{{ __('app.quick_booking.more') }}</summary>
             <div class="ls-qb-more-body">
-                <div class="ls-qb-field">
+                <div class="ls-qb-field" id="qb-paid-wrap">
                     <label class="ls-qb-field-label" for="qb-paid">{{ __('app.quick_booking.paid_now') }}</label>
                     <div class="ls-qb-paid">
                         <input type="number" id="qb-paid" class="ls-input" min="0" step="0.01" inputmode="decimal" placeholder="0.00">
@@ -196,7 +215,8 @@
     const $ = (id) => document.getElementById(id);
     const fill = (s, map) => Object.entries(map).reduce((o, [k, v]) => o.split(':' + k).join(v), s);
 
-    const S = { user: null, date: '', start: '', minutes: 60, end: '', people: 1, roomId: null, planId: null, preferRoom: null, rooms: [], fullDay: null, token: 0 };
+    const S = { user: null, date: '', start: '', minutes: 60, end: '', people: 1, roomId: null, planId: null, preferRoom: null, rooms: [], fullDay: null, token: 0,
+        pkgs: [], pkgId: null, pkgMinutesLabel: null, pkgKey: '', pkgToken: 0 };
 
     // ---------- helpers ----------
     const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -429,7 +449,7 @@
             el.querySelector('.ls-qb-room-price b').textContent = off ? '' : r.total_price_display;
             el.querySelector('.ls-qb-room-price small').textContent = off ? (r.reason === 'no_seats' ? T.noSeats : T.bookedThen) : (r.price_note || '');
             el.querySelector('input').addEventListener('change', () => {
-                S.roomId = String(r.id); S.planId = null; renderRooms();
+                S.roomId = String(r.id); S.planId = null; S.profileId = null; renderRooms();
                 // Bring the plan choice into view when this room has plans.
                 if (!$('qb-pricing').hidden) $('qb-pricing').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
             });
@@ -451,13 +471,26 @@
         const room = currentRoom();
         return room && S.planId ? (room.plans || []).find((p) => String(p.id) === S.planId) || null : null;
     }
+    // Pricing profile (alternative hourly rate) — quoted server-side per slot.
+    function currentProfile() {
+        const room = currentRoom();
+        return room && S.profileId ? (room.profiles || []).find((p) => String(p.id) === S.profileId) || null : null;
+    }
+    // What the booking is priced with: a profile or a plan (never both), else the room default.
+    function currentChoice() {
+        const pr = currentProfile();
+        return pr ? { price: pr.total_price, price_display: pr.total_price_display, name: pr.name, note: pr.note } : currentPlan();
+    }
     function renderPlans() {
         const room = currentRoom();
         const plans = room ? room.plans || [] : [];
-        $('qb-pricing').hidden = !plans.length;
+        const profiles = room ? room.profiles || [] : [];
+        $('qb-pricing').hidden = !plans.length && !profiles.length;
         const box = $('qb-plans');
         box.innerHTML = '';
-        if (!plans.length) { S.planId = null; return; }
+        if (!plans.length) S.planId = null;
+        if (S.profileId && !currentProfile()) S.profileId = null;
+        if (!plans.length && !profiles.length) return;
 
         // A chosen plan that no longer fits (people/time changed) falls back to standard.
         const chosen = currentPlan();
@@ -468,9 +501,9 @@
             S.start = keep.start_time; startSel.value = S.start; S.minutes = 'custom'; S.end = keep.end_time; refreshWhen();
         }
 
-        const opt = (id, title, sub, price, why) => {
+        const opt = (id, title, sub, price, why, kind = 'plan') => {
             const off = !!why;
-            const on = String(S.planId || '') === String(id || '');
+            const on = kind === 'profile' ? String(S.profileId || '') === String(id) : !S.profileId && String(S.planId || '') === String(id || '');
             const el = document.createElement('label');
             el.className = 'ls-plan-opt' + (on ? ' is-selected' : '') + (off ? ' is-off' : '');
             el.innerHTML = '<input type="radio" name="qb-plan"><span class="ls-plan-opt-main"><b></b><small></small></span><span class="ls-plan-opt-price"></span>';
@@ -481,6 +514,8 @@
             if (why) { const w = document.createElement('span'); w.className = 'ls-plan-why'; w.textContent = why; el.querySelector('.ls-plan-opt-main').appendChild(w); }
             el.querySelector('.ls-plan-opt-price').textContent = price;
             input.addEventListener('change', () => {
+                if (kind === 'profile') { S.profileId = String(id); S.planId = null; renderPlans(); update(); return; }
+                S.profileId = null;
                 S.planId = id ? String(id) : null;
                 const p = currentPlan();
                 if (p) { S.start = p.start_time; startSel.value = S.start; S.minutes = 'custom'; S.end = p.end_time; refreshWhen(); schedule(); }
@@ -488,16 +523,66 @@
             });
             box.appendChild(el);
         };
-        opt(null, T.standard, room.price_note || '', room.total_price_display, '');
+        opt(null, profiles.length ? T.defaultLabel : T.standard, room.price_note || '', room.total_price_display, '');
+        profiles.forEach((p) => opt(p.id, p.name, p.rate_display, p.total_price_display, '', 'profile'));
         plans.forEach((p) => opt(p.id, p.name, `${p.people_label} · ${p.duration_label}`, p.price_display, planWhy(p)));
     }
+
+    // ---------- 5 · hour packages (server decides eligibility; POST re-checks) ----------
+    let pkgTimer = null;
+    const pkgMode = () => (document.querySelector('[data-qb-pay-mode]:checked') || {}).value || 'normal';
+    function currentPkg() { return pkgMode() === 'package' ? S.pkgs.find((p) => String(p.id) === String(S.pkgId) && p.eligible) || null : null; }
+    function refreshPackages() {
+        const room = currentRoom(), end = endMinutes();
+        const key = S.user && room && end ? [S.user.id, room.id, S.date, S.start, toHm(end), S.people, S.planId || ''].join('|') : '';
+        if (key === S.pkgKey) return;
+        S.pkgKey = key;
+        clearTimeout(pkgTimer);
+        if (!key) { S.pkgs = []; renderPackages(); return; }
+        pkgTimer = setTimeout(() => {
+            const params = new URLSearchParams({ hotspot_user_id: S.user.id, room_id: room.id, booking_date: S.date, start_time: S.start, end_time: toHm(end), guest_count: S.people });
+            if (S.planId) params.set('room_plan_id', S.planId);
+            const token = ++S.pkgToken;
+            fetch(`/bookings/package-options?${params}`, { headers: { Accept: 'application/json' } })
+                .then((r) => r.ok ? r.json() : { packages: [] })
+                .then((d) => { if (token !== S.pkgToken) return; S.pkgs = d.packages || []; S.pkgMinutesLabel = d.minutes_label; renderPackages(); update(); })
+                .catch(() => {});
+        }, 160);
+    }
+    function renderPackages() {
+        $('qb-pkg').hidden = !S.pkgs.length;
+        $('qb-pkg-n').textContent = $('qb-pricing').hidden ? '4' : '5'; // follows the visible steps
+        const use = pkgMode() === 'package';
+        $('qb-pkg-options').hidden = !use || !S.pkgs.length;
+        $('qb-pkg-needs').hidden = !use || !S.pkgMinutesLabel;
+        $('qb-pkg-needs').textContent = S.pkgMinutesLabel ? fill(T.pkgNeeds, { time: S.pkgMinutesLabel }) : '';
+        const box = $('qb-pkg-options');
+        box.innerHTML = '';
+        if (!use) return;
+        if (!currentPkg()) { const first = S.pkgs.find((p) => p.eligible); S.pkgId = first ? String(first.id) : null; }
+        S.pkgs.forEach((p) => {
+            const el = document.createElement('label');
+            el.className = 'ls-pkg-opt' + (p.eligible ? '' : ' is-disabled');
+            el.innerHTML = '<input type="radio" name="qb-pkg"><span class="ls-pkg-opt-main"><span class="ls-pkg-opt-name"></span><span class="ls-pkg-opt-meta"></span></span><span class="ls-pkg-opt-left"></span>';
+            const input = el.querySelector('input');
+            input.disabled = !p.eligible; input.checked = String(p.id) === String(S.pkgId);
+            el.querySelector('.ls-pkg-opt-name').textContent = p.name;
+            el.querySelector('.ls-pkg-opt-meta').textContent = fill(T.pkgExpires, { date: p.expires_label });
+            el.querySelector('.ls-pkg-opt-left').textContent = fill(T.pkgLeft, { time: p.remaining_label });
+            if (p.reason) { const w = document.createElement('span'); w.className = 'ls-pkg-opt-reason'; w.textContent = p.reason; el.querySelector('.ls-pkg-opt-main').appendChild(w); }
+            input.addEventListener('change', () => { S.pkgId = String(p.id); update(); });
+            box.appendChild(el);
+        });
+    }
+    document.querySelectorAll('[data-qb-pay-mode]').forEach((r) => r.addEventListener('change', () => { renderPackages(); update(); }));
 
     // ---------- price + CTA (the one summary) ----------
     const submit = $('qb-submit');
     function currentRoom() { return S.rooms.find((r) => String(r.id) === S.roomId) || null; }
     function update() {
+        refreshPackages();
         const room = currentRoom();
-        const plan = currentPlan();
+        const plan = currentChoice();
         const missing = !S.user ? T.needCustomer : !endMinutes() ? T.needTime : !room ? T.needRoom : '';
         $('qb-total').textContent = plan ? plan.price_display : room ? room.total_price_display : '—';
         // The chosen room's row shows what will actually be charged (one price on screen, not two).
@@ -511,9 +596,18 @@
         submit.textContent = room ? fill(T.cta, { total: plan ? plan.price_display : room.total_price_display }) : T.ctaIdle;
         const paid = $('qb-paid');
         if (room) paid.max = plan ? plan.price : room.total_price;
+
+        // Covered by an hour package: no deposit, one clear total.
+        const pkg = room && !missing ? currentPkg() : null;
+        $('qb-paid-wrap').hidden = !!pkg;
+        if (pkg) {
+            $('qb-total').textContent = fill(T.pkgCovered, { time: S.pkgMinutesLabel || '' });
+            $('qb-hint').textContent = pkg.name;
+            submit.textContent = T.pkgCta;
+        }
     }
     document.querySelectorAll('[data-qb-paid]').forEach((b) => b.addEventListener('click', () => {
-        const room = currentRoom(), plan = currentPlan();
+        const room = currentRoom(), plan = currentChoice();
         $('qb-paid').value = b.dataset.qbPaid === 'full' && room ? (plan ? plan.price : room.total_price) : '';
     }));
 
@@ -530,7 +624,9 @@
         body.append('room_id', room.id);
         body.append('guest_count', S.people);
         if (currentPlan()) body.append('room_plan_id', S.planId);
-        if ($('qb-paid').value) body.append('amount_paid', $('qb-paid').value);
+        if (currentProfile()) body.append('room_pricing_profile_id', S.profileId);
+        if (currentPkg()) body.append('member_package_id', S.pkgId);
+        else if ($('qb-paid').value) body.append('amount_paid', $('qb-paid').value);
         if ($('qb-notes').value.trim()) body.append('notes', $('qb-notes').value.trim());
         LS.busy(submit);
         fetch('/bookings', { method: 'POST', body, headers: { Accept: 'application/json', 'X-CSRF-TOKEN': CSRF } })
@@ -559,7 +655,9 @@
         document.querySelector('.ls-qb-more').open = false;
         if ($('qb-newcust')) $('qb-newcust').hidden = true;
         $('qb-picked-name').textContent = ''; $('qb-picked-phone').textContent = '';
-        S.user = null; S.roomId = null; S.planId = null; S.rooms = []; S.people = 1; peopleInput.value = 1;
+        S.user = null; S.roomId = null; S.planId = null; S.profileId = null; S.rooms = []; S.people = 1; peopleInput.value = 1;
+        S.pkgs = []; S.pkgId = null; S.pkgKey = ''; S.pkgMinutesLabel = null; $('qb-pkg').hidden = true;
+        document.querySelector('[data-qb-pay-mode][value="normal"]').checked = true;
         S.preferRoom = prefill.room_id || null;
         $('qb-picked').hidden = true; $('qb-find').hidden = false; search.value = '';
 

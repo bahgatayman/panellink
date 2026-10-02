@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Booking;
+use App\Models\MemberPackage;
 use App\Models\Notification;
 use App\Models\Owner;
 
@@ -16,10 +17,10 @@ class NotificationService
     public function notify(Owner $owner, array $data): Notification
     {
         $attributes = [
-            'type'       => $data['type'] ?? 'general',
-            'level'      => $data['level'] ?? 'info',
-            'title'      => $data['title'],
-            'body'       => $data['body'] ?? null,
+            'type' => $data['type'] ?? 'general',
+            'level' => $data['level'] ?? 'info',
+            'title' => $data['title'],
+            'body' => $data['body'] ?? null,
             'action_url' => $data['action_url'] ?? null,
         ];
 
@@ -31,7 +32,7 @@ class NotificationService
         }
 
         return Notification::create($attributes + [
-            'owner_id'  => $owner->id,
+            'owner_id' => $owner->id,
             'reference' => null,
         ]);
     }
@@ -47,32 +48,68 @@ class NotificationService
 
         if ($owner->hasFeature('booking')) {
             $this->checkBookings($owner);
+            $this->checkPackages($owner);
+        }
+    }
+
+    /**
+     * Hour packages still holding hours that expire within the next few days.
+     * Keyed by package + expiry date: once per package (again only if its
+     * expiry date is changed). "Exhausted" is event-driven in HourPackageService.
+     */
+    protected function checkPackages(Owner $owner): void
+    {
+        $days = (int) config('packages.expiring_soon_days', 3);
+
+        $expiring = MemberPackage::where('owner_id', $owner->id)
+            ->whereNull('cancelled_at')
+            ->whereColumn('used_minutes', '<', 'total_minutes')
+            ->whereDate('starts_on', '<=', today())
+            ->whereDate('expires_on', '>=', today())
+            ->whereDate('expires_on', '<=', today()->addDays($days))
+            ->with('member')
+            ->get();
+
+        foreach ($expiring as $pkg) {
+            $this->notify($owner, [
+                'type' => 'package_expiring',
+                'level' => 'warning',
+                'reference' => "pkg_expiring:{$pkg->id}:{$pkg->expires_on->toDateString()}",
+                'title' => __('app.packages.notify.expiring_title'),
+                'body' => __('app.packages.notify.expiring_body', [
+                    'member' => $pkg->member?->name ?? '—',
+                    'name' => $pkg->name,
+                    'remaining' => $pkg->remainingLabel(),
+                    'date' => $pkg->expires_on->translatedFormat('M j'),
+                ]),
+                'action_url' => "/users/{$pkg->hotspot_user_id}",
+            ]);
         }
     }
 
     protected function checkSubscription(Owner $owner): void
     {
         $status = $owner->subscriptionStatus();
-        $date   = $owner->subscription_expires_at?->toDateString() ?? 'none';
+        $date = $owner->subscription_expires_at?->toDateString() ?? 'none';
 
         if ($status === 'expiring_soon') {
             $this->notify($owner, [
-                'type'       => 'subscription_expiring',
-                'level'      => 'warning',
-                'reference'  => "subscription_expiring:{$date}",
-                'title'      => __('app.notif.gen.sub_expiring_title'),
-                'body'       => __('app.notif.gen.sub_expiring_body', ['days' => $owner->daysUntilExpiry()]),
+                'type' => 'subscription_expiring',
+                'level' => 'warning',
+                'reference' => "subscription_expiring:{$date}",
+                'title' => __('app.notif.gen.sub_expiring_title'),
+                'body' => __('app.notif.gen.sub_expiring_body', ['days' => $owner->daysUntilExpiry()]),
                 'action_url' => '/profile',
             ]);
         }
 
         if ($status === 'expired') {
             $this->notify($owner, [
-                'type'       => 'subscription_expired',
-                'level'      => 'danger',
-                'reference'  => "subscription_expired:{$date}",
-                'title'      => __('app.notif.gen.sub_expired_title'),
-                'body'       => __('app.notif.gen.sub_expired_body'),
+                'type' => 'subscription_expired',
+                'level' => 'danger',
+                'reference' => "subscription_expired:{$date}",
+                'title' => __('app.notif.gen.sub_expired_title'),
+                'body' => __('app.notif.gen.sub_expired_body'),
                 'action_url' => '/subscription/expired',
             ]);
         }
@@ -86,11 +123,11 @@ class NotificationService
 
         if ($owner->remainingUserSlots() === 0 && $owner->plan->max_members > 0) {
             $this->notify($owner, [
-                'type'      => 'plan_limit',
-                'level'     => 'warning',
+                'type' => 'plan_limit',
+                'level' => 'warning',
                 'reference' => "plan_limit:{$owner->plan_id}:{$owner->plan->max_members}",
-                'title'     => __('app.notif.gen.plan_limit_title'),
-                'body'      => __('app.notif.gen.plan_limit_body', ['max' => $owner->plan->max_members]),
+                'title' => __('app.notif.gen.plan_limit_title'),
+                'body' => __('app.notif.gen.plan_limit_body', ['max' => $owner->plan->max_members]),
             ]);
         }
     }
@@ -106,11 +143,11 @@ class NotificationService
 
         foreach ($todays as $booking) {
             $this->notify($owner, [
-                'type'       => 'booking_today',
-                'level'      => 'info',
-                'reference'  => "booking_today:{$booking->id}:" . today()->toDateString(),
-                'title'      => __('app.notif.gen.booking_today_title'),
-                'body'       => __('app.notif.gen.booking_today_body', [
+                'type' => 'booking_today',
+                'level' => 'info',
+                'reference' => "booking_today:{$booking->id}:".today()->toDateString(),
+                'title' => __('app.notif.gen.booking_today_title'),
+                'body' => __('app.notif.gen.booking_today_body', [
                     'room' => $booking->room?->name ?? '—',
                     'time' => $booking->timeRange(),
                 ]),
@@ -127,11 +164,11 @@ class NotificationService
 
         foreach ($pending as $booking) {
             $this->notify($owner, [
-                'type'       => 'booking_pending',
-                'level'      => 'warning',
-                'reference'  => "booking_pending:{$booking->id}",
-                'title'      => __('app.notif.gen.booking_pending_title'),
-                'body'       => __('app.notif.gen.booking_pending_body', [
+                'type' => 'booking_pending',
+                'level' => 'warning',
+                'reference' => "booking_pending:{$booking->id}",
+                'title' => __('app.notif.gen.booking_pending_title'),
+                'body' => __('app.notif.gen.booking_pending_body', [
                     'room' => $booking->room?->name ?? '—',
                     'date' => $booking->booking_date->format('M j'),
                 ]),

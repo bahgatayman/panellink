@@ -16,6 +16,7 @@ class RoleSeeder extends Seeder
             'shared_sessions.view', 'shared_sessions.manage',
             'workspaces.view',
             'coupons.apply',
+            'packages.view', 'packages.assign',
         ];
 
         $staff = array_merge($receptionist, [
@@ -28,6 +29,8 @@ class RoleSeeder extends Seeder
             'financials.view', 'financials.export',
             'expenses.view', 'expenses.create', 'expenses.edit', 'expenses.delete', 'expenses.manage_categories',
             'coupons.view', 'coupons.create', 'coupons.edit', 'coupons.delete',
+            'bookings.delete',
+            'packages.manage',
             'members.delete', 'members.manage_status',
             'settings.view',
         ]);

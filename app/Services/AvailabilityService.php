@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Booking;
 use App\Models\Room;
 use Carbon\Carbon;
 
@@ -398,6 +399,42 @@ class AvailabilityService
         $sessionUsage = (int) $room->openSharedSessions()->sum('party_size');
 
         return (int) $bookingUsage + $sessionUsage;
+    }
+
+    /**
+     * Bulk counterpart to usedCapacityNow(), for EXCLUSIVE rooms only — never
+     * pass shared-room ids, their live occupancy is the existing
+     * withSum('sharedSessions') idiom used elsewhere (ActiveSessionController,
+     * SharedSessionController). One grouped query instead of N across a room
+     * list. Mirrors usedCapacityNow()'s "overlapping right now" predicate
+     * (today, status pending/confirmed, start_time <= now < end_time) and
+     * intentionally omits its isPastNoShowGrace() reject, which only ever
+     * applies when $room->isShared() — never true for the exclusive rooms
+     * this is for. Keep this in sync if usedCapacityNow()'s predicate ever
+     * changes.
+     *
+     * @param  int[]  $exclusiveRoomIds
+     * @return array<int, int> room_id => seats occupied by a booking in progress right now
+     */
+    public function usedCapacityNowBulk(array $exclusiveRoomIds, int $ownerId): array
+    {
+        if ($exclusiveRoomIds === []) {
+            return [];
+        }
+
+        $now = Carbon::now();
+
+        return Booking::where('owner_id', $ownerId)
+            ->whereIn('room_id', $exclusiveRoomIds)
+            ->whereDate('booking_date', $now->format('Y-m-d'))
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->where('start_time', '<=', $now->format('H:i:s'))
+            ->where('end_time', '>', $now->format('H:i:s'))
+            ->selectRaw('room_id, SUM(party_size) as used_seats')
+            ->groupBy('room_id')
+            ->pluck('used_seats', 'room_id')
+            ->map(fn ($v) => (int) $v)
+            ->all();
     }
 
     /** Seats free right now (see usedCapacityNow()). */

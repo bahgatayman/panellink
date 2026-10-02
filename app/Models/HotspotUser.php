@@ -50,6 +50,11 @@ class HotspotUser extends Model
         return $this->hasMany(Sale::class, 'hotspot_user_id');
     }
 
+    public function packages(): HasMany
+    {
+        return $this->hasMany(MemberPackage::class, 'hotspot_user_id');
+    }
+
     public function hasOpenSharedSession(): bool
     {
         return $this->sharedSessions()->where('status', 'open')->exists();

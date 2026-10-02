@@ -6,7 +6,9 @@ use App\Models\Room;
 use App\Models\Workspace;
 use App\Services\ActivityLogger;
 use App\Services\AvailabilityService;
+use App\Services\SharedSessionBillingService;
 use App\Support\Pricing\PlanInput;
+use App\Support\Pricing\PricingProfileInput;
 use App\Support\Pricing\PricingRules;
 use App\Support\TenantContext;
 use Illuminate\Http\RedirectResponse;
@@ -48,6 +50,29 @@ class RoomController extends Controller
      * later restores it; open shared sessions are unaffected either way
      * because they priced from a snapshot taken when they opened.
      */
+    /**
+     * Billing Buffer (grace minutes past each block boundary): only for a
+     * shared room billed in blocks, and always shorter than one block — a
+     * 30-minute grace on 30-minute blocks would never charge a second block.
+     * Every other room stores 0 so a stray value can't linger.
+     */
+    private function validatedBuffer(array $data): int
+    {
+        $unitMinutes = app(SharedSessionBillingService::class)->unitMinutes($data['billing_unit']);
+        if ($data['type'] !== 'shared' || $unitMinutes <= 1) {
+            return 0;
+        }
+
+        $buffer = (int) ($data['billing_buffer_minutes'] ?? 0);
+        if ($buffer >= $unitMinutes) {
+            throw ValidationException::withMessages([
+                'billing_buffer_minutes' => __('app.workspace.billing_buffer_too_long', ['max' => $unitMinutes - 1]),
+            ]);
+        }
+
+        return $buffer;
+    }
+
     private function withPricing(array $data, ?Room $room = null): array
     {
         $model = $data['pricing_model'] ?? PricingRules::HOURLY;
@@ -108,6 +133,49 @@ class RoomController extends Controller
         $room->plans()->whereNotIn('id', $kept)->delete();
     }
 
+    /**
+     * The room form's Pricing Profiles, validated (PricingProfileInput). Null
+     * when the request doesn't carry the field, so other clients leave a
+     * room's profiles untouched.
+     */
+    private function validatedProfiles(Request $request): ?array
+    {
+        if (! $request->has('pricing_profiles')) {
+            return null;
+        }
+        [$profiles, $errors] = PricingProfileInput::parse($request->input('pricing_profiles'));
+        if ($errors) {
+            throw ValidationException::withMessages(['pricing_profiles' => $errors]);
+        }
+
+        return $profiles;
+    }
+
+    /**
+     * Make the room's profiles match the submitted list (matched by id, scoped
+     * to this room). A removed profile is deleted when nothing used it, else
+     * only deactivated — bookings/sessions keep their id + name snapshot.
+     */
+    private function syncProfiles(Room $room, array $profiles): void
+    {
+        $existing = $room->pricingProfiles()->get()->keyBy('id');
+        $kept = [];
+
+        foreach ($profiles as $i => $p) {
+            $attrs = ['name' => $p['name'], 'price_per_hour' => $p['price_per_hour'], 'is_active' => $p['is_active'], 'sort_order' => $i];
+            if ($p['id'] && $existing->has($p['id'])) {
+                $existing[$p['id']]->update($attrs);
+                $kept[] = $p['id'];
+            } else {
+                $kept[] = $room->pricingProfiles()->create($attrs + ['owner_id' => $room->owner_id])->id;
+            }
+        }
+
+        foreach ($existing->except($kept) as $removed) {
+            $removed->isUsed() ? $removed->update(['is_active' => false]) : $removed->delete();
+        }
+    }
+
     public function create(int $workspaceId): View
     {
         $workspace = $this->getWorkspace($workspaceId);
@@ -131,6 +199,7 @@ class RoomController extends Controller
             'capacity' => 'required|integer|min:1|max:999',
             'price_per_hour' => 'required_unless:pricing_model,duration,people,people_duration|nullable|numeric|min:0',
             'billing_unit' => 'nullable|in:minute,half_hour,hour',
+            'billing_buffer_minutes' => 'nullable|integer|min:0|max:'.SharedSessionBillingService::MAX_BUFFER_MINUTES,
             'pricing_model' => 'nullable|in:'.implode(',', PricingRules::MODELS),
             'pricing_rules' => 'nullable|string|max:20000',
             'plans' => 'nullable|string|max:20000',
@@ -141,11 +210,13 @@ class RoomController extends Controller
         // type so a stray submitted value can never linger on a room the
         // billing-unit field isn't even shown for.
         $data['billing_unit'] = $data['type'] === 'shared' ? ($data['billing_unit'] ?? 'minute') : 'minute';
+        $data['billing_buffer_minutes'] = $this->validatedBuffer($data);
         $data = $this->withPricing($data);
         $plans = $this->validatedPlans($request, $data);
+        $profiles = $this->validatedProfiles($request);
         unset($data['plans']);
 
-        $room = DB::transaction(function () use ($data, $workspace, $plans) {
+        $room = DB::transaction(function () use ($data, $workspace, $plans, $profiles) {
             $room = Room::create(array_merge($data, [
                 'workspace_id' => $workspace->id,
                 'owner_id' => TenantContext::id(),
@@ -153,13 +224,16 @@ class RoomController extends Controller
             if ($plans !== null) {
                 $this->syncPlans($room, $plans);
             }
+            if ($profiles !== null) {
+                $this->syncProfiles($room, $profiles);
+            }
 
             return $room;
         });
 
         $this->activityLogger->log('room.created', $room, "Added room {$room->name} to {$workspace->name}");
 
-        return redirect()->route('workspaces.show', $workspace)
+        return redirect()->route('workspaces.index', ['workspace' => $workspace->id])
             ->with('success', 'Room added successfully.');
     }
 
@@ -184,6 +258,7 @@ class RoomController extends Controller
             'capacity' => 'required|integer|min:1|max:999',
             'price_per_hour' => 'required_unless:pricing_model,duration,people,people_duration|nullable|numeric|min:0',
             'billing_unit' => 'nullable|in:minute,half_hour,hour',
+            'billing_buffer_minutes' => 'nullable|integer|min:0|max:'.SharedSessionBillingService::MAX_BUFFER_MINUTES,
             'pricing_model' => 'nullable|in:'.implode(',', PricingRules::MODELS),
             'pricing_rules' => 'nullable|string|max:20000',
             'plans' => 'nullable|string|max:20000',
@@ -191,8 +266,10 @@ class RoomController extends Controller
         ]);
 
         $data['billing_unit'] = $data['type'] === 'shared' ? ($data['billing_unit'] ?? 'minute') : 'minute';
+        $data['billing_buffer_minutes'] = $this->validatedBuffer($data);
         $data = $this->withPricing($data, $room);
         $plans = $this->validatedPlans($request, $data);
+        $profiles = $this->validatedProfiles($request);
         unset($data['plans']);
 
         // A type flip mid-occupancy is a bigger semantic break than a
@@ -218,16 +295,19 @@ class RoomController extends Controller
                 __('app.workspace.capacity_below_committed_usage', ['count' => $committedUsage]));
         }
 
-        DB::transaction(function () use ($room, $data, $plans) {
+        DB::transaction(function () use ($room, $data, $plans, $profiles) {
             $room->update($data);
             if ($plans !== null) {
                 $this->syncPlans($room, $plans);
+            }
+            if ($profiles !== null) {
+                $this->syncProfiles($room, $profiles);
             }
         });
 
         $this->activityLogger->log('room.updated', $room, "Updated room {$room->name}");
 
-        return redirect()->route('workspaces.show', $workspace)
+        return redirect()->route('workspaces.index', ['workspace' => $workspace->id])
             ->with('success', 'Room updated successfully.');
     }
 
@@ -240,7 +320,7 @@ class RoomController extends Controller
 
         $room->delete();
 
-        return redirect()->route('workspaces.show', $workspace)
+        return redirect()->route('workspaces.index', ['workspace' => $workspace->id])
             ->with('success', 'Room deleted successfully.');
     }
 

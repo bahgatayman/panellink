@@ -32,6 +32,8 @@ class Booking extends Model
         'owner_id',
         'room_id',
         'room_plan_id',
+        'room_pricing_profile_id',
+        'pricing_profile_name',
         'coupon_id',
         'hotspot_user_id',
         'party_size',
@@ -47,6 +49,8 @@ class Booking extends Model
         'pricing_note',
         'amount_paid',
         'payment_status',
+        'payment_method',
+        'member_package_id',
         'status',
         'notes',
     ];
@@ -106,8 +110,25 @@ class Booking extends Model
         return max(0, $this->netRoomCharge() - (float) $this->amount_paid);
     }
 
+    public const METHOD_PACKAGE = 'package';
+
+    /** Paid with prepaid hours (HourPackageService) instead of cash. */
+    public function isPackageCovered(): bool
+    {
+        return $this->payment_method === self::METHOD_PACKAGE && $this->member_package_id !== null;
+    }
+
+    public function memberPackage(): BelongsTo
+    {
+        return $this->belongsTo(MemberPackage::class);
+    }
+
     public function paymentStatusLabel(): string
     {
+        if ($this->payment_method === self::METHOD_PACKAGE) {
+            return __('app.packages.covered');
+        }
+
         return match ($this->payment_status) {
             self::PAYMENT_PAID => __('app.booking.payment.status_paid'),
             self::PAYMENT_PARTIAL => __('app.booking.payment.status_partial'),
@@ -123,6 +144,10 @@ class Booking extends Model
      */
     public function paymentStatusTone(): string
     {
+        if ($this->payment_method === self::METHOD_PACKAGE) {
+            return 'info';
+        }
+
         return match ($this->payment_status) {
             self::PAYMENT_PAID => 'ok',
             self::PAYMENT_PARTIAL => 'warn',
@@ -136,6 +161,11 @@ class Booking extends Model
     }
 
     /** The Custom Plan this booking was sold on, if any (null once the plan is deleted). */
+    public function pricingProfile(): BelongsTo
+    {
+        return $this->belongsTo(RoomPricingProfile::class, 'room_pricing_profile_id');
+    }
+
     public function plan(): BelongsTo
     {
         return $this->belongsTo(RoomPlan::class, 'room_plan_id');

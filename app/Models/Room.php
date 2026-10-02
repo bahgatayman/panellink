@@ -23,6 +23,7 @@ class Room extends Model
         'capacity',
         'price_per_hour',
         'billing_unit',
+        'billing_buffer_minutes',
         'pricing_model',
         'pricing_rules',
         'description',
@@ -33,6 +34,7 @@ class Room extends Model
     {
         return [
             'price_per_hour' => 'decimal:2',
+            'billing_buffer_minutes' => 'integer',
             'pricing_rules' => 'array',
             'is_available' => 'boolean',
         ];
@@ -64,6 +66,18 @@ class Room extends Model
     public function plans(): HasMany
     {
         return $this->hasMany(RoomPlan::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    /** Optional alternative hourly rates ("Photography — 700/hr"), active and inactive. */
+    public function pricingProfiles(): HasMany
+    {
+        return $this->hasMany(RoomPricingProfile::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    /** The profiles a new booking/session may choose. */
+    public function activePricingProfiles(): HasMany
+    {
+        return $this->pricingProfiles()->where('is_active', true);
     }
 
     public function bookings(): HasMany
@@ -121,6 +135,39 @@ class Room extends Model
     public function isShared(): bool
     {
         return $this->type === 'shared';
+    }
+
+    /**
+     * 'available' | 'occupied' | 'unavailable'. Unlike Booking::statusColor()
+     * (reads a stored column), Room has no stored status column — occupancy
+     * is a live, cross-table read ($occupiedSeats) the caller must already
+     * have batched: AvailabilityService::usedCapacityNowBulk() for exclusive
+     * rooms, the withSum('sharedSessions') idiom for shared ones. This method
+     * does no querying of its own, so a room list stays N+1-free.
+     *
+     * is_available=false always wins over a live "occupied" read — an owner
+     * who flips a room off expects it to read Unavailable immediately, not
+     * "Occupied" from a booking that's about to be superseded anyway.
+     */
+    public function statusKey(int $occupiedSeats = 0): string
+    {
+        if (! $this->is_available) {
+            return 'unavailable';
+        }
+
+        return $occupiedSeats > 0 ? 'occupied' : 'available';
+    }
+
+    /** Bilingual status text; shared rooms read "6/10 occupied", exclusive rooms just "Occupied". */
+    public function statusLabel(int $occupiedSeats = 0): string
+    {
+        return match ($this->statusKey($occupiedSeats)) {
+            'unavailable' => __('app.workspace.unavailable'),
+            'occupied' => $this->isShared()
+                ? __('app.workspace.occupied_shared', ['used' => $occupiedSeats, 'total' => $this->effectiveCapacity()])
+                : __('app.workspace.occupied'),
+            default => __('app.workspace.available'),
+        };
     }
 
     /** Bilingual label for this room's session-billing rule; unknown values fall back to the raw value. */

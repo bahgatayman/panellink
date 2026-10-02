@@ -2,6 +2,11 @@
 
 @section('page-title', __('app.booking.bookings') . ' #' . str_pad($booking->id, 4, '0', STR_PAD_LEFT))
 
+@php
+    $deleteBookingStaff = auth('staff')->user();
+    $canDeleteBooking = ! $deleteBookingStaff || $deleteBookingStaff->hasPermission('bookings.delete');
+@endphp
+
 @section('content')
     @if (session('success'))
         <div class="mb-4 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm px-4 py-3">{{ session('success') }}</div>
@@ -91,6 +96,17 @@
                     </div>
                 </dl>
 
+                @if ($booking->payment_method === \App\Models\Booking::METHOD_PACKAGE)
+                    {{-- Paid with prepaid hours: no cash due; the value is what those hours are worth. --}}
+                    <div class="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm" id="booking-package-coverage">
+                        <x-ui.badge tone="info">{{ __('app.packages.covered_by') }}</x-ui.badge>
+                        <span class="font-medium text-gray-900">{{ $booking->memberPackage?->name ?? '—' }} · {{ \App\Support\Duration::label((int) round($booking->total_hours * 60)) }}</span>
+                        <span class="text-gray-500">{{ __('app.packages.worth', ['amount' => (app()->getLocale() === 'ar' ? number_format($booking->total_price, 2).' ج.م' : 'EGP '.number_format($booking->total_price, 2))]) }}</span>
+                        @if ($booking->hotspotUser)
+                            <a href="/users/{{ $booking->hotspot_user_id }}#packages" class="ls-link">{{ $booking->hotspotUser->name }} &rarr;</a>
+                        @endif
+                    </div>
+                @else
                 <div class="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-x-8 gap-y-2 text-sm">
                     <div>
                         <span class="text-gray-500">{{ __('app.booking.payment.paid_now') }}</span>
@@ -105,6 +121,7 @@
                         {{ $booking->paymentStatusLabel() }}
                     </span>
                 </div>
+                @endif
 
                 @if ($booking->balanceDue() > 0 && ! in_array($booking->status, ['cancelled', 'no_show']))
                     <form method="POST" action="/bookings/{{ $booking->id }}/payment" class="mt-4 pt-4 border-t border-gray-100 flex items-end gap-2">
@@ -242,18 +259,37 @@
                             {{ __('app.btn.cancel_booking') }}
                         </button>
                     </form>
-                @elseif ($booking->status === 'cancelled')
-                    <form method="POST" action="/bookings/{{ $booking->id }}" onsubmit="return confirm('{{ __('app.booking.delete_booking') }}')">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm font-medium">
-                            {{ __('app.btn.delete_booking') }}
-                        </button>
-                    </form>
                 @elseif ($booking->status === 'completed')
                     <p class="text-sm text-green-600 font-medium text-center">{{ __('app.status.completed') }}</p>
+                @endif
+
+                @if ($booking->status === 'checked_in')
+                    <p class="text-xs text-gray-500 mt-3">{{ __('app.booking.delete_disabled_checked_in') }}</p>
+                @elseif ($canDeleteBooking)
+                    <button type="button" class="w-full mt-3 bg-white border border-red-200 text-red-600 px-4 py-2 rounded-lg hover:bg-red-50 transition text-sm font-medium" data-ls-open="delete-booking-modal">
+                        {{ __('app.btn.delete_booking') }}
+                    </button>
                 @endif
             </div>
         </div>
     </div>
+
+    <x-ui.modal id="delete-booking-modal" :title="__('app.booking.delete_booking')">
+        <p>{{ __('app.booking.delete_confirm_intro') }}</p>
+        <ul class="list-disc ps-5 text-sm text-gray-600 space-y-1 mt-2">
+            <li>{{ __('app.booking.delete_consequence_revenue') }}</li>
+            <li>{{ __('app.booking.delete_consequence_package') }}</li>
+            <li>{{ __('app.booking.delete_consequence_coupon') }}</li>
+            <li>{{ __('app.booking.delete_consequence_stock') }}</li>
+        </ul>
+        <p class="text-xs text-gray-500 mt-3">{{ __('app.common.cannot_be_undone') }}</p>
+        <x-slot:footer>
+            <x-ui.button variant="ghost" data-ls-close>{{ __('app.common.cancel') }}</x-ui.button>
+            <form method="POST" action="/bookings/{{ $booking->id }}">
+                @csrf
+                @method('DELETE')
+                <x-ui.button type="submit" variant="danger">{{ __('app.btn.delete_booking') }}</x-ui.button>
+            </form>
+        </x-slot:footer>
+    </x-ui.modal>
 @endsection

@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="max-w-2xl mx-auto">
-        <a href="{{ route('workspaces.show', $workspace) }}" class="text-sm text-blue-600 hover:text-blue-800 mb-4 inline-block">&larr; {{ __('app.btn.back_to_workspaces') }}</a>
+        <a href="{{ route('workspaces.index', ['workspace' => $workspace->id]) }}" class="text-sm text-blue-600 hover:text-blue-800 mb-4 inline-block">&larr; {{ __('app.btn.back_to_workspaces') }}</a>
 
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h1 class="text-xl font-bold text-gray-900 mb-6">{{ __('app.workspace.edit_workspace') }}</h1>
@@ -55,7 +55,7 @@
                         class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium shadow-sm">
                         {{ __('app.btn.update_workspace') }}
                     </button>
-                    <a href="{{ route('workspaces.show', $workspace) }}"
+                    <a href="{{ route('workspaces.index', ['workspace' => $workspace->id]) }}"
                         class="text-sm text-gray-600 hover:text-gray-800">{{ __('app.common.cancel') }}</a>
                 </div>
             </form>

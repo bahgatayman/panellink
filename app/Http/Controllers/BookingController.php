@@ -5,14 +5,17 @@ namespace App\Http\Controllers;
 use App\Exceptions\BookingCapacityExceededException;
 use App\Exceptions\CouponRejectedException;
 use App\Exceptions\CouponUsageLimitExceededException;
+use App\Exceptions\InsufficientPackageBalanceException;
 use App\Exceptions\InsufficientStockException;
 use App\Exceptions\SharedSessionCapacityExceededException;
 use App\Http\Controllers\Concerns\GeneratesTimeSlots;
 use App\Models\Booking;
 use App\Models\HotspotUser;
+use App\Models\MemberPackage;
 use App\Models\Product;
 use App\Models\Room;
 use App\Models\RoomPlan;
+use App\Models\RoomPricingProfile;
 use App\Models\SaleItem;
 use App\Models\SharedSession;
 use App\Models\Workspace;
@@ -20,12 +23,15 @@ use App\Services\ActivityLogger;
 use App\Services\AvailabilityService;
 use App\Services\BusinessHoursService;
 use App\Services\CouponService;
+use App\Services\HourPackageService;
 use App\Services\RoomPricingService;
 use App\Services\SalesService;
+use App\Support\Duration;
 use App\Support\Money;
 use App\Support\Pricing\PriceQuote;
 use App\Support\TenantContext;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -92,7 +98,7 @@ class BookingController extends Controller
         ));
     }
 
-    public function store(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours, RoomPricingService $pricing): RedirectResponse|JsonResponse
+    public function store(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours, RoomPricingService $pricing, HourPackageService $packages): RedirectResponse|JsonResponse
     {
         $owner = TenantContext::user();
 
@@ -110,9 +116,11 @@ class BookingController extends Controller
             'start_time' => 'required|date_format:H:i',
             'end_time' => 'required_without:room_plan_id|nullable|date_format:H:i|after:start_time',
             'room_plan_id' => 'nullable|integer',
+            'room_pricing_profile_id' => 'nullable|integer',
             'party_size' => 'nullable|integer|min:1',
             'guest_count' => 'nullable|integer|min:1|max:999',
             'amount_paid' => 'nullable|numeric|min:0',
+            'member_package_id' => 'nullable|integer',
             'notes' => 'nullable|string|max:500',
         ];
 
@@ -146,7 +154,7 @@ class BookingController extends Controller
         // is its headcount (seats); an exclusive room's party_size stays 1
         // (it books the whole room), so its headcount travels separately.
         $people = $room->isShared() ? $partySize : (int) ($validated['guest_count'] ?? 1);
-        [$quote, $planId, $planError] = $this->priceBooking($pricing, $room, $validated, $people);
+        [$quote, $planId, $planError, $profile] = $this->priceBooking($pricing, $room, $validated, $people);
         if ($planError) {
             return $fail($planError);
         }
@@ -162,14 +170,25 @@ class BookingController extends Controller
         // matter what the client submitted. The payment section is already
         // hidden for shared rooms in the UI; this is the server-side
         // enforcement of that same rule.
-        $amountPaid = $room->isShared() ? 0.0 : round((float) ($validated['amount_paid'] ?? 0), 2);
+        // Optional "Use hour package": checked up front for a friendly reason;
+        // the balance itself is re-enforced atomically inside the transaction.
+        $package = null;
+        if (! empty($validated['member_package_id'])) {
+            [$package, $packageError] = $this->resolvePackage($packages, (int) $validated['member_package_id'], $hotspotUser->id, $room, $validated, $quote, $partySize);
+            if ($packageError) {
+                return $fail($packageError);
+            }
+        }
+
+        // A package-covered booking takes no cash deposit.
+        $amountPaid = ($room->isShared() || $package) ? 0.0 : round((float) ($validated['amount_paid'] ?? 0), 2);
 
         if ($amountPaid > $quote->totalPrice) {
             return $fail(__('app.booking.payment.exceeds_total', ['total' => number_format($quote->totalPrice, 2)]));
         }
 
         try {
-            $booking = DB::transaction(function () use ($validated, $ownerId, $room, $hotspotUser, $quote, $planId, $people, $availability, $partySize, $amountPaid) {
+            $booking = DB::transaction(function () use ($validated, $ownerId, $room, $hotspotUser, $quote, $planId, $people, $availability, $partySize, $amountPaid, $package, $packages, $profile) {
                 // Lock the room row so concurrent store()/update() calls for
                 // this room serialize through here. Genuine row-level locking
                 // on MySQL (production) — compiles to a real `FOR UPDATE`; a
@@ -192,6 +211,8 @@ class BookingController extends Controller
                     'owner_id' => $ownerId,
                     'room_id' => $lockedRoom->id,
                     'room_plan_id' => $planId,
+                    'room_pricing_profile_id' => $profile?->id,
+                    'pricing_profile_name' => $profile?->name,
                     'hotspot_user_id' => $hotspotUser->id,
                     'party_size' => $partySize,
                     'booking_date' => $validated['booking_date'],
@@ -212,10 +233,16 @@ class BookingController extends Controller
                     throw new BookingCapacityExceededException;
                 }
 
+                if ($package) {
+                    $this->coverWithPackage($packages, $newBooking, $package, $quote);
+                }
+
                 return $newBooking;
             });
         } catch (BookingCapacityExceededException) {
             $booking = null;
+        } catch (InsufficientPackageBalanceException $e) {
+            return $fail($e->getMessage());
         }
 
         if (! $booking) {
@@ -238,21 +265,84 @@ class BookingController extends Controller
     }
 
     /**
+     * Owner/member-scope the chosen hour package and check it can cover this
+     * booking (room, booking date, balance). Shared rooms use packages at
+     * check-in/close instead, since they're billed by actual elapsed time.
+     *
+     * @return array{0: ?MemberPackage, 1: ?string}
+     */
+    private function resolvePackage(HourPackageService $packages, int $packageId, int $memberId, Room $room, array $validated, PriceQuote $quote, int $partySize, ?Booking $ignore = null): array
+    {
+        $package = MemberPackage::where('owner_id', $room->owner_id)
+            ->where('hotspot_user_id', $memberId)
+            ->whereKey($packageId)
+            ->firstOrFail();
+
+        if ($room->isShared()) {
+            return [null, __('app.packages.reasons.shared_booking')];
+        }
+
+        $reason = $packages->eligibility($package, $room, $validated['booking_date'], (int) ceil($quote->totalMinutes), $partySize, $ignore);
+        if ($reason === 'insufficient') {
+            return [null, (new InsufficientPackageBalanceException($packages->available($package, $ignore)))->getMessage()];
+        }
+
+        return [$reason ? null : $package, $reason ? __('app.packages.reasons.'.$reason) : null];
+    }
+
+    /**
+     * Draw the booking's minutes from $package (or return them when null) and
+     * record it as covered: total_price = amount_paid = the package value those
+     * hours represent, which is how the revenue is recognised on completion.
+     * Runs inside the caller's transaction.
+     */
+    private function coverWithPackage(HourPackageService $packages, Booking $booking, ?MemberPackage $package, PriceQuote $quote): void
+    {
+        $minutes = (int) ceil($quote->totalMinutes);
+        $value = $packages->reconcileBooking($booking, $package, $package ? $minutes : 0);
+
+        if (! $package) {
+            return;
+        }
+
+        $booking->update([
+            'payment_method' => Booking::METHOD_PACKAGE,
+            'member_package_id' => $package->id,
+            'total_price' => $value,
+            'amount_paid' => $value,
+            'payment_status' => Booking::PAYMENT_PAID,
+            'pricing_note' => __('app.packages.covered_note', ['name' => $package->name, 'hours' => Duration::label($minutes)]),
+        ]);
+    }
+
+    /**
      * Price a booking through RoomPricingService: a Custom Plan when one is
      * chosen (fixed price, and the plan sets the booking's window — so
      * $validated's start/end are replaced by the plan's), otherwise the
-     * room's standard pricing. Returns [quote, planId, errorMessage].
+     * room's standard pricing — or a chosen Pricing Profile's hourly rate.
+     * Plan and profile are alternatives, never combined.
+     * Returns [quote, planId, errorMessage, profile].
      *
-     * @return array{0: ?PriceQuote, 1: ?int, 2: ?string}
+     * @return array{0: ?PriceQuote, 1: ?int, 2: ?string, 3: ?RoomPricingProfile}
      */
-    private function priceBooking(RoomPricingService $pricing, Room $room, array &$validated, int $people): array
+    private function priceBooking(RoomPricingService $pricing, Room $room, array &$validated, int $people, ?int $keepProfileId = null): array
     {
+        if (! empty($validated['room_pricing_profile_id']) && ! empty($validated['room_plan_id'])) {
+            return [null, null, __('app.pricing_profiles.errors.with_plan'), null];
+        }
+
         if (empty($validated['room_plan_id'])) {
             if (empty($validated['end_time'])) {
-                return [null, null, __('validation.required', ['attribute' => 'end time'])];
+                return [null, null, __('validation.required', ['attribute' => 'end time']), null];
+            }
+            try {
+                $profile = $pricing->resolveProfile($room, (int) ($validated['room_pricing_profile_id'] ?? 0) ?: null, $keepProfileId);
+            } catch (ModelNotFoundException) {
+                // Another room's / tenant's profile, or deactivated — never priced with.
+                return [null, null, __('app.pricing_profiles.errors.not_available'), null];
             }
 
-            return [$pricing->quoteBooking($room, $people, $validated['booking_date'], $validated['start_time'], $validated['end_time']), null, null];
+            return [$pricing->quoteBooking($room, $people, $validated['booking_date'], $validated['start_time'], $validated['end_time'], $profile), null, null, $profile];
         }
 
         $plan = RoomPlan::where('id', $validated['room_plan_id'])
@@ -260,20 +350,20 @@ class BookingController extends Controller
             ->where('room_id', $room->id)
             ->first();
         if (! $plan) {
-            return [null, null, __('app.plans.errors.plan_room')];
+            return [null, null, __('app.plans.errors.plan_room'), null];
         }
 
         try {
             $quote = $pricing->quotePlan($room, $plan, $people, $validated['booking_date'], $validated['start_time']);
         } catch (\InvalidArgumentException $e) {
-            return [null, null, __('app.plans.errors.'.$e->getMessage(), ['count' => $plan->people])];
+            return [null, null, __('app.plans.errors.'.$e->getMessage(), ['count' => $plan->people]), null];
         }
 
         $window = $pricing->planWindow($room, $plan, $validated['booking_date'], $validated['start_time']);
         $validated['start_time'] = $window['start'];
         $validated['end_time'] = $window['end'];
 
-        return [$quote, $plan->id, null];
+        return [$quote, $plan->id, null, null];
     }
 
     /**
@@ -353,7 +443,7 @@ class BookingController extends Controller
         return view('bookings.edit', compact('booking', 'rooms', 'users', 'timeSlots'));
     }
 
-    public function update(Request $request, $id, AvailabilityService $availability, BusinessHoursService $businessHours, RoomPricingService $pricing, CouponService $coupons): RedirectResponse
+    public function update(Request $request, $id, AvailabilityService $availability, BusinessHoursService $businessHours, RoomPricingService $pricing, CouponService $coupons, HourPackageService $packages): RedirectResponse
     {
         $owner = TenantContext::user();
         $ownerId = $owner->id;
@@ -371,11 +461,15 @@ class BookingController extends Controller
             'start_time' => 'required|date_format:H:i',
             'end_time' => 'required_without:room_plan_id|nullable|date_format:H:i|after:start_time',
             'room_plan_id' => 'nullable|integer',
+            'room_pricing_profile_id' => 'nullable|integer',
             'party_size' => 'nullable|integer|min:1',
             'guest_count' => 'nullable|integer|min:1|max:999',
             'amount_paid' => 'nullable|numeric|min:0',
+            'member_package_id' => 'nullable|integer',
             'notes' => 'nullable|string|max:500',
         ]);
+
+        $wasCovered = $booking->isPackageCovered();
 
         $room = Room::where('id', $validated['room_id'])
             ->where('owner_id', $ownerId)
@@ -383,7 +477,15 @@ class BookingController extends Controller
 
         $partySize = (int) ($validated['party_size'] ?? 1);
         $people = $room->isShared() ? $partySize : (int) ($validated['guest_count'] ?? $booking->guest_count ?? 1);
-        [$quote, $planId, $planError] = $this->priceBooking($pricing, $room, $validated, $people);
+        // A form that doesn't send the field keeps the booking's profile (same room, no plan).
+        if (! $request->exists('room_pricing_profile_id') && $booking->room_pricing_profile_id
+            && (int) $validated['room_id'] === (int) $booking->room_id && empty($validated['room_plan_id'])) {
+            $validated['room_pricing_profile_id'] = $booking->room_pricing_profile_id;
+        }
+
+        // A pricing profile kept from before still prices this edit even if it
+        // was deactivated since; one from another room is rejected (404).
+        [$quote, $planId, $planError, $profile] = $this->priceBooking($pricing, $room, $validated, $people, $booking->room_pricing_profile_id);
         if ($planError) {
             return back()->withInput()->with('error', $planError);
         }
@@ -396,14 +498,27 @@ class BookingController extends Controller
         // room doesn't silently wipe a deposit the request didn't mention —
         // but it's still re-validated against the *new* total below, since
         // shortening the booking could make an old deposit exceed it.
-        $amountPaid = $room->isShared() ? 0.0 : round((float) ($validated['amount_paid'] ?? $booking->amount_paid), 2);
+        // A form that doesn't send the field keeps the booking's current package.
+        $packageId = $request->exists('member_package_id') ? ($validated['member_package_id'] ?? null) : $booking->member_package_id;
+        $package = null;
+        if ($packageId) {
+            [$package, $packageError] = $this->resolvePackage($packages, (int) $packageId, (int) $validated['hotspot_user_id'], $room, $validated, $quote, $partySize, $booking);
+            if ($packageError) {
+                return back()->withInput()->with('error', $packageError);
+            }
+        }
+
+        // A package booking's amount_paid is the package value, never a cash
+        // deposit — switching it back to normal payment starts from 0.
+        $amountPaid = ($room->isShared() || $package) ? 0.0
+            : round((float) ($validated['amount_paid'] ?? ($wasCovered ? 0 : $booking->amount_paid)), 2);
 
         if ($amountPaid > $quote->totalPrice) {
             return back()->withInput()->with('error', __('app.booking.payment.exceeds_total', ['total' => number_format($quote->totalPrice, 2)]));
         }
 
         try {
-            $updated = DB::transaction(function () use ($validated, $room, $booking, $quote, $planId, $people, $availability, $id, $partySize, $amountPaid) {
+            $updated = DB::transaction(function () use ($validated, $room, $booking, $quote, $planId, $people, $availability, $id, $partySize, $amountPaid, $package, $packages, $profile) {
                 // Same lock + post-write re-verify pattern as store() — see
                 // the comment there for why both layers exist.
                 $lockedRoom = Room::where('id', $room->id)->lockForUpdate()->firstOrFail();
@@ -420,6 +535,8 @@ class BookingController extends Controller
                 $booking->update([
                     'room_id' => $lockedRoom->id,
                     'room_plan_id' => $planId,
+                    'room_pricing_profile_id' => $profile?->id,
+                    'pricing_profile_name' => $profile?->name,
                     'hotspot_user_id' => $validated['hotspot_user_id'],
                     'party_size' => $partySize,
                     'booking_date' => $validated['booking_date'],
@@ -432,6 +549,8 @@ class BookingController extends Controller
                     'pricing_note' => $quote->note,
                     'amount_paid' => $amountPaid,
                     'payment_status' => Booking::derivePaymentStatus($amountPaid, $quote->totalPrice),
+                    'payment_method' => 'cash',
+                    'member_package_id' => null,
                     'notes' => $validated['notes'] ?? null,
                 ]);
 
@@ -439,10 +558,16 @@ class BookingController extends Controller
                     throw new BookingCapacityExceededException;
                 }
 
+                // Reconcile the package hours (2h→3h draws 1h more, 3h→1h
+                // returns 2h, switched/removed package returns everything).
+                $this->coverWithPackage($packages, $booking, $package, $quote);
+
                 return true;
             });
         } catch (BookingCapacityExceededException) {
             $updated = false;
+        } catch (InsufficientPackageBalanceException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
         }
 
         if (! $updated) {
@@ -462,7 +587,7 @@ class BookingController extends Controller
         return $warning ? $redirect->with('warning', $warning) : $redirect;
     }
 
-    public function updateStatus(Request $request, $id, CouponService $coupons): RedirectResponse
+    public function updateStatus(Request $request, $id, CouponService $coupons, HourPackageService $packages): RedirectResponse
     {
         $booking = Booking::where('owner_id', TenantContext::id())->with('room')->findOrFail($id);
 
@@ -533,6 +658,25 @@ class BookingController extends Controller
             if (! $claimed) {
                 return back()->with('error', 'Invalid status transition.');
             }
+        } elseif ($validated['status'] === 'cancelled') {
+            // Atomic claim so two racing cancels can't both return the
+            // booking's package hours; history rows are kept either way.
+            $claimed = DB::transaction(function () use ($booking, $packages) {
+                $updated = Booking::where('id', $booking->id)
+                    ->where('owner_id', $booking->owner_id)
+                    ->whereIn('status', ['pending', 'confirmed'])
+                    ->update(['status' => 'cancelled']);
+
+                if ($updated) {
+                    $packages->releaseBooking($booking);
+                }
+
+                return (bool) $updated;
+            });
+
+            if (! $claimed) {
+                return back()->with('error', 'Invalid status transition.');
+            }
         } else {
             $booking->update(['status' => $validated['status']]);
         }
@@ -553,7 +697,7 @@ class BookingController extends Controller
      * they have no check-in concept and keep their existing four-status
      * lifecycle untouched.
      */
-    public function checkIn(Request $request, $id, AvailabilityService $availability, BusinessHoursService $businessHours, RoomPricingService $pricing): RedirectResponse
+    public function checkIn(Request $request, $id, AvailabilityService $availability, BusinessHoursService $businessHours, RoomPricingService $pricing, HourPackageService $packages): RedirectResponse
     {
         $owner = TenantContext::user();
         $ownerId = $owner->id;
@@ -585,11 +729,25 @@ class BookingController extends Controller
 
         $validated = $request->validate([
             'party_size' => 'required|integer|min:1',
+            'member_package_id' => 'nullable|integer',
         ]);
         $actualPartySize = (int) $validated['party_size'];
 
+        // Optional hour package for the session (drawn at close by actual time).
+        $packageId = null;
+        if (! empty($validated['member_package_id'])) {
+            $package = MemberPackage::where('owner_id', $ownerId)
+                ->where('hotspot_user_id', $booking->hotspot_user_id)
+                ->whereKey($validated['member_package_id'])
+                ->firstOrFail();
+            if ($reason = $packages->eligibility($package, $booking->room, today(), 1, $actualPartySize)) {
+                return back()->with('error', __('app.packages.reasons.'.$reason));
+            }
+            $packageId = $package->id;
+        }
+
         try {
-            $session = DB::transaction(function () use ($booking, $ownerId, $actualPartySize, $availability, $pricing) {
+            $session = DB::transaction(function () use ($booking, $ownerId, $actualPartySize, $availability, $pricing, $packageId) {
                 $lockedRoom = Room::where('id', $booking->room_id)->lockForUpdate()->firstOrFail();
 
                 // Atomic claim: only one concurrent check-in attempt on this
@@ -630,9 +788,15 @@ class BookingController extends Controller
                     'status' => 'open',
                     'booking_id' => $booking->id,
                     'billing_unit' => $lockedRoom->billing_unit,
-                    'billed_price_per_hour' => $lockedRoom->price_per_hour,
-                    'pricing_snapshot' => $pricing->snapshotFor($lockedRoom),
+                    'billing_buffer_minutes' => (int) $lockedRoom->billing_buffer_minutes,
+                    // A reservation priced with a profile keeps the rate it was
+                    // booked at (its own snapshot), not today's profile price.
+                    'billed_price_per_hour' => $booking->room_pricing_profile_id ? $booking->price_per_hour : $lockedRoom->price_per_hour,
+                    'pricing_snapshot' => $booking->room_pricing_profile_id ? null : $pricing->snapshotFor($lockedRoom),
+                    'room_pricing_profile_id' => $booking->room_pricing_profile_id,
+                    'pricing_profile_name' => $booking->pricing_profile_name,
                     'plan_snapshot' => $pricing->planSnapshotFor($booking),
+                    'member_package_id' => $packageId,
                 ]);
 
                 // Post-write defense-in-depth, same reasoning as store()'s.
@@ -656,17 +820,88 @@ class BookingController extends Controller
             ->with('success', 'Checked in. The session is now open.');
     }
 
-    public function destroy($id): RedirectResponse
+    /**
+     * Delete a mistaken booking and fully reverse everything it caused:
+     * restore any Sale's inventory then delete the Sale (its booking_id FK is
+     * nullOnDelete, not cascade — leaving it orphaned would keep counting in
+     * RevenueAnalyticsService::saleRevenue() forever), release any Member
+     * Hour Package minutes it held, and release any redeemed coupon usage
+     * (same nullOnDelete leak against Coupon usage-limit counting). Revenue
+     * itself needs no separate reversal — it's a live sum over bookings/sales,
+     * so it's correct again the instant both rows are actually gone.
+     *
+     * Blocked outright for a 'checked_in' booking — that status is this
+     * codebase's sole, sufficient marker for "this booking has a currently
+     * open SharedSession" (only checkIn() can set it, nothing transitions a
+     * booking out of it), so deleting one here would corrupt a live session.
+     *
+     * The inner atomic re-check (lockForUpdate + a status whitelist) is the
+     * same two-phase pattern updateStatus() already uses for its cancel/
+     * complete branches: it's what actually makes a duplicate/double-submit
+     * delete request a no-op instead of a double reversal, not the outer
+     * findOrFail (which only guards the normal 404/UX case).
+     */
+    public function destroy($id, CouponService $coupons, HourPackageService $packages, SalesService $sales): RedirectResponse
     {
-        $booking = Booking::where('owner_id', TenantContext::id())->findOrFail($id);
+        $booking = Booking::where('owner_id', TenantContext::id())->with(['sale.items', 'couponUsage'])->findOrFail($id);
 
-        if ($booking->status !== 'cancelled') {
-            return back()->with('error', 'Only cancelled bookings can be deleted.');
+        if ($booking->status === 'checked_in') {
+            return back()->with('error', __('app.booking.delete_disabled_checked_in'));
         }
 
-        $booking->delete();
+        try {
+            $deleted = DB::transaction(function () use ($booking, $coupons, $packages, $sales) {
+                $locked = Booking::where('id', $booking->id)
+                    ->where('owner_id', $booking->owner_id)
+                    ->whereIn('status', ['pending', 'confirmed', 'completed', 'cancelled', 'no_show'])
+                    ->lockForUpdate()
+                    ->first();
 
-        return redirect('/bookings')->with('success', 'Booking deleted successfully.');
+                if (! $locked) {
+                    return false;
+                }
+
+                $restoredItems = [];
+                $sale = $locked->sale;
+                if ($sale) {
+                    foreach ($sale->items->all() as $item) {
+                        $restoredItems[] = ['product' => $item->name, 'quantity' => $item->quantity];
+                        $sales->removeItem($item);
+                    }
+                    $sale->delete();
+                }
+
+                $packageMinutesHeld = (int) round((float) $locked->total_hours * 60);
+                $packages->releaseBooking($locked);
+
+                $couponUsage = $locked->couponUsage;
+                $coupons->releaseBooking($locked);
+
+                $this->activityLogger->log('booking.deleted', $locked, "Deleted booking #{$locked->id}", [
+                    'status_at_deletion' => $locked->status,
+                    'amount_paid' => (float) $locked->amount_paid,
+                    'discount_total' => (float) $locked->discount_total,
+                    'payment_method' => $locked->payment_method,
+                    'package_minutes_released' => $locked->isPackageCovered() ? $packageMinutesHeld : 0,
+                    'member_package_id' => $locked->member_package_id,
+                    'coupon_code' => $couponUsage?->coupon?->code,
+                    'coupon_usage_id_removed' => $couponUsage?->id,
+                    'sale_items_restored' => $restoredItems,
+                ]);
+
+                $locked->delete();
+
+                return true;
+            });
+        } catch (\Throwable $e) {
+            return back()->with('error', __('app.booking.delete_failed'));
+        }
+
+        if (! $deleted) {
+            return back()->with('error', __('app.booking.delete_already_gone'));
+        }
+
+        return redirect('/bookings')->with('success', __('app.booking.deleted_successfully'));
     }
 
     /**
@@ -857,6 +1092,87 @@ class BookingController extends Controller
      * checkAvailability() itself uses; no pricing/availability math is
      * duplicated here. Read-only, no locks — safe to call on every keystroke.
      */
+    /**
+     * A member's usable hour packages for the "Use hour package" choice in the
+     * booking form, the quick-booking popup and the start-session modal. Each
+     * comes with its remaining time, expiry and — once the slot is known —
+     * whether it can cover it (and if not, why). Never decides anything:
+     * store()/update()/SharedSessionController re-check server-side.
+     */
+    public function packageOptions(Request $request, RoomPricingService $pricing, HourPackageService $packages): JsonResponse
+    {
+        $ownerId = TenantContext::id();
+
+        $validated = $request->validate([
+            'hotspot_user_id' => 'required|integer',
+            'room_id' => 'nullable|integer',
+            'booking_date' => 'nullable|date',
+            'start_time' => 'nullable|date_format:H:i',
+            'end_time' => 'nullable|date_format:H:i',
+            'room_plan_id' => 'nullable|integer',
+            'party_size' => 'nullable|integer|min:1',
+            'guest_count' => 'nullable|integer|min:1|max:999',
+            'booking_id' => 'nullable|integer',
+            'context' => 'nullable|in:booking,session',
+        ]);
+
+        $member = HotspotUser::where('owner_id', $ownerId)->findOrFail($validated['hotspot_user_id']);
+        $room = ! empty($validated['room_id']) ? Room::where('owner_id', $ownerId)->find($validated['room_id']) : null;
+        $ignore = ! empty($validated['booking_id']) ? Booking::where('owner_id', $ownerId)->find($validated['booking_id']) : null;
+        $isSession = ($validated['context'] ?? 'booking') === 'session';
+        $date = $isSession ? today()->toDateString() : ($validated['booking_date'] ?? today()->toDateString());
+        $partySize = (int) ($validated['party_size'] ?? 1);
+
+        // Minutes needed: a session draws its actual time at close (so ≥ 1
+        // minute is enough to open one); a booking needs its priced duration.
+        $minutes = null;
+        if ($isSession) {
+            $minutes = 1;
+        } elseif ($room && ! empty($validated['start_time']) && (! empty($validated['end_time']) || ! empty($validated['room_plan_id']))) {
+            $people = $room->isShared() ? $partySize : (int) ($validated['guest_count'] ?? 1);
+            [$quote] = $this->priceBooking($pricing, $room, $validated, $people);
+            $minutes = $quote ? (int) ceil($quote->totalMinutes) : null;
+        }
+
+        $list = MemberPackage::where('owner_id', $ownerId)
+            ->where('hotspot_user_id', $member->id)
+            ->whereNull('cancelled_at')
+            ->where(fn ($q) => $q->whereDate('expires_on', '>=', today())
+                ->when($ignore?->member_package_id, fn ($q2, $id) => $q2->orWhere('id', $id)))
+            ->orderBy('expires_on')
+            ->get();
+
+        $options = $list->map(function (MemberPackage $pkg) use ($packages, $room, $date, $minutes, $partySize, $ignore, $isSession) {
+            $reason = null;
+            if ($room && ! $isSession && $room->isShared()) {
+                $reason = 'shared_booking';
+            } elseif ($room && $minutes !== null) {
+                $reason = $packages->eligibility($pkg, $room, $date, $minutes, $partySize, $ignore);
+            } elseif ($pkg->cancelled_at || $pkg->expires_on->lt(today())) {
+                $reason = 'expired';
+            }
+            $available = $packages->available($pkg, $ignore);
+
+            return [
+                'id' => $pkg->id,
+                'name' => $pkg->name,
+                'remaining_minutes' => $available,
+                'remaining_label' => Duration::label($available),
+                'total_label' => $pkg->totalLabel(),
+                'expires_on' => $pkg->expires_on->toDateString(),
+                'expires_label' => $pkg->expires_on->translatedFormat('M j, Y'),
+                'eligible' => $reason === null && ($minutes !== null || $isSession) && $room !== null,
+                'reason' => $reason ? __('app.packages.reasons.'.$reason) : null,
+            ];
+        })->values();
+
+        return response()->json([
+            'packages' => $options,
+            'minutes' => $minutes,
+            'minutes_label' => $minutes !== null && ! $isSession ? Duration::label($minutes) : null,
+        ]);
+    }
+
     public function roomOptions(Request $request, AvailabilityService $availability, BusinessHoursService $businessHours, RoomPricingService $pricing): JsonResponse
     {
         $owner = TenantContext::user();
@@ -896,7 +1212,7 @@ class BookingController extends Controller
 
         $rooms = Room::where('owner_id', $owner->id)
             ->where('is_available', true)
-            ->with(['workspace', 'plans'])
+            ->with(['workspace', 'plans', 'activePricingProfiles'])
             ->orderBy('name')
             ->get();
 
@@ -951,6 +1267,15 @@ class BookingController extends Controller
                 'pricing_model' => $room->pricingRules()->model,
                 'uses_people' => $room->pricingRules()->usesPeople(),
                 'plans' => $this->planOptions($room, $validated, $bookingId, $room->isShared() ? $partySize : $guestCount, $availability, $businessHours, $owner, $pricing),
+                // Alternative hourly rates, each quoted server-side for this exact slot.
+                'profiles' => $room->activePricingProfiles->map(function (RoomPricingProfile $p) use ($room, $pricing, $validated, $partySize, $guestCount) {
+                    $q = $pricing->quoteBooking($room, $room->isShared() ? $partySize : $guestCount, $validated['booking_date'], $validated['start_time'], $validated['end_time'], $p);
+
+                    return [
+                        'id' => $p->id, 'name' => $p->name, 'rate_display' => $p->rateLabel(),
+                        'total_price' => $q->totalPrice, 'total_price_display' => Money::format($q->totalPrice), 'note' => $q->note,
+                    ];
+                })->values()->all(),
                 'total_hours' => $quote->totalHours(),
                 'total_price' => $quote->totalPrice,
                 'total_price_display' => Money::format($quote->totalPrice),

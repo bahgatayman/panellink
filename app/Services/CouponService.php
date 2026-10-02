@@ -161,6 +161,9 @@ class CouponService
         if ($booking->room?->isShared()) {
             throw new CouponRejectedException('shared_room');
         }
+        if ($booking->payment_method === Booking::METHOD_PACKAGE) {
+            throw new CouponRejectedException('package_booking');
+        }
         if (! in_array($booking->status, ['pending', 'confirmed'], true)) {
             throw new CouponRejectedException('not_editable');
         }
@@ -216,6 +219,13 @@ class CouponService
     {
         if (! $booking->coupon_id) {
             return null;
+        }
+
+        // Hours from a package can't be discounted (V1) — drop the coupon.
+        if ($booking->payment_method === Booking::METHOD_PACKAGE) {
+            $this->detachFromBooking($booking);
+
+            return __('app.coupons.errors.package_booking');
         }
 
         $coupon = Coupon::where('owner_id', $booking->owner_id)->find($booking->coupon_id);
@@ -317,5 +327,19 @@ class CouponService
         }
 
         return $usage;
+    }
+
+    /**
+     * Booking deleted: undo an already-redeemed coupon. No counterpart ever
+     * existed for redeemForBooking() before this — detachFromBooking() is a
+     * different operation (it only clears a still-pending, not-yet-redeemed
+     * attachment). Every usage-limit/per-customer-limit check is a live
+     * usages()->count() query (see evaluate() above), so deleting the row is
+     * the entire reversal — nothing else to decrement. Idempotent no-op for
+     * a booking with no coupon or no usage row.
+     */
+    public function releaseBooking(Booking $booking): void
+    {
+        CouponUsage::where('booking_id', $booking->id)->first()?->delete();
     }
 }

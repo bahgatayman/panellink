@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Booking;
 use App\Models\HotspotUser;
+use App\Models\MemberPackage;
 use App\Models\Owner;
+use App\Models\PackageTemplate;
+use App\Models\PackageUsage;
 use App\Models\SharedSession;
 use App\Models\SpeedProfile;
 use App\Services\ActivityLogger;
@@ -35,6 +38,16 @@ class HotspotUserController extends Controller
             })
             ->latest()
             ->paginate(15);
+
+        // Hour package pill: each member's usable packages, eager-loaded in one query.
+        $owner = TenantContext::user();
+        if ($owner->hasFeature('booking')) {
+            $users->load(['packages' => fn ($q) => $q->whereNull('cancelled_at')
+                ->whereDate('starts_on', '<=', today())
+                ->whereDate('expires_on', '>=', today())
+                ->whereColumn('used_minutes', '<', 'total_minutes')
+                ->orderBy('expires_on')]);
+        }
 
         return view('users.index', [
             'users' => $users,
@@ -216,6 +229,14 @@ class HotspotUserController extends Controller
             ];
         }
 
+        // Hour Packages (booking feature + packages.view): every package with
+        // its usage history, plus the active templates for "Add package".
+        $staff = auth('staff')->user();
+        $showPackages = $owner->hasFeature('booking') && (! $staff || $staff->hasPermission('packages.view'));
+        $packages = $showPackages
+            ? MemberPackage::where('owner_id', $owner->id)->where('hotspot_user_id', $user->id)->latest('id')->get()
+            : collect();
+
         return view('users.show', [
             'user' => $user,
             'speedProfiles' => $speedProfiles,
@@ -223,6 +244,16 @@ class HotspotUserController extends Controller
             'openSession' => $openSession,
             'stats' => $stats,
             'activity' => $this->activityFeed($owner, $user),
+            'showPackages' => $showPackages,
+            'packages' => $packages,
+            'packageUsages' => $showPackages
+                ? PackageUsage::where('owner_id', $owner->id)->where('hotspot_user_id', $user->id)
+                    ->with(['memberPackage:id,name', 'booking:id,booking_date'])->latest('id')->take(30)->get()
+                : collect(),
+            'packageTemplates' => $showPackages
+                ? PackageTemplate::where('owner_id', $owner->id)->where('is_active', true)->orderBy('name')->get()
+                : collect(),
+            'canAssignPackages' => $showPackages && (! $staff || $staff->hasPermission('packages.assign')),
         ]);
     }
 

@@ -30,8 +30,10 @@
     // keep party_size = 1 for availability; the headcount travels as guest_count.
     $initialGuests = (int) ($isEdit ? old('guest_count', $booking->guest_count ?? $booking->party_size ?? 1) : old('guest_count', 1));
     $initialPlanId = (string) ($isEdit ? old('room_plan_id', $booking->room_plan_id) : old('room_plan_id', ''));
+    $initialProfileId = (string) ($isEdit ? old('room_pricing_profile_id', $booking->room_pricing_profile_id) : old('room_pricing_profile_id', ''));
     $planI18n = [
         'standard' => __('app.plans.standard'),
+        'defaultLabel' => __('app.pricing_profiles.default_label'),
         'forPeople1' => trans_choice('app.plans.for_people', 1, ['count' => 1]),
         'forPeopleN' => trans_choice('app.plans.for_people', 2, ['count' => ':count']),
         'booked' => __('app.plans.booked_then'), 'noFit' => __('app.plans.no_fit'), 'closed' => __('app.booking.outside_working_hours'),
@@ -66,6 +68,12 @@
         'free' => __('app.booking.rooms.state_free'),
         'partial' => __('app.booking.rooms.state_partial'),
         'unavailable' => __('app.booking.rooms.state_unavailable'),
+    ];
+    $pkgI18n = [
+        'needs' => __('app.packages.needs'), 'expires' => __('app.packages.expires_short'),
+        'covered' => __('app.packages.covered_total'), 'cta' => __('app.packages.cta_covered'),
+        'left' => __('app.packages.left'), 'pickSlot' => __('app.packages.pick_slot_first'),
+        'coveredLabel' => __('app.packages.covered'),
     ];
     $paymentStatusLabels = [
         'paid' => __('app.booking.payment.status_paid'),
@@ -170,11 +178,13 @@
                     <div class="ls-plan-pick" id="plan-options" role="radiogroup" aria-labelledby="plan-choice-label"></div>
                 </div>
                 <input type="hidden" name="room_plan_id" id="room_plan_id" value="{{ $initialPlanId }}">
+                {{-- Pricing profile (alternative hourly rate) — chosen in the same Pricing list as plans. --}}
+                <input type="hidden" name="room_pricing_profile_id" id="room_pricing_profile_id" value="{{ $initialProfileId }}">
             </div>
         </div>
 
         {{-- 4. Payment --}}
-        @include('bookings._payment', ['amountPaid' => $initialAmountPaid])
+        @include('bookings._payment', ['amountPaid' => $initialAmountPaid, 'memberPackageId' => $isEdit ? $booking->member_package_id : ''])
 
         <details class="ls-plain-section ls-notes-details">
             <summary class="ls-section-label">{{ __('app.placeholder.notes_optional') }}</summary>
@@ -231,6 +241,7 @@
     const planInput = document.getElementById('room_plan_id');
     const planChoice = document.getElementById('plan-choice');
     const planOptionsBox = document.getElementById('plan-options');
+    const profileInput = document.getElementById('room_pricing_profile_id');
     const PT = @json($planI18n);
 
     function addMinutes(hm, mins) {
@@ -436,6 +447,7 @@
 
     roomGrid.addEventListener('change', () => {
         planInput.value = ''; // plans belong to one room
+        profileInput.value = ''; // …and so do pricing profiles — never kept across rooms
         updateRoomSelectedClasses();
         renderPlanChoice();
         updateSummaryAndPayment();
@@ -453,6 +465,10 @@
     function currentPlan() {
         const opt = rawRoomOption();
         return opt && planInput.value ? (opt.plans || []).find(p => String(p.id) === String(planInput.value)) || null : null;
+    }
+    function currentProfile() {
+        const opt = rawRoomOption();
+        return opt && profileInput.value ? (opt.profiles || []).find(p => String(p.id) === String(profileInput.value)) || null : null;
     }
     function planWhy(p) {
         if (!p.fits_people) return p.people === 1 ? PT.forPeople1 : PT.forPeopleN.replace(':count', p.people);
@@ -478,17 +494,23 @@
     function renderPlanChoice() {
         const opt = rawRoomOption();
         const plans = opt ? opt.plans || [] : [];
-        planChoice.hidden = !plans.length;
+        const profiles = opt ? opt.profiles || [] : [];
+        planChoice.hidden = !plans.length && !profiles.length;
         planOptionsBox.innerHTML = '';
-        if (!plans.length) { planInput.value = ''; return; }
+        if (!plans.length) planInput.value = '';
+        if (opt && profileInput.value && !currentProfile()) profileInput.value = ''; // inactive / another room's
+        if (!plans.length && !profiles.length) return;
 
         const chosen = currentPlan();
         if (chosen && planWhy(chosen)) planInput.value = '';
         const keep = currentPlan();
         if (keep && (keep.start_time !== startHidden.value || keep.end_time !== endHidden.value)) { applyPlanWindow(keep); fetchRoomOptions(); }
 
-        const add = (id, title, sub, price, why) => {
-            const on = String(planInput.value || '') === String(id || '');
+        // One list, one choice: Default · a pricing profile · a Custom Plan.
+        const add = (id, title, sub, price, why, kind = 'plan') => {
+            const on = kind === 'profile'
+                ? String(profileInput.value || '') === String(id)
+                : !profileInput.value && String(planInput.value || '') === String(id || '');
             const el = document.createElement('label');
             el.className = 'ls-plan-opt' + (on ? ' is-selected' : '') + (why ? ' is-off' : '');
             el.innerHTML = '<input type="radio" name="plan-choice"><span class="ls-plan-opt-main"><b></b><small></small></span><span class="ls-plan-opt-price"></span>';
@@ -499,6 +521,8 @@
             if (why) { const w = document.createElement('span'); w.className = 'ls-plan-why'; w.textContent = why; el.querySelector('.ls-plan-opt-main').appendChild(w); }
             el.querySelector('.ls-plan-opt-price').textContent = price;
             input.addEventListener('change', () => {
+                if (kind === 'profile') { profileInput.value = id; planInput.value = ''; renderPlanChoice(); updateSummaryAndPayment(); fetchRoomOptions(); return; }
+                profileInput.value = '';
                 planInput.value = id || '';
                 const p = currentPlan();
                 if (p) { applyPlanWindow(p); fetchRoomOptions(); }
@@ -507,7 +531,8 @@
             });
             planOptionsBox.appendChild(el);
         };
-        add(null, PT.standard, opt.price_note || '', opt.total_price_display, '');
+        add(null, profiles.length ? PT.defaultLabel : PT.standard, opt.price_note || opt.price_summary || '', opt.total_price_display, '');
+        profiles.forEach(p => add(p.id, p.name, p.rate_display, p.total_price_display, '', 'profile'));
         plans.forEach(p => add(p.id, p.name, p.people_label + ' · ' + p.duration_label, p.price_display, planWhy(p)));
     }
     updateRoomSelectedClasses();
@@ -560,6 +585,8 @@
     function currentRoomOption() {
         const opt = rawRoomOption();
         const plan = currentPlan();
+        const profile = currentProfile();
+        if (opt && profile) return { ...opt, total_price: profile.total_price, total_price_display: profile.total_price_display, price_note: profile.note };
         return opt && plan ? { ...opt, total_price: plan.price, total_price_display: plan.price_display, price_note: plan.note } : opt;
     }
 
@@ -585,6 +612,74 @@
 
     const toneFor = { paid: 'ok', partial: 'warn', unpaid: 'neutral' };
 
+    // --- Hour packages (Normal payment · Use hour package) ---
+    // The server decides eligibility (/bookings/package-options) and re-checks
+    // everything on submit; this only renders the choice.
+    const pkgBox = document.getElementById('pkg-pay');
+    const pkgInput = document.getElementById('f-member_package_id');
+    const pkgOptionsBox = document.getElementById('pkg-options');
+    const pkgNeeds = document.getElementById('pkg-needs');
+    const pkgCovered = document.getElementById('pkg-covered');
+    const PK = @json($pkgI18n);
+    let pkgList = [], pkgMinutesLabel = null, pkgToken = 0;
+    const payMode = () => (document.querySelector('[data-pay-mode]:checked') || {}).value || 'normal';
+    function pkgChosen() {
+        return payMode() === 'package' ? pkgList.find(p => String(p.id) === String(pkgInput.value) && p.eligible) || null : null;
+    }
+    function fetchPackages() {
+        const uid = document.getElementById('selected-user-id').value;
+        if (!uid) { pkgList = []; renderPackages(); updateSummaryAndPayment(); return; }
+        const params = new URLSearchParams({ hotspot_user_id: uid, guest_count: guestInput.value || 1 });
+        if (selectedRoomId()) params.set('room_id', selectedRoomId());
+        if (dateInput.value) params.set('booking_date', dateInput.value);
+        if (startHidden.value) params.set('start_time', startHidden.value);
+        if (endHidden.value) params.set('end_time', endHidden.value);
+        if (planInput.value) params.set('room_plan_id', planInput.value);
+        @if ($isEdit)
+            params.set('booking_id', '{{ $booking->id }}');
+        @endif
+        const token = ++pkgToken;
+        fetch(`/bookings/package-options?${params}`, { headers: { Accept: 'application/json' } })
+            .then(r => r.ok ? r.json() : { packages: [] })
+            .then(d => {
+                if (token !== pkgToken) return;
+                pkgList = d.packages || [];
+                pkgMinutesLabel = d.minutes_label;
+                renderPackages();
+                updateSummaryAndPayment();
+            })
+            .catch(() => {});
+    }
+    function renderPackages() {
+        pkgBox.hidden = !pkgList.length;
+        if (!pkgList.length) { pkgInput.value = ''; return; }
+        const usePkg = payMode() === 'package';
+        pkgOptionsBox.hidden = !usePkg;
+        pkgNeeds.hidden = !usePkg;
+        pkgNeeds.textContent = pkgMinutesLabel ? PK.needs.replace(':time', pkgMinutesLabel) : PK.pickSlot;
+        if (!usePkg) { pkgInput.value = ''; return; }
+        // Keep the chosen package while it's still eligible; otherwise pick the first that is.
+        if (!pkgChosen()) { const first = pkgList.find(p => p.eligible); pkgInput.value = first ? first.id : ''; }
+        pkgOptionsBox.innerHTML = '';
+        pkgList.forEach(p => {
+            const el = document.createElement('label');
+            el.className = 'ls-pkg-opt' + (p.eligible ? '' : ' is-disabled');
+            el.innerHTML = '<input type="radio" name="pkg-choice"><span class="ls-pkg-opt-main"><span class="ls-pkg-opt-name"></span><span class="ls-pkg-opt-meta"></span></span><span class="ls-pkg-opt-left"></span>';
+            const input = el.querySelector('input');
+            input.disabled = !p.eligible;
+            input.checked = String(pkgInput.value) === String(p.id);
+            el.querySelector('.ls-pkg-opt-name').textContent = p.name;
+            el.querySelector('.ls-pkg-opt-meta').textContent = PK.expires.replace(':date', p.expires_label);
+            el.querySelector('.ls-pkg-opt-left').textContent = PK.left.replace(':time', p.remaining_label);
+            if (p.reason) { const w = document.createElement('span'); w.className = 'ls-pkg-opt-reason'; w.textContent = p.reason; el.querySelector('.ls-pkg-opt-main').appendChild(w); }
+            input.addEventListener('change', () => { pkgInput.value = p.id; updateSummaryAndPayment(); });
+            pkgOptionsBox.appendChild(el);
+        });
+    }
+    document.querySelectorAll('[data-pay-mode]').forEach(r => r.addEventListener('change', () => { renderPackages(); updateSummaryAndPayment(); }));
+    let pkgTimer = null;
+    const schedulePackages = () => { clearTimeout(pkgTimer); pkgTimer = setTimeout(fetchPackages, 150); };
+
     function updateSummaryAndPayment() {
         const opt = currentRoomOption();
         // The selected room card shows what will actually be charged (plan price when a plan is chosen).
@@ -594,8 +689,13 @@
         }
         const total = opt ? opt.total_price : 0;
         const isShared = opt ? opt.is_shared : false;
+        const pkg = opt && !isShared ? pkgChosen() : null;
 
         paymentSection.style.display = (opt && !isShared) ? '' : 'none';
+        // A package covers the whole booking: hide the deposit inputs.
+        document.getElementById('pay-deposit').hidden = !!pkg;
+        pkgCovered.hidden = !pkg;
+        if (pkg) pkgCovered.querySelector('span').textContent = PK.covered.replace(':time', pkgMinutesLabel || '');
         document.getElementById('pay-shared-note').hidden = !(opt && isShared);
 
         let paid = 0;
@@ -635,6 +735,16 @@
 
         const cta = document.getElementById('confirm-cta');
         cta.textContent = ctaTemplate.replace(':total', opt ? opt.total_price_display : '—');
+
+        if (pkg) {
+            document.getElementById('confirm-total').textContent = PK.covered.replace(':time', pkgMinutesLabel || '');
+            pricingRow.hidden = false;
+            document.getElementById('confirm-pricing').textContent = pkg.name;
+            document.getElementById('confirm-paid').textContent = '—';
+            document.getElementById('confirm-remaining').textContent = formatMoney(0);
+            setBadge(document.getElementById('confirm-status-badge'), 'info', PK.coveredLabel);
+            cta.textContent = PK.cta;
+        }
     }
 
     function roomNameFor(id) {
@@ -714,12 +824,24 @@
     window.selectUser = function (...args) {
         baseSelectUser(...args);
         updateSummaryAndPayment();
+        schedulePackages();
     };
     const baseClearUserSelection = window.clearUserSelection;
     window.clearUserSelection = function (...args) {
         baseClearUserSelection(...args);
         updateSummaryAndPayment();
+        schedulePackages();
     };
+
+    // Re-check package eligibility whenever the slot changes (room, date,
+    // time, people, plan) — the needed minutes come from the server's quote.
+    roomGrid.addEventListener('change', schedulePackages);
+    dateInput.addEventListener('change', schedulePackages);
+    guestInput.addEventListener('input', schedulePackages);
+    document.querySelectorAll('[data-guest-step]').forEach(b => b.addEventListener('click', schedulePackages));
+    const baseFetchRoomOptions = fetchRoomOptions;
+    fetchRoomOptions = function () { baseFetchRoomOptions(); schedulePackages(); };
+    planOptionsBox.addEventListener('change', schedulePackages);
 
     // --- Initial state ---
     refreshStepperState();
@@ -740,6 +862,7 @@
     } else {
         fetchFullDay();
         updateSummaryAndPayment();
+        schedulePackages();
     }
 })();
 </script>

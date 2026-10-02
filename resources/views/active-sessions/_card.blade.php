@@ -39,10 +39,19 @@
         $rate = (float) ($estimate?->liveRatePerHour ?? 0);
         $roomCharge = (float) ($estimate?->totalPrice ?? 0);
         $billingLabel = $estimate?->note ?? __('app.session.billed_per.'.$unit);
+        if ($model->pricing_profile_name && ! $model->pricing_snapshot && ! $model->plan_snapshot) {
+            // Pricing profile: "Photography · EGP 15.00/hr · Billed per hour".
+            $billingLabel .= ' · '.__('app.session.billed_per.'.$unit);
+        }
+        // Block billing: when the bill next goes up (grace buffer included) —
+        // from the same service that prices preview/close.
+        $nextChargeAt = app(\App\Services\RoomPricingService::class)->nextSessionChargeAt($model, now());
+        $grace = $nextChargeAt ? (int) ($model->billing_buffer_minutes ?? 0) : 0;
         $endsAt = null;
         $endingSoon = false;
     } else {
         $unit = null;
+        $nextChargeAt = null;
         $rate = (float) $model->price_per_hour;
         $roomCharge = $model->netRoomCharge();
         $endsAt = $model->endsAt();
@@ -109,6 +118,16 @@
             </span>
             <span class="ls-faint ls-trunc">{{ $billingLabel }}</span>
         </div>
+        @if ($nextChargeAt)
+            @php $nextKey = $unit === 'half_hour' ? 'next_half_hour' : 'next_hour'; @endphp
+            <div class="ls-session-next">
+                <x-ui.icon name="clock" />
+                <span data-ls-countdown="{{ $nextChargeAt->toIso8601String() }}"
+                      data-ls-template="{{ __('app.session.'.$nextKey, ['d' => ':d']) }}"
+                      data-ls-done="{{ __('app.session.next_updating') }}">{{ __('app.session.'.$nextKey, ['d' => max(1, (int) ceil(now()->diffInSeconds($nextChargeAt, false) / 60)).__('app.ui.unit_m')]) }}</span>
+                @if ($grace > 0)<span class="ls-faint">· {{ __('app.session.grace', ['count' => $grace]) }}</span>@endif
+            </div>
+        @endif
     @else
         <div class="ls-session-timing">
         <div class="ls-meter {{ $endingSoon ? 'is-warn' : '' }}" role="progressbar" aria-label="{{ $model->timeRange() }}">

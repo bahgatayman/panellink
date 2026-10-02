@@ -13,6 +13,7 @@ class SharedSession extends Model
         'session_date', 'start_time',
         'opened_at', 'closed_at', 'total_minutes', 'total_price',
         'status', 'booking_id', 'billing_unit', 'billed_price_per_hour', 'pricing_snapshot', 'plan_snapshot',
+        'member_package_id', 'billing_buffer_minutes', 'room_pricing_profile_id', 'pricing_profile_name',
     ];
 
     protected $casts = [
@@ -25,7 +26,18 @@ class SharedSession extends Model
         'pricing_snapshot' => 'array',
         'plan_snapshot' => 'array',
         'party_size' => 'integer',
+        'billing_buffer_minutes' => 'integer',
     ];
+
+    public function pricingProfile(): BelongsTo
+    {
+        return $this->belongsTo(RoomPricingProfile::class, 'room_pricing_profile_id');
+    }
+
+    public function memberPackage(): BelongsTo
+    {
+        return $this->belongsTo(MemberPackage::class);
+    }
 
     public function owner(): BelongsTo
     {

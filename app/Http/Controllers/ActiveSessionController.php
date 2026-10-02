@@ -41,7 +41,7 @@ class ActiveSessionController extends Controller
             ->withSum(['sharedSessions as occupied_seats' => function ($q) {
                 $q->where('status', 'open');
             }], 'party_size')
-            ->with('workspace')
+            ->with(['workspace', 'activePricingProfiles'])
             ->get();
 
         // Catalog for the add-product picker (only when the sales feature is on).

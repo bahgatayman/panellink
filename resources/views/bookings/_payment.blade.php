@@ -8,10 +8,27 @@
     store/update) re-validates and re-derives payment_status regardless of
     anything computed here.
 --}}
-@php $amountPaid = $amountPaid ?? ''; @endphp
+@php $amountPaid = $amountPaid ?? ''; $memberPackageId = $memberPackageId ?? ''; @endphp
 <section class="ls-plain-section" id="payment-section">
     <h2 class="ls-section-label">{{ __('app.booking.payment.title') }}</h2>
 
+    {{--
+        Hour packages: "Normal payment · Use hour package", shown only when the
+        member has packages (filled from /bookings/package-options). A chosen
+        package covers the whole booking — no deposit is taken.
+    --}}
+    <input type="hidden" name="member_package_id" id="f-member_package_id" value="{{ old('member_package_id', $memberPackageId) }}">
+    <div class="ls-pkg-pay" id="pkg-pay" hidden>
+        <div class="ls-inv-seg" role="radiogroup" aria-label="{{ __('app.packages.pay_title') }}">
+            <label><input type="radio" name="pay_mode" value="normal" data-pay-mode @checked(! old('member_package_id', $memberPackageId))><span>{{ __('app.packages.pay_normal') }}</span></label>
+            <label><input type="radio" name="pay_mode" value="package" data-pay-mode @checked((bool) old('member_package_id', $memberPackageId))><span>{{ __('app.packages.pay_package') }}</span></label>
+        </div>
+        <p class="ls-hint" id="pkg-needs" hidden></p>
+        <div class="ls-pkg-options" id="pkg-options" role="radiogroup" aria-label="{{ __('app.packages.pick_package') }}" hidden></div>
+        <div class="ls-pkg-covered" id="pkg-covered" hidden><x-ui.icon name="check-circle" /><span></span></div>
+    </div>
+
+    <div id="pay-deposit">
     <div class="ls-pay-total-row">
         <span>{{ __('app.booking.payment.total') }}</span>
         <span class="ls-num" id="pay-total">&mdash;</span>
@@ -34,6 +51,7 @@
             <span class="ls-num" id="pay-remaining">&mdash;</span>
             <span class="ls-status" id="pay-status-text">&mdash;</span>
         </span>
+    </div>
     </div>
 
     <p class="ls-hint" id="pay-shared-note" hidden>{{ __('app.booking.payment.shared_estimate_note') }}</p>

@@ -25,7 +25,9 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\FinancialController as OwnerFinancialController;
 use App\Http\Controllers\HotspotUserController;
 use App\Http\Controllers\LanguageController;
+use App\Http\Controllers\MemberPackageController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PackageTemplateController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RoomController;
@@ -120,14 +122,10 @@ Route::middleware(['auth:owner,staff', 'subscription.active', 'staff.active'])->
     Route::middleware('feature:workspace')->group(function () {
         Route::get('/workspaces', [WorkspaceController::class, 'index'])->name('workspaces.index')->middleware('permission:workspaces.view');
 
-        // /workspaces/create must be registered before the /workspaces/{workspace}
-        // wildcard below, or "create" gets swallowed as a workspace ID.
         Route::middleware('permission:workspaces.manage')->group(function () {
             Route::get('/workspaces/create', [WorkspaceController::class, 'create'])->name('workspaces.create');
             Route::post('/workspaces', [WorkspaceController::class, 'store'])->name('workspaces.store');
         });
-
-        Route::get('/workspaces/{workspace}', [WorkspaceController::class, 'show'])->name('workspaces.show')->middleware('permission:workspaces.view');
 
         Route::middleware('permission:workspaces.manage')->group(function () {
             Route::get('/workspaces/{workspace}/edit', [WorkspaceController::class, 'edit'])->name('workspaces.edit');
@@ -184,6 +182,26 @@ Route::middleware(['auth:owner,staff', 'subscription.active', 'staff.active'])->
             Route::get('/bookings/room-options', [BookingController::class, 'roomOptions']);
             Route::get('/bookings', [BookingController::class, 'index']);
         });
+
+        // Hour Packages: the member's usable packages for the booking form,
+        // quick popup and start-session modal (before the {booking} wildcard).
+        Route::get('/bookings/package-options', [BookingController::class, 'packageOptions'])
+            ->middleware('permission:bookings.view,shared_sessions.manage');
+
+        // Hour Package templates + assigning/cancelling a member's packages.
+        Route::get('/packages', [PackageTemplateController::class, 'index'])->name('packages.index')->middleware('permission:packages.view');
+        Route::middleware('permission:packages.manage')->group(function () {
+            Route::get('/packages/create', [PackageTemplateController::class, 'create'])->name('packages.create');
+            Route::post('/packages', [PackageTemplateController::class, 'store'])->name('packages.store');
+            Route::get('/packages/{id}/edit', [PackageTemplateController::class, 'edit'])->name('packages.edit');
+            Route::put('/packages/{id}', [PackageTemplateController::class, 'update'])->name('packages.update');
+            Route::post('/packages/{id}/toggle', [PackageTemplateController::class, 'toggle'])->name('packages.toggle');
+            Route::delete('/packages/{id}', [PackageTemplateController::class, 'destroy'])->name('packages.destroy');
+        });
+        Route::middleware('permission:packages.assign')->group(function () {
+            Route::post('/users/{id}/packages', [MemberPackageController::class, 'store'])->name('member-packages.store');
+            Route::post('/member-packages/{id}/cancel', [MemberPackageController::class, 'cancel'])->name('member-packages.cancel');
+        });
         // /bookings/create must be registered before the /bookings/{booking}
         // wildcard below, or "create" gets swallowed as a booking ID.
         Route::middleware('permission:bookings.create')->group(function () {
@@ -202,7 +220,7 @@ Route::middleware(['auth:owner,staff', 'subscription.active', 'staff.active'])->
         Route::middleware('permission:bookings.edit,bookings.cancel')->group(function () {
             Route::post('/bookings/{booking}/status', [BookingController::class, 'updateStatus']);
         });
-        Route::delete('/bookings/{booking}', [BookingController::class, 'destroy'])->middleware('permission:bookings.cancel');
+        Route::delete('/bookings/{booking}', [BookingController::class, 'destroy'])->middleware('permission:bookings.delete');
 
         // Attaching products to a booking needs BOTH booking and sales features.
         Route::middleware(['feature:sales', 'permission:bookings.edit'])->group(function () {

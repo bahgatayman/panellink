@@ -55,6 +55,12 @@
                             <td class="px-4 py-3 font-medium text-gray-900">
                                 {{-- Real link: keeps the row reachable by keyboard and ctrl/middle-clickable. --}}
                                 <a href="/users/{{ $user->id }}" class="hover:text-blue-600">{{ $user->name }}</a>
+                                @if ($user->relationLoaded('packages') && ($pkg = $user->packages->first()))
+                                    @php $left = \App\Support\Duration::label($user->packages->sum(fn ($p) => $p->remainingMinutes())); @endphp
+                                    <div><span class="ls-pkg-pill {{ $pkg->isExpiringSoon() ? 'is-soon' : '' }}" title="{{ $user->packages->pluck('name')->implode(', ') }}">
+                                        <x-ui.icon name="clock" />{{ $pkg->isExpiringSoon() ? __('app.packages.expiring_left', ['time' => $left]) : __('app.packages.left', ['time' => $left]) }}
+                                    </span></div>
+                                @endif
                             </td>
                             <td class="px-4 py-3">{{ $user->phone }}</td>
                             @if($owner->hasFeature('hotspot'))

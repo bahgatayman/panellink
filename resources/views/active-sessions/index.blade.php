@@ -18,7 +18,7 @@
 
     <x-ui.page-header :title="__('app.session.active_sessions')" :count="$totalCount" :subtitle="__('app.ui.sessions.subtitle')">
         <x-slot:actions>
-            <x-ui.button variant="primary" icon="play" :href="route('active-sessions.create')">{{ __('app.ui.sessions.start_session') }}</x-ui.button>
+            <x-ui.button variant="primary" icon="play" data-ls-open="start-session-modal">{{ __('app.ui.sessions.start_session') }}</x-ui.button>
         </x-slot:actions>
     </x-ui.page-header>
 
@@ -75,7 +75,7 @@
     @if ($sessions->isEmpty())
         <div class="ls-card">
             <x-ui.empty-state illustration="quiet" :title="__('app.ui.sessions.empty_title')" :text="__('app.empty.no_active_sessions').' '.__('app.ui.sessions.empty_text')">
-                <x-ui.button variant="primary" icon="play" :href="route('active-sessions.create')">{{ __('app.ui.sessions.start_session') }}</x-ui.button>
+                <x-ui.button variant="primary" icon="play" data-ls-open="start-session-modal">{{ __('app.ui.sessions.start_session') }}</x-ui.button>
             </x-ui.empty-state>
         </div>
     @else
@@ -92,6 +92,241 @@
         </div>
     @endif
 </div>
+
+{{-- ===================== Start a new shared/walk-in session =====================
+     Was a standalone page (active-sessions/create); now a modal on this page so
+     starting a session never leaves it. Plain form POST to the existing
+     shared-sessions.store route — unchanged server-side, including its
+     redirect back to active-sessions.index on both success and validation
+     failure, which is exactly this page. --}}
+<x-ui.modal id="start-session-modal" :title="__('app.session.open_new_session')" size="wide">
+    <form id="start-session-form" method="POST" action="{{ route('shared-sessions.store') }}" style="display:grid;gap:18px">
+        @csrf
+
+        <div class="ls-field">
+            <label class="ls-label">{{ __('app.session.room') }}</label>
+            <div class="ls-qb-rooms">
+                @php
+                    // Only one shared area at all → pick it for the owner, nothing
+                    // to choose between. Two or more → leave it unselected rather
+                    // than guess which one they mean.
+                    $onlyRoom = $sharedRooms->count() === 1 ? $sharedRooms->first() : null;
+                @endphp
+                @foreach ($sharedRooms as $room)
+                    @php
+                        $available = max(0, $room->capacity - ($room->occupied_seats ?? 0));
+                        $isFull = $available <= 0;
+                        $selected = old('room_id') !== null
+                            ? old('room_id') == $room->id
+                            : ($onlyRoom && $onlyRoom->id === $room->id && ! $isFull);
+                    @endphp
+                    <label class="ls-qb-room {{ $isFull ? 'is-off' : '' }} {{ $selected ? 'is-selected' : '' }}">
+                        <input type="radio" name="room_id" value="{{ $room->id }}"
+                               data-capacity="{{ $room->capacity }}" data-available="{{ $available }}"
+                               data-default-rate="{{ \App\Support\Money::format((float) $room->price_per_hour).__('app.common.slash_hr') }}"
+                               data-profiles="{{ $room->activePricingProfiles->map(fn ($p) => ['id' => $p->id, 'label' => __('app.pricing_profiles.option', ['name' => $p->name, 'rate' => $p->rateLabel()])])->values()->toJson() }}"
+                               {{ $selected ? 'checked' : '' }} {{ $isFull ? 'disabled' : '' }} required>
+                        <span class="ls-qb-room-main">
+                            <b class="ls-trunc">{{ $room->workspace->name }} &rarr; {{ $room->name }}</b>
+                            <span class="ls-qb-room-meta">{{ __('app.workspace.rooms') }}</span>
+                        </span>
+                        <span class="ls-qb-room-price">
+                            <b>{{ $available }}/{{ $room->capacity }}</b>
+                            <small>{{ $isFull ? __('app.workspace.seats_full') : __('app.ui.sessions.shared_seats') }}</small>
+                        </span>
+                    </label>
+                @endforeach
+            </div>
+            @error('room_id') <p class="ls-error">{{ $message }}</p> @enderror
+        </div>
+
+        {{-- Pricing profile (alternative hourly rate) — only when the chosen room has profiles. --}}
+        <div class="ls-field ls-profile-pick" id="start-session-profile" hidden>
+            <label class="ls-label" for="start-session-profile-select">{{ __('app.pricing_profiles.pricing') }}</label>
+            <select name="room_pricing_profile_id" id="start-session-profile-select" class="ls-select" data-old="{{ old('room_pricing_profile_id') }}"></select>
+        </div>
+
+        <div class="ls-field">
+            <label class="ls-label" for="start-session-party">{{ __('app.session.party_size') }}</label>
+            <input type="number" name="party_size" id="start-session-party" min="1"
+                   value="{{ old('party_size', 1) }}" required class="ls-input" style="max-width:140px">
+            <p class="ls-hint">{{ __('app.session.party_size_hint') }}</p>
+            @error('party_size') <p class="ls-error">{{ $message }}</p> @enderror
+        </div>
+
+        <div class="ls-field relative">
+            @include('partials.member-picker', ['label' => __('app.session.user'), 'searchIcon' => true])
+            @error('hotspot_user_id') <p class="ls-error">{{ $message }}</p> @enderror
+        </div>
+
+        {{-- Hour package for the member's own seat — shown only when they have packages;
+             the actual time is deducted when the session closes (SharedSessionController). --}}
+        <input type="hidden" name="member_package_id" id="start-session-pkg" value="{{ old('member_package_id') }}">
+        <div class="ls-pkg-pay" id="start-session-pkg-box" hidden>
+            <div class="ls-inv-seg" role="radiogroup" aria-label="{{ __('app.packages.pay_title') }}">
+                <label><input type="radio" name="ss_pay_mode" value="normal" data-ss-pay-mode @checked(! old('member_package_id'))><span>{{ __('app.packages.pay_normal') }}</span></label>
+                <label><input type="radio" name="ss_pay_mode" value="package" data-ss-pay-mode @checked((bool) old('member_package_id'))><span>{{ __('app.packages.pay_package') }}</span></label>
+            </div>
+            <p class="ls-hint">{{ __('app.packages.session_hint') }}</p>
+            <div class="ls-pkg-options" id="start-session-pkg-options" hidden></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="ls-field">
+                <label class="ls-label" for="start-session-date">{{ __('app.session.date') }}</label>
+                <input type="date" name="session_date" id="start-session-date"
+                       value="{{ old('session_date', now()->format('Y-m-d')) }}" required class="ls-input">
+                @error('session_date') <p class="ls-error">{{ $message }}</p> @enderror
+            </div>
+            <div class="ls-field">
+                <label class="ls-label" for="start-session-time">{{ __('app.session.start') }}</label>
+                <input type="time" name="start_time" id="start-session-time"
+                       value="{{ old('start_time', now()->format('H:i')) }}" required class="ls-input">
+                @error('start_time') <p class="ls-error">{{ $message }}</p> @enderror
+            </div>
+        </div>
+    </form>
+
+    <x-slot:footer>
+        <x-ui.button variant="ghost" data-ls-close>{{ __('app.common.cancel') }}</x-ui.button>
+        <div class="ls-push">
+            <x-ui.button type="submit" form="start-session-form" variant="primary" icon="play">{{ __('app.session.open_session') }}</x-ui.button>
+        </div>
+    </x-slot:footer>
+</x-ui.modal>
+
+@if ($errors->any() && old('room_id') !== null)
+    <script>document.addEventListener('DOMContentLoaded', () => LS.open('start-session-modal'));</script>
+@endif
+
+<script>
+(function () {
+    const partyInput = document.getElementById('start-session-party');
+    if (!partyInput) return;
+
+    // The server-rendered default (now()->format('H:i')) is only "now" at the
+    // moment the page itself was loaded — since this modal lives inline in the
+    // page instead of being its own freshly-rendered route anymore, re-stamp
+    // both fields with the browser's actual current time each time it's
+    // opened, so leaving the tab open for a while doesn't leave a stale time.
+    // Skipped only when re-showing the form after a validation error (not
+    // merely because a room happens to be pre-checked — the lone-shared-area
+    // default-select below also leaves a radio checked on a plain page load).
+    const modal = document.getElementById('start-session-modal');
+    const dateInput = document.getElementById('start-session-date');
+    const timeInput = document.getElementById('start-session-time');
+    @php $isValidationRedisplay = old('room_id') !== null; @endphp
+    const isValidationRedisplay = @json($isValidationRedisplay);
+    if (modal && !isValidationRedisplay) {
+        modal.addEventListener('ls:open', () => {
+            const now = new Date();
+            dateInput.value = now.toLocaleDateString('en-CA'); // YYYY-MM-DD, locale-independent
+            timeInput.value = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+        });
+    }
+
+    function syncMax() {
+        const checked = document.querySelector('#start-session-form input[name="room_id"]:checked');
+        const available = checked ? parseInt(checked.dataset.available || '0', 10) : null;
+        if (available) {
+            partyInput.max = available;
+            if (parseInt(partyInput.value, 10) > available) partyInput.value = available;
+        } else {
+            partyInput.removeAttribute('max');
+        }
+    }
+
+    // Pricing select: Default — room rate, then the room's active profiles.
+    const profileBox = document.getElementById('start-session-profile');
+    const profileSelect = document.getElementById('start-session-profile-select');
+    const DEFAULT_OPTION = @json(__('app.pricing_profiles.default_option', ['rate' => ':rate']));
+    function syncProfiles() {
+        const checked = document.querySelector('#start-session-form input[name="room_id"]:checked');
+        let profiles = [];
+        try { profiles = checked ? JSON.parse(checked.dataset.profiles || '[]') : []; } catch (e) { profiles = []; }
+        profileBox.hidden = !profiles.length;
+        const keep = profileSelect.value || profileSelect.dataset.old || '';
+        profileSelect.innerHTML = '';
+        if (!profiles.length) return;
+        profileSelect.add(new Option(DEFAULT_OPTION.replace(':rate', checked.dataset.defaultRate), ''));
+        profiles.forEach((p) => profileSelect.add(new Option(p.label, p.id)));
+        profileSelect.value = profiles.some((p) => String(p.id) === String(keep)) ? keep : '';
+        profileSelect.dataset.old = '';
+    }
+
+    document.querySelectorAll('#start-session-form input[name="room_id"]').forEach((radio) => {
+        radio.addEventListener('change', function () {
+            document.querySelectorAll('#start-session-form .ls-qb-room').forEach((label) => label.classList.remove('is-selected'));
+            this.closest('.ls-qb-room').classList.add('is-selected');
+            profileSelect.value = ''; // profiles belong to one room
+            syncMax();
+            syncProfiles();
+        });
+    });
+    syncMax();
+    syncProfiles();
+
+    // --- Hour package (member's own seat; eligibility from the server) ---
+    @php $ssPkgI18n = ['expires' => __('app.packages.expires_short'), 'left' => __('app.packages.left')]; @endphp
+    const PK = @json($ssPkgI18n);
+    const pkgInput = document.getElementById('start-session-pkg');
+    const pkgBox = document.getElementById('start-session-pkg-box');
+    const pkgOpts = document.getElementById('start-session-pkg-options');
+    const userInput = document.getElementById('selected-user-id');
+    let pkgs = [], pkgTimer = null, pkgToken = 0;
+    const mode = () => (document.querySelector('[data-ss-pay-mode]:checked') || {}).value || 'normal';
+    function renderPkgs() {
+        pkgBox.hidden = !pkgs.length;
+        const use = mode() === 'package' && pkgs.length;
+        pkgOpts.hidden = !use;
+        pkgOpts.innerHTML = '';
+        if (!use) { pkgInput.value = ''; return; }
+        if (!pkgs.some((p) => p.eligible && String(p.id) === String(pkgInput.value))) {
+            const first = pkgs.find((p) => p.eligible); pkgInput.value = first ? first.id : '';
+        }
+        pkgs.forEach((p) => {
+            const el = document.createElement('label');
+            el.className = 'ls-pkg-opt' + (p.eligible ? '' : ' is-disabled');
+            el.innerHTML = '<input type="radio" name="ss-pkg"><span class="ls-pkg-opt-main"><span class="ls-pkg-opt-name"></span><span class="ls-pkg-opt-meta"></span></span><span class="ls-pkg-opt-left"></span>';
+            const input = el.querySelector('input');
+            input.disabled = !p.eligible; input.checked = String(p.id) === String(pkgInput.value);
+            el.querySelector('.ls-pkg-opt-name').textContent = p.name;
+            el.querySelector('.ls-pkg-opt-meta').textContent = PK.expires.replace(':date', p.expires_label);
+            el.querySelector('.ls-pkg-opt-left').textContent = PK.left.replace(':time', p.remaining_label);
+            if (p.reason) { const w = document.createElement('span'); w.className = 'ls-pkg-opt-reason'; w.textContent = p.reason; el.querySelector('.ls-pkg-opt-main').appendChild(w); }
+            input.addEventListener('change', () => { pkgInput.value = p.id; });
+            pkgOpts.appendChild(el);
+        });
+    }
+    function fetchPkgs() {
+        clearTimeout(pkgTimer);
+        pkgTimer = setTimeout(() => {
+            const uid = userInput ? userInput.value : '';
+            if (!uid) { pkgs = []; renderPkgs(); return; }
+            const room = document.querySelector('#start-session-form input[name="room_id"]:checked');
+            const params = new URLSearchParams({ hotspot_user_id: uid, context: 'session', party_size: partyInput.value || 1 });
+            if (room) params.set('room_id', room.value);
+            const token = ++pkgToken;
+            fetch(`/bookings/package-options?${params}`, { headers: { Accept: 'application/json' } })
+                .then((r) => r.ok ? r.json() : { packages: [] })
+                .then((d) => { if (token === pkgToken) { pkgs = d.packages || []; renderPkgs(); } })
+                .catch(() => {});
+        }, 150);
+    }
+    document.querySelectorAll('[data-ss-pay-mode]').forEach((r) => r.addEventListener('change', renderPkgs));
+    document.querySelectorAll('#start-session-form input[name="room_id"]').forEach((r) => r.addEventListener('change', fetchPkgs));
+    partyInput.addEventListener('input', fetchPkgs);
+    if (typeof window.selectUser === 'function') {
+        const baseSelect = window.selectUser;
+        window.selectUser = function (...args) { baseSelect(...args); fetchPkgs(); };
+    }
+    if (typeof window.clearUserSelection === 'function') {
+        const baseClear = window.clearUserSelection;
+        window.clearUserSelection = function (...args) { baseClear(...args); fetchPkgs(); };
+    }
+    fetchPkgs();
+})();
+</script>
 
 {{-- ===================== Shared session: add products + check out =====================
      One modal serves both actions (as before); the title, note and primary button reflect
@@ -117,6 +352,7 @@
             <dt>{{ __('app.session.time') }}</dt><dd><bdi id="modal-time" class="ls-num" dir="ltr"></bdi></dd>
             <dt>{{ __('app.session.duration') }}</dt><dd><span id="modal-duration"></span><span id="modal-billed-row" hidden class="ls-faint" style="display:block;font-size:12px;font-weight:400"><span id="modal-billed"></span></span></dd>
             <dt>{{ __('app.session.rate') }}</dt><dd id="modal-rate"></dd>
+            <dt id="modal-pkg-label" hidden>{{ __('app.packages.covered_by') }}</dt><dd id="modal-pkg-row" hidden><span id="modal-pkg"></span></dd>
         </dl>
 
         @if ($canSell)
@@ -221,6 +457,7 @@
     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
     const RTL = document.documentElement.dir === 'rtl';
     const SALES_ENABLED = @json($canSell);
+    const PKG_COVERED = @json(__('app.packages.covered_total'));
     const S = @json(__('app.ui.sessions'));
     const L = {
         usedVsBilled: @json(__('app.session.used_vs_billed')),
@@ -294,7 +531,15 @@
         show('modal-billed-row', !!data.billed_duration);
         if (data.billed_duration) $('modal-billed').textContent = fill(L.usedVsBilled, { used: data.duration, billed: data.billed_duration });
 
-        const total = SALES_ENABLED ? data.grand_total : data.total_price;
+        // Hour package chosen at open: covers the room time, or says why it can't.
+        const pkg = data.package;
+        show('modal-pkg-label', !!pkg); show('modal-pkg-row', !!pkg);
+        if (pkg) {
+            $('modal-pkg').textContent = pkg.message;
+            if (pkg.covers) $('modal-total').textContent = PKG_COVERED.replace(':time', pkg.hours);
+        }
+        data.collect = SALES_ENABLED ? data.grand_total : (pkg && pkg.covers ? '0.00' : data.total_price);
+        const total = data.collect;
         if (SALES_ENABLED) {
             $('modal-items-total').textContent = money(data.items_total);
             $('modal-grand-total').textContent = money(data.grand_total);
@@ -346,7 +591,7 @@
         .then(r => r.json())
         .then(data => {
             if (!data.success) { LS.busy(btn, false); LS.toast(data.message || L.closeFailed, { tone: 'danger' }); return; }
-            const amount = preview ? (SALES_ENABLED ? preview.grand_total : preview.total_price) : '';
+            const amount = preview ? preview.collect : '';
             LS.reloadWithToast(fill(S.settled, { amount: money(amount), name: preview ? preview.user_name : '' }));
         })
         .catch(() => { LS.busy(btn, false); LS.toast(L.closeFailed, { tone: 'danger' }); });

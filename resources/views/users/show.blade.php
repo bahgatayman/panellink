@@ -83,6 +83,10 @@
         </div>
     </div>
 
+    @if ($showPackages)
+        @include('users._package-summary')
+    @endif
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {{-- ── Left + centre ───────────────────────────────────────────── --}}
@@ -175,6 +179,10 @@
                     </p>
                 </div>
             </div>
+
+            @if ($showPackages)
+                @include('users._packages')
+            @endif
 
             {{-- Booking history --}}
             @if ($owner->hasFeature('booking'))
